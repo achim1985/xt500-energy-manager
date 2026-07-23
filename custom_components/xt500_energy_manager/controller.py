@@ -348,6 +348,16 @@ def calculate_control(data: ControlInput, cfg: ControlSettings) -> ControlResult
     if load_backfeed <= 0:
         raw_grid_target += load_grid_target
     desired_load_output = max(positive_load - load_grid_target, 0.0)
+    # Compensate the observed difference between the XT500 command and its
+    # actual grid-port output. This keeps the topology feed-forward target while
+    # closing the loop around conversion losses, device lag, and derating.
+    feedback_grid_target = raw_grid_target + (
+        data.current_grid_setpoint - grid_port
+    )
+    feedback_inverter_target = desired_load_output + max(
+        feedback_grid_target,
+        0.0,
+    )
     pv_direct_target = min(
         max(estimated_home_load + cfg.target_grid_power, 0.0),
         max(data.pv_power, 0.0),
@@ -366,7 +376,7 @@ def calculate_control(data: ControlInput, cfg: ControlSettings) -> ControlResult
     elif pv_direct:
         grid_target = pv_direct_target
     else:
-        grid_target = raw_grid_target
+        grid_target = feedback_grid_target
 
     min_grid = -cfg.grid_limit
     max_grid = cfg.grid_limit
@@ -376,7 +386,12 @@ def calculate_control(data: ControlInput, cfg: ControlSettings) -> ControlResult
         max_grid = 0.0
     grid_target = clamp(grid_target, min_grid, max_grid)
 
-    inverter_target = pv_direct_target if (pv_direct or grid_charge_only) else raw_is_target
+    if pv_direct or grid_charge_only:
+        inverter_target = pv_direct_target
+    elif not charge_active and active_mode == BASE_NORMAL:
+        inverter_target = feedback_inverter_target
+    else:
+        inverter_target = raw_is_target
     if discharge_blocked:
         inverter_target = min(inverter_target, max(data.pv_power, 0.0))
     inverter_target = clamp(inverter_target, 0.0, cfg.inverter_limit)

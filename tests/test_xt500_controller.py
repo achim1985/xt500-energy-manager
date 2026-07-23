@@ -111,6 +111,99 @@ class ControllerTest(unittest.TestCase):
         self.assertFalse(result.target_reached)
         self.assertEqual(result.status, "normal")
 
+    def test_normal_operation_compensates_sustained_grid_import(self):
+        result = controller.calculate_control(
+            self.input(
+                grid_power=79,
+                grid_port_power=173,
+                load_port_power=0,
+                current_grid_setpoint=250,
+                current_inverter_setpoint=251,
+            ),
+            controller.ControlSettings(
+                charge_active=False,
+                target_grid_power=-10,
+                meter_export_positive=False,
+            ),
+        )
+        self.assertEqual(result.normalized_grid_power, -79)
+        self.assertEqual(result.recommended_grid_setpoint, 319)
+        self.assertEqual(result.recommended_inverter_setpoint, 319)
+
+    def test_normal_operation_compensates_grid_export(self):
+        result = controller.calculate_control(
+            self.input(
+                grid_power=-100,
+                grid_port_power=400,
+                load_port_power=0,
+                current_grid_setpoint=300,
+                current_inverter_setpoint=300,
+            ),
+            controller.ControlSettings(
+                charge_active=False,
+                target_grid_power=-10,
+                meter_export_positive=False,
+            ),
+        )
+        self.assertEqual(result.normalized_grid_power, 100)
+        self.assertEqual(result.recommended_grid_setpoint, 190)
+        self.assertEqual(result.recommended_inverter_setpoint, 190)
+
+    def test_normal_feedback_preserves_load_port_output(self):
+        result = controller.calculate_control(
+            self.input(
+                grid_power=79,
+                grid_port_power=173,
+                load_port_power=300,
+                current_grid_setpoint=250,
+                current_inverter_setpoint=550,
+            ),
+            controller.ControlSettings(
+                charge_active=False,
+                target_grid_power=-10,
+                meter_export_positive=False,
+            ),
+        )
+        self.assertEqual(result.recommended_grid_setpoint, 319)
+        self.assertEqual(result.recommended_inverter_setpoint, 619)
+
+    def test_normal_feedback_respects_configured_output_limits(self):
+        result = controller.calculate_control(
+            self.input(
+                grid_power=500,
+                grid_port_power=2300,
+                load_port_power=0,
+                current_grid_setpoint=2390,
+                current_inverter_setpoint=2390,
+            ),
+            controller.ControlSettings(
+                charge_active=False,
+                target_grid_power=-10,
+                grid_limit=2400,
+                inverter_limit=2400,
+                meter_export_positive=False,
+            ),
+        )
+        self.assertEqual(result.recommended_grid_setpoint, 2400)
+        self.assertEqual(result.recommended_inverter_setpoint, 2400)
+
+    def test_grid_charge_does_not_use_normal_feedback_correction(self):
+        result = controller.calculate_control(
+            self.input(
+                grid_power=500,
+                current_grid_setpoint=900,
+                current_inverter_setpoint=900,
+            ),
+            controller.ControlSettings(
+                charge_active=True,
+                charge_source="manual",
+                charge_mode="grid_charge",
+                charge_power=600,
+                meter_export_positive=False,
+            ),
+        )
+        self.assertEqual(result.recommended_grid_setpoint, -600)
+
     def test_charge_limit_returns_to_normal_after_target_charge(self):
         self.assertEqual(
             controller.select_charge_limit(
@@ -235,7 +328,12 @@ class ControllerTest(unittest.TestCase):
 
     def test_xt500_pro_keeps_2400_watt_range(self):
         result = controller.calculate_control(
-            self.input(grid_power=2100, grid_port_power=300),
+            self.input(
+                grid_power=2100,
+                grid_port_power=300,
+                current_grid_setpoint=300,
+                current_inverter_setpoint=300,
+            ),
             controller.ControlSettings(
                 grid_limit=2400,
                 inverter_limit=2400,

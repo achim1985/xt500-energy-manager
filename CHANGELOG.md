@@ -1,5 +1,14 @@
 # Änderungsprotokoll
 
+## Unveröffentlicht
+
+- Normalbetrieb gleicht jetzt zusätzlich die Differenz zwischen angefordertem
+  XT500-Sollwert und tatsächlich gemessener Netzanschlussleistung aus
+- dauerhafter kleiner Netzbezug durch Wandlungsverluste, Verzögerung oder
+  Leistungsabweichungen des XT500 wird begrenzt nachgeregelt
+- Ziellademodi, PV-Überschussbetrieb, Lastanschluss-Aufteilung und bestehende
+  Leistungsgrenzen bleiben unverändert
+
 ## 1.1.0
 
 - Zyklusladung kann unabhängig von der Fälligkeit sofort manuell gestartet
