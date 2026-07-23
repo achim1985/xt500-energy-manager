@@ -97,13 +97,6 @@ class XT500Sensor(XT500Entity, SensorEntity):
             attrs.update(
                 {
                     "error": self.runtime.control_error_message,
-                    "last_control_write": self.runtime.last_control_write,
-                    "control_ready": self.runtime.control_ready,
-                    "control_band": self.runtime.control_profile.band,
-                    "control_error_w": round(self.runtime.control_error, 1),
-                    "effective_interval_s": self.runtime.effective_control_interval,
-                    "maximum_change_w": self.runtime.control_profile.maximum_change,
-                    "feedback_ready": self.runtime.feedback_ready,
                     "recovery_status": self.runtime.recovery_status,
                     "recovery_attempts": self.runtime.recovery_attempts,
                     "recovery_max_attempts": self.runtime.recovery_max_attempts,

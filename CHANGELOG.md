@@ -8,6 +8,9 @@
   Leistungsabweichungen des XT500 wird begrenzt nachgeregelt
 - Ziellademodi, PV-Überschussbetrieb, Lastanschluss-Aufteilung und bestehende
   Leistungsgrenzen bleiben unverändert
+- schnell wechselnde Regelwerte werden nicht mehr zusätzlich als Attribute des
+  Statussensors gespeichert; sie bleiben als eigene Live-Entitäten und im
+  Diagnosebericht verfügbar
 
 ## 1.1.0
 
