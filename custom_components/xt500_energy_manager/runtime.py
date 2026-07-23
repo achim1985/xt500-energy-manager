@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Callable
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, time, timedelta
 import logging
 from time import monotonic
 from typing import Any
@@ -13,7 +13,10 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EVENT_HOMEASSISTANT_STARTED
 from homeassistant.core import Event, HomeAssistant, State, callback
 from homeassistant.exceptions import HomeAssistantError
-from homeassistant.helpers.event import async_track_state_change_event
+from homeassistant.helpers.event import (
+    async_track_state_change_event,
+    async_track_time_change,
+)
 from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
@@ -47,7 +50,10 @@ from .const import (
     SETTING_CONTROL_SMALL_MAX_STEP,
     SETTING_CONTROL_SLOW_INTERVAL,
     SETTING_CYCLE_REFERENCE,
+    SETTING_CYCLE_AUTOMATIC_ACTIVE,
+    SETTING_CYCLE_CHECK_TIME,
     SETTING_CYCLE_INTERVAL_DAYS,
+    SETTING_CYCLE_MANUAL_ACTIVE,
     SETTING_FEEDBACK_SETTLE_TIME,
     SETTING_LAST_FULL,
     SETTING_MANUAL_ACTIVE,
@@ -74,6 +80,7 @@ from .controller import (
     cycle_is_due,
     feedback_samples_are_fresh,
     limit_setpoint_change,
+    next_cycle_check_at,
     overall_control_error,
     RECOVERY_DELAY_MULTIPLIERS,
     recovery_delay_seconds,
@@ -124,6 +131,7 @@ class XT500Runtime:
         self._listeners: set[Callable[[], None]] = set()
         self._unsub_state: Callable[[], None] | None = None
         self._unsub_started: Callable[[], None] | None = None
+        self._unsub_cycle_check: Callable[[], None] | None = None
         self._control_apply_task: asyncio.Task | None = None
         self._startup_ready_task: asyncio.Task | None = None
         self._control_apply_requested = False
@@ -198,9 +206,14 @@ class XT500Runtime:
             self.settings[SETTING_CYCLE_REFERENCE] = dt_util.now().isoformat()
             migrated = True
 
+        if self._automatic_cycle_should_start_now():
+            self.settings[SETTING_CYCLE_AUTOMATIC_ACTIVE] = True
+            migrated = True
+
         if migrated:
             await self._store.async_save(self.settings)
 
+        self._schedule_cycle_check()
         self._unsub_state = async_track_state_change_event(
             self.hass, self.source_entities, self._async_state_changed
         )
@@ -228,6 +241,9 @@ class XT500Runtime:
         if self._unsub_state:
             self._unsub_state()
             self._unsub_state = None
+        if self._unsub_cycle_check:
+            self._unsub_cycle_check()
+            self._unsub_cycle_check = None
 
     @callback
     def _async_home_assistant_started(self, _event: Event) -> None:
@@ -352,9 +368,18 @@ class XT500Runtime:
             self._store.async_delay_save(lambda: self.settings, 1)
             manual_active = False
 
-        automatic_active = self.automatic_cycle_requested
-        charge_active = manual_active or automatic_active
-        source = "manual" if manual_active else "automatic" if automatic_active else "none"
+        manual_cycle_active = self.manual_cycle_requested
+        automatic_cycle_active = self.automatic_cycle_requested
+        charge_active = manual_active or manual_cycle_active or automatic_cycle_active
+        source = (
+            "manual"
+            if manual_active
+            else "cycle_manual"
+            if manual_cycle_active
+            else "cycle_automatic"
+            if automatic_cycle_active
+            else "none"
+        )
         mode = (
             self.settings[SETTING_MANUAL_MODE]
             if manual_active
@@ -429,12 +454,21 @@ class XT500Runtime:
         """Record one full-charge event when SOC crosses the automatic target."""
         target = float(self.settings[SETTING_AUTO_TARGET_SOC])
         if soc >= target:
+            changed = False
             if not self._full_soc_latched:
                 timestamp = dt_util.now().isoformat()
                 self.settings[SETTING_LAST_FULL] = timestamp
                 self.settings[SETTING_CYCLE_REFERENCE] = timestamp
-                self._store.async_delay_save(lambda: self.settings, 1)
                 self._full_soc_latched = True
+                changed = True
+            if bool(self.settings[SETTING_CYCLE_MANUAL_ACTIVE]) or bool(
+                self.settings[SETTING_CYCLE_AUTOMATIC_ACTIVE]
+            ):
+                self.settings[SETTING_CYCLE_MANUAL_ACTIVE] = False
+                self.settings[SETTING_CYCLE_AUTOMATIC_ACTIVE] = False
+                changed = True
+            if changed:
+                self._store.async_delay_save(lambda: self.settings, 1)
         elif soc < target - 1:
             self._full_soc_latched = False
 
@@ -457,25 +491,126 @@ class XT500Runtime:
 
     @property
     def next_cycle_at(self) -> str | None:
-        """Return the next scheduled automatic full-charge timestamp."""
+        """Return the next daily check at which a due cycle may start."""
         baseline = self._setting_datetime(
             SETTING_LAST_FULL
         ) or self._setting_datetime(SETTING_CYCLE_REFERENCE)
         if baseline is None:
             return None
-        return (
-            baseline
-            + timedelta(days=float(self.settings[SETTING_CYCLE_INTERVAL_DAYS]))
+        return next_cycle_check_at(
+            baseline=baseline,
+            interval_days=float(self.settings[SETTING_CYCLE_INTERVAL_DAYS]),
+            check_time=self.cycle_check_time,
         ).isoformat()
+
+    @property
+    def cycle_check_time(self) -> time:
+        """Return the configured local daily cycle-check time."""
+        value = self.settings.get(SETTING_CYCLE_CHECK_TIME)
+        if isinstance(value, str):
+            try:
+                return time.fromisoformat(value)
+            except ValueError:
+                pass
+        return time(hour=12)
+
+    @callback
+    def _schedule_cycle_check(self) -> None:
+        """Schedule the persistent local-time daily cycle check."""
+        if self._unsub_cycle_check:
+            self._unsub_cycle_check()
+        check_time = self.cycle_check_time
+        self._unsub_cycle_check = async_track_time_change(
+            self.hass,
+            self._async_cycle_check,
+            hour=check_time.hour,
+            minute=check_time.minute,
+            second=check_time.second,
+        )
+
+    @callback
+    def _async_cycle_check(self, _now: datetime) -> None:
+        """Start one due automatic cycle at the configured daily check."""
+        if not self._activate_automatic_cycle_if_due():
+            return
+        self._store.async_delay_save(lambda: self.settings, 1)
+        self.async_calculate()
+
+    def _automatic_cycle_should_start_now(self) -> bool:
+        """Return whether the first eligible daily check has already passed."""
+        if (
+            not bool(self.settings[SETTING_AUTO_ENABLED])
+            or bool(self.settings[SETTING_CYCLE_MANUAL_ACTIVE])
+            or bool(self.settings[SETTING_CYCLE_AUTOMATIC_ACTIVE])
+            or not self.cycle_due
+        ):
+            return False
+        baseline = self._setting_datetime(
+            SETTING_LAST_FULL
+        ) or self._setting_datetime(SETTING_CYCLE_REFERENCE)
+        if baseline is None:
+            return False
+        scheduled = next_cycle_check_at(
+            baseline=baseline,
+            interval_days=float(self.settings[SETTING_CYCLE_INTERVAL_DAYS]),
+            check_time=self.cycle_check_time,
+        )
+        return dt_util.now() >= scheduled
+
+    @callback
+    def _activate_automatic_cycle_if_due(self) -> bool:
+        """Latch one automatic cycle when monitoring is enabled and due."""
+        if (
+            not bool(self.settings[SETTING_AUTO_ENABLED])
+            or bool(self.settings[SETTING_CYCLE_MANUAL_ACTIVE])
+            or bool(self.settings[SETTING_CYCLE_AUTOMATIC_ACTIVE])
+            or not self.cycle_due
+        ):
+            return False
+        self.settings[SETTING_CYCLE_AUTOMATIC_ACTIVE] = True
+        return True
+
+    @property
+    def manual_cycle_requested(self) -> bool:
+        """Return whether a manually started cycle currently requests charging."""
+        return self.regulation_enabled and bool(
+            self.settings[SETTING_CYCLE_MANUAL_ACTIVE]
+        )
 
     @property
     def automatic_cycle_requested(self) -> bool:
         """Return whether the integration currently requests an automatic cycle."""
-        return (
-            self.regulation_enabled
-            and bool(self.settings[SETTING_AUTO_ENABLED])
-            and self.cycle_due
+        return self.regulation_enabled and bool(
+            self.settings[SETTING_CYCLE_AUTOMATIC_ACTIVE]
         )
+
+    @property
+    def cycle_charge_active(self) -> bool:
+        """Return whether a cycle request is actively controlling the battery."""
+        return (
+            self.data_valid
+            and not bool(self.settings[SETTING_MANUAL_ACTIVE])
+            and (self.manual_cycle_requested or self.automatic_cycle_requested)
+        )
+
+    @property
+    def cycle_state(self) -> str:
+        """Return an explicit monitoring-versus-charging cycle state."""
+        manual = bool(self.settings[SETTING_CYCLE_MANUAL_ACTIVE])
+        automatic = bool(self.settings[SETTING_CYCLE_AUTOMATIC_ACTIVE])
+        if manual or automatic:
+            if (
+                not self.regulation_enabled
+                or not self.data_valid
+                or bool(self.settings[SETTING_MANUAL_ACTIVE])
+            ):
+                return "paused"
+            return "manual_active" if manual else "automatic_active"
+        if not bool(self.settings[SETTING_AUTO_ENABLED]):
+            return "monitoring_disabled"
+        if self.cycle_due:
+            return "due_waiting"
+        return "monitoring"
 
     @property
     def regulation_enabled(self) -> bool:
@@ -1106,11 +1241,35 @@ class XT500Runtime:
 
     @property
     def days_since_full(self) -> float | None:
-        """Return elapsed days since the last observed automatic target SOC."""
-        value = self.settings.get(SETTING_LAST_FULL)
-        if not value or (last_full := dt_util.parse_datetime(value)) is None:
+        """Return elapsed days in the current full-charge cycle."""
+        baseline = self._setting_datetime(
+            SETTING_LAST_FULL
+        ) or self._setting_datetime(SETTING_CYCLE_REFERENCE)
+        if baseline is None:
             return None
-        return round(max((dt_util.now() - last_full).total_seconds(), 0) / 86400, 1)
+        return round(max((dt_util.now() - baseline).total_seconds(), 0) / 86400, 1)
+
+    async def async_start_manual_cycle(self) -> None:
+        """Start a cycle charge immediately with the configured cycle mode."""
+        if not self.regulation_enabled:
+            raise HomeAssistantError(
+                "Die Regelung muss vor dem Start der Zyklusladung aktiv sein."
+            )
+        self.settings[SETTING_MANUAL_ACTIVE] = False
+        self.settings[SETTING_CYCLE_AUTOMATIC_ACTIVE] = False
+        self.settings[SETTING_CYCLE_MANUAL_ACTIVE] = True
+        await self._store.async_save(self.settings)
+        self.async_calculate()
+
+    async def async_reset_cycle(self) -> None:
+        """Reset elapsed cycle days and stop any current cycle charge."""
+        self.settings[SETTING_LAST_FULL] = None
+        self.settings[SETTING_CYCLE_REFERENCE] = dt_util.now().isoformat()
+        self.settings[SETTING_CYCLE_MANUAL_ACTIVE] = False
+        self.settings[SETTING_CYCLE_AUTOMATIC_ACTIVE] = False
+        self._full_soc_latched = False
+        await self._store.async_save(self.settings)
+        self.async_calculate()
 
     @callback
     def async_set_setting(self, key: str, value: Any) -> None:
@@ -1123,6 +1282,16 @@ class XT500Runtime:
             and self._setting_datetime(SETTING_CYCLE_REFERENCE) is None
         ):
             self.settings[SETTING_CYCLE_REFERENCE] = dt_util.now().isoformat()
+        if key == SETTING_AUTO_ENABLED:
+            if bool(value):
+                if self._automatic_cycle_should_start_now():
+                    self.settings[SETTING_CYCLE_AUTOMATIC_ACTIVE] = True
+            else:
+                self.settings[SETTING_CYCLE_AUTOMATIC_ACTIVE] = False
+        elif key == SETTING_CYCLE_CHECK_TIME:
+            self._schedule_cycle_check()
+            if self._automatic_cycle_should_start_now():
+                self.settings[SETTING_CYCLE_AUTOMATIC_ACTIVE] = True
         self._store.async_delay_save(lambda: self.settings, 1)
         if key == SETTING_AUTOMATIC_RECOVERY_ENABLED:
             self._cancel_recovery_task()

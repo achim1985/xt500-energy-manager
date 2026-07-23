@@ -21,7 +21,8 @@ class XT500BinaryDescription(BinarySensorEntityDescription):
 
 BINARY_SENSORS = (
     XT500BinaryDescription(key="data_valid", translation_key="data_valid", icon="mdi:database-check", value_fn=lambda r: r.data_valid),
-    XT500BinaryDescription(key="cycle_due", translation_key="cycle_due", icon="mdi:battery-sync", value_fn=lambda r: r.automatic_cycle_requested),
+    XT500BinaryDescription(key="cycle_due", translation_key="cycle_due", icon="mdi:calendar-alert", value_fn=lambda r: r.cycle_due),
+    XT500BinaryDescription(key="cycle_charge_active", translation_key="cycle_charge_active", icon="mdi:battery-sync", value_fn=lambda r: r.cycle_charge_active),
     XT500BinaryDescription(key="charge_request", translation_key="charge_request", icon="mdi:battery-arrow-up", value_fn=lambda r: r.charge_request_active),
     XT500BinaryDescription(key="control_ready", translation_key="control_ready", icon="mdi:shield-check", value_fn=lambda r: r.control_ready),
     XT500BinaryDescription(key="feedback_ready", translation_key="feedback_ready", icon="mdi:database-sync", value_fn=lambda r: r.feedback_ready),

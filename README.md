@@ -2,7 +2,8 @@
 
 Home-Assistant-Integration zur produktiven Regelung von SunEnergyXT XT500 und
 XT500 Pro. Sie übernimmt Nulleinspeisung, normales Laden, manuelle Zielladung,
-automatische Zyklusladung und die Begrenzung der Wechselrichterleistung.
+manuelle und zeitgesteuerte Zyklusladung sowie die Begrenzung der
+Wechselrichterleistung.
 
 > [!NOTE]
 > Dies ist ein unabhängiges Community-Projekt und keine offizielle
@@ -191,9 +192,10 @@ Messwertes prüfen.
 Die Strategie erzeugt automatisch zwei Ansichten:
 
 - **Speicher:** Status, Speicherstand, Leistungsflüsse und Schnellsteuerung
-  für Regelung, manuelle Zielladung und Zyklusladung Automatik
-- **Einstellungen:** Anleitung, manuelle Zielladung, Zyklusladung Automatik,
-  Normalbetrieb und erweiterte Regelparameter
+  für Regelung, manuelle Zielladung und Zyklusladung
+- **Einstellungen:** Anleitung, manuelle Zielladung, Zyklusüberwachung,
+  tägliche Prüfzeit, manueller Zyklusstart, Normalbetrieb und erweiterte
+  Regelparameter
 
 ### Einstellungsansicht nicht übersehen
 
@@ -221,7 +223,7 @@ Karten.
 5. Als URL exakt eintragen:
 
    ```text
-   /xt500_energy_manager/xt500-energy-dashboard-strategy.js?v=1.0.7
+   /xt500_energy_manager/xt500-energy-dashboard-strategy.js?v=1.1.0
    ```
 
 6. Als Ressourcentyp **JavaScript-Modul** auswählen.
@@ -307,11 +309,42 @@ Damit kann das Ziel auch nachts oder bei schlechtem Wetter erreicht werden.
 Vorhandene PV-Leistung wird genutzt und zusätzlich ist Netzladung mit der
 eingestellten AC-Leistung erlaubt.
 
+### Zyklusladung
+
+Die Zyklusladung verwendet ihren eigenen **Lademodus** und ihr eigenes
+**Vollladeziel**:
+
+- **Automatische Zyklusüberwachung** zählt die Tage seit dem letzten erreichten
+  Vollladeziel beziehungsweise seit dem letzten manuellen Zurücksetzen. Der
+  eingeschaltete Schalter bedeutet nur, dass überwacht wird – noch nicht, dass
+  gerade geladen wird.
+- Ist das Intervall abgelaufen, lautet der Zyklusstatus
+  **Fällig – wartet auf tägliche Prüfzeit**. Erst zur eingestellten
+  **täglichen Prüfzeit** wird die Zyklusladung im ausgewählten Modus gestartet.
+- **Zyklusladung jetzt manuell starten** startet sofort, auch wenn das
+  Intervall noch nicht abgelaufen ist. Die automatische Überwachung wird
+  dadurch nicht umgeschaltet.
+- **Zyklustage auf 0 zurücksetzen** beginnt das Intervall ab diesem Zeitpunkt
+  neu und beendet eine gegebenenfalls laufende Zyklusladung. Der Reset wird
+  nicht als künstlich erreichte Vollladung gespeichert.
+
+Der separate **Zyklusstatus** unterscheidet:
+
+- automatische Überwachung aus
+- automatische Überwachung aktiv
+- Zyklus fällig und auf Prüfzeit wartend
+- manuell gestartete Zyklusladung aktiv
+- automatisch gestartete Zyklusladung aktiv
+- Zyklusladung angehalten, beispielsweise bei ausgeschalteter Regelung oder
+  ungültigen Eingangsdaten
+
 ### Verhalten bei erreichtem Ziel
 
 - Die manuelle Zielladung wird beendet.
-- Bei einer automatischen Vollladung wird der Zeitpunkt gespeichert und das
-  Zyklusintervall beginnt neu.
+- Eine manuell oder automatisch gestartete Zyklusladung wird beendet.
+- Beim Erreichen des Vollladeziels wird der Zeitpunkt gespeichert und das
+  Zyklusintervall beginnt neu. Das gilt auch, wenn der Speicher dieses Ziel im
+  Normalbetrieb allein durch PV erreicht.
 - Die System-Ladegrenze kehrt zum **Ladelimit im Normalbetrieb** zurück.
 - Anschließend arbeitet wieder der gewählte Grundmodus.
 
@@ -394,7 +427,7 @@ eingestellten AC-Leistung erlaubt.
 
 ## Projektstatus
 
-Version 1.0.7 ist der aktuelle öffentliche Betateststand. Gesucht werden
+Version 1.1.0 ist der aktuelle Betateststand. Gesucht werden
 Testerinnen und Tester mit unterschiedlichen XT500- und XT500-Pro-Systemen,
 Firmwareständen und Stromzählern.
 

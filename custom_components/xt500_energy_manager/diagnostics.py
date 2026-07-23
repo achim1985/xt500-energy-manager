@@ -36,6 +36,10 @@ async def async_get_config_entry_diagnostics(_hass: HomeAssistant, entry: XT500C
         "cycle_schedule": {
             "enabled": bool(runtime.settings["automatic_enabled"]),
             "due": runtime.cycle_due,
+            "state": runtime.cycle_state,
+            "manual_active": runtime.settings["cycle_manual_active"],
+            "automatic_active": runtime.settings["cycle_automatic_active"],
+            "check_time": runtime.settings["cycle_check_time"],
             "last_full": runtime.settings["last_full"],
             "reference": runtime.settings["cycle_reference"],
             "next_cycle": runtime.next_cycle_at,

@@ -1,5 +1,25 @@
 # Änderungsprotokoll
 
+## 1.1.0
+
+- Zyklusladung kann unabhängig von der Fälligkeit sofort manuell gestartet
+  werden
+- einstellbare tägliche Prüfzeit für den Start einer fälligen automatischen
+  Zyklusladung
+- eindeutiger Zyklusstatus trennt automatische Überwachung, fälligen Zyklus,
+  manuelle Ladung, automatische Ladung und angehaltene Ladung
+- eigener Zustand „Zyklusladung aktiv“ zusätzlich zur reinen
+  Zyklusüberwachung
+- Rücksetzknopf setzt die Zyklustage auf 0 und beendet eine laufende
+  Zyklusladung, ohne eine künstliche Vollladung einzutragen
+- manuelle und automatische Zyklusladung verwenden denselben separat
+  einstellbaren Zyklus-Lademodus und dasselbe Vollladeziel
+- verpasste Prüfzeit wird nach einem Neustart sicher nachgeholt; wird der
+  Zyklus erst nach der Prüfzeit fällig, startet er erst am Folgetag
+- Dashboard und Anleitung um Zyklusstatus, Start, Prüfzeit und Rücksetzen
+  ergänzt
+- „Neu berechnen“ aus dem automatisch erzeugten Dashboard entfernt
+
 ## 1.0.7
 
 - neue Installationen und Aktualisierungen starten die Zyklusladung Automatik

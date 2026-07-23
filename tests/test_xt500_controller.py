@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, time, timedelta
 from pathlib import Path
 import sys
 from types import ModuleType
@@ -187,6 +187,26 @@ class ControllerTest(unittest.TestCase):
                 cycle_reference=now - timedelta(days=30),
                 interval_days=14,
             )
+        )
+
+    def test_next_cycle_check_uses_same_day_when_due_before_check_time(self):
+        self.assertEqual(
+            controller.next_cycle_check_at(
+                baseline=datetime(2026, 7, 1, 8, tzinfo=UTC),
+                interval_days=14,
+                check_time=time(12, 0),
+            ),
+            datetime(2026, 7, 15, 12, tzinfo=UTC),
+        )
+
+    def test_next_cycle_check_waits_until_next_day_when_due_after_check_time(self):
+        self.assertEqual(
+            controller.next_cycle_check_at(
+                baseline=datetime(2026, 7, 1, 18, tzinfo=UTC),
+                interval_days=14,
+                check_time=time(12, 0),
+            ),
+            datetime(2026, 7, 16, 12, tzinfo=UTC),
         )
 
     def test_low_soc_blocks_discharge(self):

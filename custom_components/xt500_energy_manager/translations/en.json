@@ -70,7 +70,15 @@
           "automatic_grid_charge": "Automatic - grid charging",
           "automatic_pv_surplus": "Automatic - PV surplus",
           "automatic_pv_priority": "Automatic - PV priority",
-          "automatic_pv_and_grid": "Automatic - PV and grid"
+          "automatic_pv_and_grid": "Automatic - PV and grid",
+          "cycle_manual_grid_charge": "Manual cycle - grid charging",
+          "cycle_manual_pv_surplus": "Manual cycle - PV surplus",
+          "cycle_manual_pv_priority": "Manual cycle - PV priority",
+          "cycle_manual_pv_and_grid": "Manual cycle - PV and grid",
+          "cycle_automatic_grid_charge": "Automatic cycle - grid charging",
+          "cycle_automatic_pv_surplus": "Automatic cycle - PV surplus",
+          "cycle_automatic_pv_priority": "Automatic cycle - PV priority",
+          "cycle_automatic_pv_and_grid": "Automatic cycle - PV and grid"
         }
       },
       "recovery_status": {
@@ -108,7 +116,18 @@
       "control_max_step": { "name": "Active maximum setpoint change" },
       "active_target_soc": { "name": "Currently used charge target" },
       "desired_charge_limit": { "name": "Applied system charge limit" },
-      "days_since_full": { "name": "Days since full charge" }
+      "cycle_state": {
+        "name": "Cycle status",
+        "state": {
+          "monitoring_disabled": "Automatic monitoring off",
+          "monitoring": "Automatic monitoring active",
+          "due_waiting": "Due - waiting for daily check time",
+          "manual_active": "Cycle charging active - manual",
+          "automatic_active": "Cycle charging active - automatic",
+          "paused": "Cycle charging paused"
+        }
+      },
+      "days_since_full": { "name": "Days in current cycle" }
     },
     "binary_sensor": {
       "data_valid": {
@@ -118,7 +137,8 @@
           "off": "Invalid"
         }
       },
-      "cycle_due": { "name": "Cycle charging automation active" },
+      "cycle_due": { "name": "Cycle due" },
+      "cycle_charge_active": { "name": "Cycle charging active" },
       "charge_request": { "name": "Charge request active" },
       "control_ready": { "name": "Production control ready" },
       "feedback_ready": { "name": "Fresh feedback received" },
@@ -128,7 +148,7 @@
       "regulation_enabled": { "name": "Energy manager enabled" },
       "automatic_recovery_enabled": { "name": "Automatic error recovery" },
       "manual_active": { "name": "Start manual target charging" },
-      "automatic_enabled": { "name": "Cycle charging automation" },
+      "automatic_enabled": { "name": "Automatic cycle monitoring" },
       "show_advanced": { "name": "Show fine tuning" }
     },
     "select": {
@@ -137,7 +157,7 @@
         "state": { "grid_charge": "Grid charging", "pv_surplus": "PV surplus", "pv_priority": "PV priority", "pv_and_grid": "PV and grid" }
       },
       "automatic_mode": {
-        "name": "Cycle charging automation mode",
+        "name": "Cycle charging mode",
         "state": { "grid_charge": "Grid charging", "pv_surplus": "PV surplus", "pv_priority": "PV priority", "pv_and_grid": "PV and grid" }
       },
       "base_mode": {
@@ -147,7 +167,7 @@
     },
     "number": {
       "target_soc": { "name": "Manual target charge level" },
-      "automatic_target_soc": { "name": "Cycle charging automation target" },
+      "automatic_target_soc": { "name": "Cycle full-charge target" },
       "normal_charge_limit": { "name": "Normal-operation charge limit" },
       "charge_power": { "name": "Requested AC charging power" },
       "cycle_interval_days": { "name": "Interval between full charges" },
@@ -170,8 +190,13 @@
       "pv_start_power": { "name": "PV restart power" },
       "pv_start_delay": { "name": "PV restart delay" }
     },
+    "time": {
+      "cycle_check_time": { "name": "Daily automatic cycle check time" }
+    },
     "button": {
-      "recalculate": { "name": "Recalculate now" }
+      "recalculate": { "name": "Recalculate now" },
+      "cycle_start": { "name": "Start cycle charging manually now" },
+      "cycle_reset": { "name": "Reset cycle days to 0" }
     }
   }
 }

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime, time, timedelta
 
 from .const import (
     BASE_NORMAL,
@@ -41,6 +41,24 @@ def cycle_is_due(
     if baseline is None:
         return False
     return now >= baseline + timedelta(days=max(float(interval_days), 0.0))
+
+
+def next_cycle_check_at(
+    *,
+    baseline: datetime,
+    interval_days: float,
+    check_time: time,
+) -> datetime:
+    """Return the first configured daily check at or after the cycle is due."""
+    due_at = baseline + timedelta(days=max(float(interval_days), 0.0))
+    candidate = datetime.combine(
+        due_at.date(),
+        check_time.replace(tzinfo=None),
+        tzinfo=due_at.tzinfo,
+    )
+    if candidate < due_at:
+        candidate += timedelta(days=1)
+    return candidate
 
 
 def normalize_charge_mode(value: str) -> str:

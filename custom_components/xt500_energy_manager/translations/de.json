@@ -70,7 +70,15 @@
           "automatic_grid_charge": "Automatisch – Netzladung",
           "automatic_pv_surplus": "Automatisch – PV-Überschuss",
           "automatic_pv_priority": "Automatisch – PV-Vorrang",
-          "automatic_pv_and_grid": "Automatisch – PV + Netz"
+          "automatic_pv_and_grid": "Automatisch – PV + Netz",
+          "cycle_manual_grid_charge": "Zyklus manuell – Netzladung",
+          "cycle_manual_pv_surplus": "Zyklus manuell – PV-Überschuss",
+          "cycle_manual_pv_priority": "Zyklus manuell – PV-Vorrang",
+          "cycle_manual_pv_and_grid": "Zyklus manuell – PV + Netz",
+          "cycle_automatic_grid_charge": "Zyklus automatisch – Netzladung",
+          "cycle_automatic_pv_surplus": "Zyklus automatisch – PV-Überschuss",
+          "cycle_automatic_pv_priority": "Zyklus automatisch – PV-Vorrang",
+          "cycle_automatic_pv_and_grid": "Zyklus automatisch – PV + Netz"
         }
       },
       "recovery_status": {
@@ -108,7 +116,18 @@
       "control_max_step": { "name": "Aktive maximale Sollwertänderung" },
       "active_target_soc": { "name": "Aktuell verwendetes Ladeziel" },
       "desired_charge_limit": { "name": "Verwendete System-Ladegrenze" },
-      "days_since_full": { "name": "Tage seit Vollladung" }
+      "cycle_state": {
+        "name": "Zyklusstatus",
+        "state": {
+          "monitoring_disabled": "Automatische Überwachung aus",
+          "monitoring": "Automatische Überwachung aktiv",
+          "due_waiting": "Fällig – wartet auf tägliche Prüfzeit",
+          "manual_active": "Zyklusladung läuft – manuell",
+          "automatic_active": "Zyklusladung läuft – automatisch",
+          "paused": "Zyklusladung angehalten"
+        }
+      },
+      "days_since_full": { "name": "Tage im aktuellen Zyklus" }
     },
     "binary_sensor": {
       "data_valid": {
@@ -118,7 +137,8 @@
           "off": "Ungültig"
         }
       },
-      "cycle_due": { "name": "Zyklusladung Automatik aktiv" },
+      "cycle_due": { "name": "Zyklus fällig" },
+      "cycle_charge_active": { "name": "Zyklusladung aktiv" },
       "charge_request": { "name": "Ladeanforderung aktiv" },
       "control_ready": { "name": "Produktivregelung bereit" },
       "feedback_ready": { "name": "Neue Rückmeldungen eingetroffen" },
@@ -128,7 +148,7 @@
       "regulation_enabled": { "name": "Energiemanager aktiv" },
       "automatic_recovery_enabled": { "name": "Automatische Fehlerwiederherstellung" },
       "manual_active": { "name": "Manuelle Zielladung starten" },
-      "automatic_enabled": { "name": "Zyklusladung Automatik" },
+      "automatic_enabled": { "name": "Automatische Zyklusüberwachung" },
       "show_advanced": { "name": "Feinabstimmung anzeigen" }
     },
     "select": {
@@ -137,7 +157,7 @@
         "state": { "grid_charge": "Netzladung", "pv_surplus": "PV-Überschuss", "pv_priority": "PV-Vorrang", "pv_and_grid": "PV + Netz" }
       },
       "automatic_mode": {
-        "name": "Ladeart der Zyklusladung Automatik",
+        "name": "Ladeart der Zyklusladung",
         "state": { "grid_charge": "Netzladung", "pv_surplus": "PV-Überschuss", "pv_priority": "PV-Vorrang", "pv_and_grid": "PV + Netz" }
       },
       "base_mode": {
@@ -147,7 +167,7 @@
     },
     "number": {
       "target_soc": { "name": "Ladeziel der manuellen Zielladung" },
-      "automatic_target_soc": { "name": "Ladeziel der Zyklusladung Automatik" },
+      "automatic_target_soc": { "name": "Vollladeziel der Zyklusladung" },
       "normal_charge_limit": { "name": "Ladelimit im Normalbetrieb" },
       "charge_power": { "name": "Gewünschte AC-Ladeleistung" },
       "cycle_interval_days": { "name": "Abstand zwischen Vollladungen" },
@@ -170,8 +190,13 @@
       "pv_start_power": { "name": "PV-Startleistung" },
       "pv_start_delay": { "name": "Verzögerung der PV-Freigabe" }
     },
+    "time": {
+      "cycle_check_time": { "name": "Tägliche Prüfzeit der Zyklusautomatik" }
+    },
     "button": {
-      "recalculate": { "name": "Jetzt neu berechnen" }
+      "recalculate": { "name": "Jetzt neu berechnen" },
+      "cycle_start": { "name": "Zyklusladung jetzt manuell starten" },
+      "cycle_reset": { "name": "Zyklustage auf 0 zurücksetzen" }
     }
   }
 }

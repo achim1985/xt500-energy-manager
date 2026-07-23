@@ -16,8 +16,11 @@ const XT500_DISPLAY_NAMES = {
   feedback_ready: "Neue Rückmeldungen",
   pv_release_active: "PV-Ausgabe",
   active_target_soc: "Aktives Ladeziel",
-  cycle_due: "Zyklusladung Automatik",
-  days_since_full: "Tage seit Vollladung",
+  cycle_state: "Zyklusstatus",
+  cycle_charge_active: "Zyklusladung aktiv",
+  cycle_due: "Zyklus fällig",
+  cycle_check_time: "Tägliche Prüfzeit",
+  days_since_full: "Tage im aktuellen Zyklus",
 };
 
 const XT500_DISPLAY_ICONS = {
@@ -99,8 +102,14 @@ class XT500EnergyManagerDashboardStrategy extends HTMLElement {
         "estimated_home_load",
       ]));
       statusEntities.push(
-        { type: "section", label: "Zyklusautomatik" },
-        ...namedExisting(["cycle_due", "days_since_full"]),
+        { type: "section", label: "Zyklusladung" },
+        ...namedExisting([
+          "cycle_state",
+          "cycle_charge_active",
+          "cycle_due",
+          "days_since_full",
+          "cycle_check_time",
+        ]),
       );
 
       const flowEntities = [
@@ -126,11 +135,23 @@ class XT500EnergyManagerDashboardStrategy extends HTMLElement {
         tile("manual_mode", "Lademodus", [{ type: "select-options" }]),
         tile("target_soc", "Ladeziel", [{ type: "numeric-input", style: "buttons" }]),
         tile("charge_power", "AC-Ladeleistung", [{ type: "numeric-input", style: "buttons" }]),
-        heading("Zyklusladung Automatik", "mdi:battery-sync"),
-        tile("automatic_enabled", "Zyklusladung Automatik", [{ type: "toggle" }]),
-        tile("automatic_mode", "Lademodus", [{ type: "select-options" }]),
+        heading("Zyklusladung", "mdi:battery-sync"),
+        tile("cycle_state", "Zyklusstatus"),
+        tile("cycle_start", "Jetzt manuell starten", [{ type: "button" }]),
+        tile("cycle_reset", "Zyklustage auf 0 setzen", [{ type: "button" }]),
+        tile("automatic_enabled", "Automatische Zyklusüberwachung", [{ type: "toggle" }]),
+        entities.cycle_check_time ? {
+          type: "entities",
+          show_header_toggle: false,
+          entities: [{
+            entity: entities.cycle_check_time,
+            name: "Tägliche Prüfzeit",
+            icon: "mdi:clock-check-outline",
+          }],
+        } : null,
+        tile("automatic_mode", "Lademodus der Zyklusladung", [{ type: "select-options" }]),
         tile("automatic_target_soc", "Vollladeziel", [{ type: "numeric-input", style: "buttons" }]),
-        tile("cycle_interval_days", "Intervall", [{ type: "numeric-input", style: "buttons" }]),
+        tile("cycle_interval_days", "Intervall in Tagen", [{ type: "numeric-input", style: "buttons" }]),
       ]);
       const normalControlCards = compact([
         heading("Normalbetrieb und Grenzen", "mdi:tune-variant"),
@@ -140,7 +161,6 @@ class XT500EnergyManagerDashboardStrategy extends HTMLElement {
         tile("soc_hysteresis", "Wiederfreigabe", [{ type: "numeric-input", style: "buttons" }]),
         tile("target_grid_power", "Netzziel", [{ type: "numeric-input", style: "buttons" }]),
         tile("maximum_grid_output", "Hausnetz-Limit", [{ type: "numeric-input", style: "buttons" }]),
-        tile("recalculate", "Neu berechnen", [{ type: "button" }]),
       ]);
       const advancedControlCards = compact([
         heading("Adaptive Regelung", "mdi:speedometer"),
@@ -203,9 +223,16 @@ class XT500EnergyManagerDashboardStrategy extends HTMLElement {
           "- **PV-Überschuss:** Gibt aktuelle PV-Leistung nur passend zum Hausverbrauch weiter; der Rest kann den Akku laden. Es wird keine Netzladung angefordert. Das Ziel kann mehrere Tage aktiv bleiben.\n" +
           "- **PV-Vorrang:** Verfolgt das Ziel ausschließlich mit PV und hält die Batterieentladung zurück. Bei schlechtem Wetter läuft die Anforderung über mehrere Tage weiter.\n" +
           "- **PV + Netz:** Nutzt vorhandene PV und fordert zusätzlich die eingestellte AC-Ladeleistung aus dem Netz an. Damit wird das Ziel auch an schlechten Tagen erreicht.\n\n" +
-          "**Ziel erreicht und Zyklusladung**\n\n" +
+          "**Zyklusladung: Überwachung, Start und Rücksetzen**\n\n" +
+          "- **Automatische Zyklusüberwachung** beobachtet nur den Zeitabstand. Sie bedeutet nicht, dass gerade geladen wird.\n" +
+          "- Ist das Intervall abgelaufen, zeigt der Zyklusstatus **Fällig – wartet auf tägliche Prüfzeit**. Erst zur eingestellten **täglichen Prüfzeit** startet die Integration die Ladung im gewählten Zyklus-Lademodus.\n" +
+          "- **Jetzt manuell starten** beginnt die Zyklusladung sofort – unabhängig davon, ob sie bereits fällig ist. Dafür werden ebenfalls der Zyklus-Lademodus und das Vollladeziel verwendet. Die automatische Überwachung bleibt unverändert ein- oder ausgeschaltet.\n" +
+          "- Der **Zyklusstatus** unterscheidet eindeutig zwischen Überwachung, fälligem Zyklus, manueller Zyklusladung, automatischer Zyklusladung und einer angehaltenen Ladung.\n" +
+          "- **Zyklustage auf 0 setzen** beginnt das Intervall ab jetzt neu und beendet eine eventuell laufende Zyklusladung. Es wird dabei keine künstliche Vollladung eingetragen.\n\n" +
+          "**Ziel erreicht**\n\n" +
           "- Beim manuellen Ziel wird die manuelle Zielladung ausgeschaltet und der Grundmodus wieder aktiv.\n" +
-          "- Beim automatischen Vollladeziel wird der Zeitpunkt gespeichert; die nächste Zyklusladung wird erst nach dem eingestellten Intervall fällig.\n" +
+          "- Erreicht eine manuell oder automatisch gestartete Zyklusladung das Vollladeziel, wird sie beendet, der Zeitpunkt gespeichert und der Grundmodus wieder aktiv.\n" +
+          "- Die nächste automatische Zyklusladung wird erst nach dem Intervall und anschließend zur täglichen Prüfzeit gestartet.\n" +
           "- Erreicht der Speicher das automatische Vollladeziel ganz normal durch PV, zählt dies ebenfalls als erfolgreiche Vollladung – auch ohne laufende Zyklusladung.\n" +
           "- Die System-Ladegrenze kehrt danach immer zum **Ladelimit Normalbetrieb** zurück.\n\n" +
           "**Regelruhe und Sicherheit:** Kleine Abweichungen werden fein, mittlere stärker und große Lastsprünge schnell korrigiert. Nach einem Sollwertschreiben wartet die Integration auf neue Messwerte. Im PV-Überschussbetrieb setzt die Niedrig-PV-Sperre beide Sollwerte unterhalb der Abschaltschwelle sofort auf 0 W und gibt sie erst nach der eingestellten Zeit oberhalb der Startleistung wieder frei.\n\n" +
@@ -239,7 +266,9 @@ class XT500EnergyManagerDashboardStrategy extends HTMLElement {
               tile("regulation_enabled", "Regelung aktiv", [{ type: "toggle" }]),
               tile("automatic_recovery_enabled", "Fehler automatisch beheben", [{ type: "toggle" }]),
               tile("manual_active", "Manuelle Zielladung", [{ type: "toggle" }]),
-              tile("automatic_enabled", "Zyklusladung Automatik", [{ type: "toggle" }]),
+              tile("cycle_state", "Zyklusstatus"),
+              tile("cycle_start", "Zyklusladung jetzt starten", [{ type: "button" }]),
+              tile("automatic_enabled", "Automatische Zyklusüberwachung", [{ type: "toggle" }]),
             ].filter(Boolean),
           },
         ],

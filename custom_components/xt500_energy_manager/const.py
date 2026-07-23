@@ -5,7 +5,15 @@ from __future__ import annotations
 from typing import Final
 
 DOMAIN: Final = "xt500_energy_manager"
-PLATFORMS: Final = ("sensor", "binary_sensor", "switch", "select", "number", "button")
+PLATFORMS: Final = (
+    "sensor",
+    "binary_sensor",
+    "switch",
+    "select",
+    "number",
+    "time",
+    "button",
+)
 
 CONF_SOC_ENTITY: Final = "soc_entity"
 CONF_PV_POWER_ENTITY: Final = "pv_power_entity"
@@ -59,6 +67,9 @@ SETTING_AUTO_TARGET_SOC: Final = "automatic_target_soc"
 SETTING_NORMAL_CHARGE_LIMIT: Final = "normal_charge_limit"
 SETTING_CHARGE_POWER: Final = "charge_power"
 SETTING_CYCLE_INTERVAL_DAYS: Final = "cycle_interval_days"
+SETTING_CYCLE_CHECK_TIME: Final = "cycle_check_time"
+SETTING_CYCLE_MANUAL_ACTIVE: Final = "cycle_manual_active"
+SETTING_CYCLE_AUTOMATIC_ACTIVE: Final = "cycle_automatic_active"
 SETTING_MIN_SOC: Final = "minimum_soc"
 SETTING_SOC_HYSTERESIS: Final = "soc_hysteresis"
 SETTING_TARGET_GRID_POWER: Final = "target_grid_power"
@@ -94,6 +105,9 @@ DEFAULT_SETTINGS: Final = {
     SETTING_NORMAL_CHARGE_LIMIT: 100.0,
     SETTING_CHARGE_POWER: 2400.0,
     SETTING_CYCLE_INTERVAL_DAYS: 14.0,
+    SETTING_CYCLE_CHECK_TIME: "12:00:00",
+    SETTING_CYCLE_MANUAL_ACTIVE: False,
+    SETTING_CYCLE_AUTOMATIC_ACTIVE: False,
     SETTING_MIN_SOC: 10.0,
     SETTING_SOC_HYSTERESIS: 5.0,
     SETTING_TARGET_GRID_POWER: 0.0,

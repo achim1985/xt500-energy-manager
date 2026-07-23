@@ -27,6 +27,10 @@ STATUS_OPTIONS = (
     "manual_pv_surplus", "manual_pv_priority", "manual_pv_and_grid",
     "automatic_grid_charge", "automatic_pv_surplus", "automatic_pv_priority",
     "automatic_pv_and_grid",
+    "cycle_manual_grid_charge", "cycle_manual_pv_surplus",
+    "cycle_manual_pv_priority", "cycle_manual_pv_and_grid",
+    "cycle_automatic_grid_charge", "cycle_automatic_pv_surplus",
+    "cycle_automatic_pv_priority", "cycle_automatic_pv_and_grid",
 )
 
 SENSORS = (
@@ -58,6 +62,21 @@ SENSORS = (
     XT500SensorDescription(key="control_max_step", translation_key="control_max_step", icon="mdi:delta", native_unit_of_measurement=UnitOfPower.WATT, value_fn=lambda r: r.control_profile.maximum_change),
     XT500SensorDescription(key="active_target_soc", translation_key="active_target_soc", icon="mdi:battery-charging", native_unit_of_measurement=PERCENTAGE, value_fn=lambda r: r.active_target_soc),
     XT500SensorDescription(key="desired_charge_limit", translation_key="desired_charge_limit", icon="mdi:battery-lock", native_unit_of_measurement=PERCENTAGE, value_fn=lambda r: r.desired_charge_limit),
+    XT500SensorDescription(
+        key="cycle_state",
+        translation_key="cycle_state",
+        icon="mdi:battery-sync",
+        device_class=SensorDeviceClass.ENUM,
+        options=(
+            "monitoring_disabled",
+            "monitoring",
+            "due_waiting",
+            "manual_active",
+            "automatic_active",
+            "paused",
+        ),
+        value_fn=lambda r: r.cycle_state,
+    ),
     XT500SensorDescription(key="days_since_full", translation_key="days_since_full", icon="mdi:calendar-clock", value_fn=lambda r: r.days_since_full),
 )
 
