@@ -20,6 +20,7 @@ from .const import (
 )
 
 RECOVERY_DELAY_MULTIPLIERS = (1.0, 5.0, 15.0)
+WRITE_RETRY_DELAY_MULTIPLIERS = (1.0, 2.0)
 
 
 def normalize_charge_mode(value: str) -> str:
@@ -65,6 +66,17 @@ def recovery_delay_seconds(
     return max(float(base_delay), 1.0) * RECOVERY_DELAY_MULTIPLIERS[
         attempts_completed
     ]
+
+
+def write_retry_delay_seconds(
+    base_delay: float,
+    failed_attempts: int,
+) -> float | None:
+    """Return the delay after a transient write timeout."""
+    index = failed_attempts - 1
+    if index < 0 or index >= len(WRITE_RETRY_DELAY_MULTIPLIERS):
+        return None
+    return max(float(base_delay), 1.0) * WRITE_RETRY_DELAY_MULTIPLIERS[index]
 
 
 def limit_setpoint_change(

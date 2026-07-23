@@ -78,11 +78,14 @@ from .controller import (
     select_adaptive_control_profile,
     select_charge_limit,
     update_pv_release,
+    WRITE_RETRY_DELAY_MULTIPLIERS,
+    write_retry_delay_seconds,
 )
 
 _LOGGER = logging.getLogger(__name__)
 _STARTUP_STABILITY_SECONDS = 5.0
 _RECOVERY_FEEDBACK_TIMEOUT_SECONDS = 30.0
+_WRITE_MAX_ATTEMPTS = len(WRITE_RETRY_DELAY_MULTIPLIERS) + 1
 
 
 class XT500Runtime:
@@ -101,6 +104,9 @@ class XT500Runtime:
         self.control_error_message: str | None = None
         self.last_control_write: str | None = None
         self.last_recovery_success: str | None = None
+        self.last_transient_write_error: str | None = None
+        self.last_transient_write_recovery: str | None = None
+        self.transient_write_timeouts = 0
 
         self._data_valid_since_monotonic: float | None = None
         self._ha_started = hass.is_running
@@ -959,13 +965,7 @@ class XT500Runtime:
             step = float(state.attributes.get("step", 1) or 1)
             if abs(target - current) < max(step / 2, 0.5):
                 continue
-            await self.hass.services.async_call(
-                "number",
-                "set_value",
-                {"value": target},
-                blocking=True,
-                target={"entity_id": entity_id},
-            )
+            await self._async_set_number_resilient(entity_id, target)
             wrote = True
             setpoint_wrote = setpoint_wrote or is_control_setpoint
 
@@ -975,6 +975,91 @@ class XT500Runtime:
         if wrote:
             self.last_control_write = dt_util.now().isoformat()
             self._notify()
+
+    async def _async_set_number_resilient(
+        self,
+        entity_id: str,
+        target: float,
+    ) -> None:
+        """Retry transient SunEnergyXT timeouts before latching a control error."""
+        for attempt in range(1, _WRITE_MAX_ATTEMPTS + 1):
+            try:
+                await self.hass.services.async_call(
+                    "number",
+                    "set_value",
+                    {"value": target},
+                    blocking=True,
+                    target={"entity_id": entity_id},
+                )
+            except TimeoutError as err:
+                self.transient_write_timeouts += 1
+                self.last_transient_write_error = (
+                    f"{dt_util.now().isoformat()} · {entity_id} · "
+                    f"Ziel {target:g} · Versuch {attempt}/{_WRITE_MAX_ATTEMPTS}"
+                )
+                delay = write_retry_delay_seconds(
+                    float(self.settings[SETTING_FEEDBACK_SETTLE_TIME]),
+                    attempt,
+                )
+                if delay is None:
+                    raise HomeAssistantError(
+                        f"Zeitüberschreitung beim Schreiben von {target:g} "
+                        f"auf {entity_id} nach {_WRITE_MAX_ATTEMPTS} Versuchen"
+                    ) from err
+                _LOGGER.warning(
+                    "Temporary XT500 write timeout for %s target %s "
+                    "(attempt %s/%s); waiting %.1f seconds for readback",
+                    entity_id,
+                    target,
+                    attempt,
+                    _WRITE_MAX_ATTEMPTS,
+                    delay,
+                )
+                if await self._async_wait_for_entity_target(
+                    entity_id,
+                    target,
+                    delay,
+                ):
+                    self.last_transient_write_recovery = (
+                        f"{dt_util.now().isoformat()} · {entity_id} · "
+                        "Zielwert nach Timeout zurückgelesen"
+                    )
+                    self._notify()
+                    return
+                continue
+
+            if attempt > 1:
+                self.last_transient_write_recovery = (
+                    f"{dt_util.now().isoformat()} · {entity_id} · "
+                    f"Schreibversuch {attempt}/{_WRITE_MAX_ATTEMPTS} erfolgreich"
+                )
+                self._notify()
+            return
+
+    async def _async_wait_for_entity_target(
+        self,
+        entity_id: str,
+        target: float,
+        timeout: float,
+    ) -> bool:
+        """Wait briefly for coordinator readback after an ambiguous timeout."""
+        deadline = monotonic() + max(timeout, 0.0)
+        while True:
+            if self._entity_target_matches(entity_id, target):
+                return True
+            remaining = deadline - monotonic()
+            if remaining <= 0:
+                return False
+            await asyncio.sleep(min(1.0, remaining))
+
+    def _entity_target_matches(self, entity_id: str, target: float) -> bool:
+        """Return whether the entity readback already reflects the target."""
+        current = self._float_state(entity_id)
+        state = self.hass.states.get(entity_id)
+        if current is None or state is None:
+            return False
+        step = float(state.attributes.get("step", 1) or 1)
+        return abs(target - current) < max(step / 2, 0.5)
 
     def _limited_entity_target(
         self, entity_id: str, requested: float, maximum_change: float

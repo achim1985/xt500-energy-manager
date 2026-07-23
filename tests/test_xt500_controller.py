@@ -306,6 +306,13 @@ class ControllerTest(unittest.TestCase):
         self.assertEqual(controller.recovery_delay_seconds(0, 0), 1)
         self.assertIsNone(controller.recovery_delay_seconds(60, -1))
 
+    def test_transient_write_retry_uses_feedback_based_backoff(self):
+        self.assertEqual(controller.write_retry_delay_seconds(6, 1), 6)
+        self.assertEqual(controller.write_retry_delay_seconds(6, 2), 12)
+
+    def test_transient_write_retry_stops_after_two_retries(self):
+        self.assertIsNone(controller.write_retry_delay_seconds(6, 3))
+
     def test_low_pv_stops_release_immediately(self):
         decision = controller.update_pv_release(
             active=True,

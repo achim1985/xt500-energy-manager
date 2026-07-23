@@ -90,6 +90,9 @@ class XT500Sensor(XT500Entity, SensorEntity):
                     "recovery_max_attempts": self.runtime.recovery_max_attempts,
                     "next_recovery_attempt": self.runtime.next_recovery_attempt,
                     "last_recovery_success": self.runtime.last_recovery_success,
+                    "transient_write_timeouts": self.runtime.transient_write_timeouts,
+                    "last_transient_write_error": self.runtime.last_transient_write_error,
+                    "last_transient_write_recovery": self.runtime.last_transient_write_recovery,
                 }
             )
         elif self.key == "recovery_status":

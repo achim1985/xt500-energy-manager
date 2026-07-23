@@ -1,5 +1,20 @@
 # Änderungsprotokoll
 
+## 1.0.6
+
+- einzelne SunEnergyXT-Schreib-Timeouts führen nicht mehr sofort zur
+  Sicherheitsverriegelung
+- nach einem Timeout wird zunächst auf die Rückmeldung des möglicherweise
+  bereits übernommenen Zielwerts gewartet
+- falls nötig folgen höchstens zwei idempotente Wiederholungen mit wachsender
+  Wartezeit
+- erst drei fehlgeschlagene Schreibversuche lösen den bestehenden
+  `control_error` samt iPhone-Benachrichtigung aus
+- Diagnoseattribute zeigen Anzahl, letzten Timeout und erfolgreiche
+  vorübergehende Wiederherstellung
+- Fehlermeldungen enthalten jetzt betroffene Entität und Zielwert
+- Dashboard-Ressource auf Version 1.0.6 angehoben
+
 ## 1.0.5
 
 - kontrollierte automatische Wiederherstellung nach einem Schreibfehler

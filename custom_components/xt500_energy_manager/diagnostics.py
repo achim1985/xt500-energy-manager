@@ -25,6 +25,12 @@ async def async_get_config_entry_diagnostics(_hass: HomeAssistant, entry: XT500C
             "fresh_feedback_after_error": runtime.recovery_feedback_ready,
             "feedback_current": runtime.recovery_feedback_current,
         },
+        "transient_write_handling": {
+            "maximum_attempts_per_value": 3,
+            "timeouts_since_start": runtime.transient_write_timeouts,
+            "last_timeout": runtime.last_transient_write_error,
+            "last_recovery": runtime.last_transient_write_recovery,
+        },
         "configured_entities": dict(entry.data),
         "settings": dict(runtime.settings),
         "data_valid": runtime.data_valid,
