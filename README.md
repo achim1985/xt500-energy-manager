@@ -207,7 +207,7 @@ Karten.
 5. Als URL exakt eintragen:
 
    ```text
-   /xt500_energy_manager/xt500-energy-dashboard-strategy.js?v=1.0.6
+   /xt500_energy_manager/xt500-energy-dashboard-strategy.js?v=1.0.7
    ```
 
 6. Als Ressourcentyp **JavaScript-Modul** auswählen.
@@ -380,7 +380,7 @@ eingestellten AC-Leistung erlaubt.
 
 ## Projektstatus
 
-Version 1.0.6 ist der aktuelle öffentliche Betateststand. Gesucht werden
+Version 1.0.7 ist der aktuelle öffentliche Betateststand. Gesucht werden
 Testerinnen und Tester mit unterschiedlichen XT500- und XT500-Pro-Systemen,
 Firmwareständen und Stromzählern.
 

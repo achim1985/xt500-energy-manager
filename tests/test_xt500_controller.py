@@ -148,6 +148,47 @@ class ControllerTest(unittest.TestCase):
             70,
         )
 
+    def test_new_cycle_without_reference_is_not_due(self):
+        now = datetime(2026, 7, 23, 12, tzinfo=UTC)
+        self.assertFalse(
+            controller.cycle_is_due(
+                now=now,
+                last_full=None,
+                cycle_reference=None,
+                interval_days=14,
+            )
+        )
+
+    def test_cycle_uses_reference_until_first_full_charge(self):
+        reference = datetime(2026, 7, 23, 12, tzinfo=UTC)
+        self.assertFalse(
+            controller.cycle_is_due(
+                now=reference + timedelta(days=13, hours=23),
+                last_full=None,
+                cycle_reference=reference,
+                interval_days=14,
+            )
+        )
+        self.assertTrue(
+            controller.cycle_is_due(
+                now=reference + timedelta(days=14),
+                last_full=None,
+                cycle_reference=reference,
+                interval_days=14,
+            )
+        )
+
+    def test_observed_full_charge_is_authoritative_cycle_reference(self):
+        now = datetime(2026, 7, 23, 12, tzinfo=UTC)
+        self.assertFalse(
+            controller.cycle_is_due(
+                now=now,
+                last_full=now - timedelta(days=1),
+                cycle_reference=now - timedelta(days=30),
+                interval_days=14,
+            )
+        )
+
     def test_low_soc_blocks_discharge(self):
         result = controller.calculate_control(
             self.input(soc=9),

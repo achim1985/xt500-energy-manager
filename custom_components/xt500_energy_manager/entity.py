@@ -32,7 +32,7 @@ class XT500Entity(Entity):
             name=runtime.entry.title,
             manufacturer="Community",
             model="XT500 energy manager",
-            sw_version="1.0.6",
+            sw_version="1.0.7",
         )
 
     @property

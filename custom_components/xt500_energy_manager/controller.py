@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from .const import (
     BASE_NORMAL,
@@ -21,6 +21,26 @@ from .const import (
 
 RECOVERY_DELAY_MULTIPLIERS = (1.0, 5.0, 15.0)
 WRITE_RETRY_DELAY_MULTIPLIERS = (1.0, 2.0)
+
+
+def cycle_is_due(
+    *,
+    now: datetime,
+    last_full: datetime | None,
+    cycle_reference: datetime | None,
+    interval_days: float,
+) -> bool:
+    """Return whether a scheduled full-charge cycle is due.
+
+    An observed full charge is authoritative. The separate reference is used
+    only until the first full charge has been recorded. With neither value
+    available, a new installation must first establish a reference instead of
+    starting an immediate cycle.
+    """
+    baseline = last_full or cycle_reference
+    if baseline is None:
+        return False
+    return now >= baseline + timedelta(days=max(float(interval_days), 0.0))
 
 
 def normalize_charge_mode(value: str) -> str:

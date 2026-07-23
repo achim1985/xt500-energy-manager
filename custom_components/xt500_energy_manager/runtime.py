@@ -46,6 +46,7 @@ from .const import (
     SETTING_CONTROL_SMALL_ERROR,
     SETTING_CONTROL_SMALL_MAX_STEP,
     SETTING_CONTROL_SLOW_INTERVAL,
+    SETTING_CYCLE_REFERENCE,
     SETTING_CYCLE_INTERVAL_DAYS,
     SETTING_FEEDBACK_SETTLE_TIME,
     SETTING_LAST_FULL,
@@ -70,6 +71,7 @@ from .controller import (
     ControlResult,
     ControlSettings,
     calculate_control,
+    cycle_is_due,
     feedback_samples_are_fresh,
     limit_setpoint_change,
     overall_control_error,
@@ -186,6 +188,14 @@ class XT500Runtime:
             and (current_limit := self._float_state(charge_limit_entity)) is not None
         ):
             self.settings[SETTING_NORMAL_CHARGE_LIMIT] = current_limit
+            migrated = True
+
+        if (
+            bool(self.settings[SETTING_AUTO_ENABLED])
+            and self._setting_datetime(SETTING_LAST_FULL) is None
+            and self._setting_datetime(SETTING_CYCLE_REFERENCE) is None
+        ):
+            self.settings[SETTING_CYCLE_REFERENCE] = dt_util.now().isoformat()
             migrated = True
 
         if migrated:
@@ -420,7 +430,9 @@ class XT500Runtime:
         target = float(self.settings[SETTING_AUTO_TARGET_SOC])
         if soc >= target:
             if not self._full_soc_latched:
-                self.settings[SETTING_LAST_FULL] = dt_util.now().isoformat()
+                timestamp = dt_util.now().isoformat()
+                self.settings[SETTING_LAST_FULL] = timestamp
+                self.settings[SETTING_CYCLE_REFERENCE] = timestamp
                 self._store.async_delay_save(lambda: self.settings, 1)
                 self._full_soc_latched = True
         elif soc < target - 1:
@@ -429,15 +441,32 @@ class XT500Runtime:
     @property
     def cycle_due(self) -> bool:
         """Return whether the configured full-charge interval has elapsed."""
-        value = self.settings.get(SETTING_LAST_FULL)
-        if not value:
-            return True
-        last_full = dt_util.parse_datetime(value)
-        if last_full is None:
-            return True
-        return dt_util.now() >= last_full + timedelta(
-            days=float(self.settings[SETTING_CYCLE_INTERVAL_DAYS])
+        return cycle_is_due(
+            now=dt_util.now(),
+            last_full=self._setting_datetime(SETTING_LAST_FULL),
+            cycle_reference=self._setting_datetime(SETTING_CYCLE_REFERENCE),
+            interval_days=float(self.settings[SETTING_CYCLE_INTERVAL_DAYS]),
         )
+
+    def _setting_datetime(self, key: str) -> datetime | None:
+        """Parse one persisted scheduling timestamp."""
+        value = self.settings.get(key)
+        if not isinstance(value, str):
+            return None
+        return dt_util.parse_datetime(value)
+
+    @property
+    def next_cycle_at(self) -> str | None:
+        """Return the next scheduled automatic full-charge timestamp."""
+        baseline = self._setting_datetime(
+            SETTING_LAST_FULL
+        ) or self._setting_datetime(SETTING_CYCLE_REFERENCE)
+        if baseline is None:
+            return None
+        return (
+            baseline
+            + timedelta(days=float(self.settings[SETTING_CYCLE_INTERVAL_DAYS]))
+        ).isoformat()
 
     @property
     def automatic_cycle_requested(self) -> bool:
@@ -1087,6 +1116,13 @@ class XT500Runtime:
     def async_set_setting(self, key: str, value: Any) -> None:
         """Persist an integration-owned setting and recalculate."""
         self.settings[key] = value
+        if (
+            key == SETTING_AUTO_ENABLED
+            and bool(value)
+            and self._setting_datetime(SETTING_LAST_FULL) is None
+            and self._setting_datetime(SETTING_CYCLE_REFERENCE) is None
+        ):
+            self.settings[SETTING_CYCLE_REFERENCE] = dt_util.now().isoformat()
         self._store.async_delay_save(lambda: self.settings, 1)
         if key == SETTING_AUTOMATIC_RECOVERY_ENABLED:
             self._cancel_recovery_task()

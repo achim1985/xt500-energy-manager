@@ -33,6 +33,13 @@ async def async_get_config_entry_diagnostics(_hass: HomeAssistant, entry: XT500C
         },
         "configured_entities": dict(entry.data),
         "settings": dict(runtime.settings),
+        "cycle_schedule": {
+            "enabled": bool(runtime.settings["automatic_enabled"]),
+            "due": runtime.cycle_due,
+            "last_full": runtime.settings["last_full"],
+            "reference": runtime.settings["cycle_reference"],
+            "next_cycle": runtime.next_cycle_at,
+        },
         "data_valid": runtime.data_valid,
         "adaptive_control": {
             "band": runtime.control_profile.band,

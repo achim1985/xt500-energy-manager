@@ -65,6 +65,7 @@ SETTING_TARGET_GRID_POWER: Final = "target_grid_power"
 SETTING_MAX_GRID_OUTPUT: Final = "maximum_grid_output"
 SETTING_MAX_INVERTER_OUTPUT: Final = "maximum_inverter_output"
 SETTING_LAST_FULL: Final = "last_full"
+SETTING_CYCLE_REFERENCE: Final = "cycle_reference"
 
 DEFAULT_SETTINGS: Final = {
     SETTING_REGULATION_ENABLED: True,
@@ -99,6 +100,7 @@ DEFAULT_SETTINGS: Final = {
     SETTING_MAX_GRID_OUTPUT: 2400.0,
     SETTING_MAX_INVERTER_OUTPUT: 2400.0,
     SETTING_LAST_FULL: None,
+    SETTING_CYCLE_REFERENCE: None,
 }
 
 FRONTEND_URL: Final = "/xt500_energy_manager/xt500-energy-dashboard-strategy.js"

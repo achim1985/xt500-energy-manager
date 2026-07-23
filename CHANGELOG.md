@@ -1,5 +1,14 @@
 # Änderungsprotokoll
 
+## 1.0.7
+
+- neue Installationen und Aktualisierungen starten die Zyklusladung Automatik
+  nicht mehr sofort, wenn noch keine Volladung aufgezeichnet wurde
+- beim ersten Aktivieren beginnt stattdessen das eingestellte Zyklusintervall
+- eine tatsächlich erreichte automatische Ziel-SOC setzt den Zeitplan zurück
+- Diagnoseausgabe zeigt Zeitanker, Fälligkeit und nächsten Zykluszeitpunkt
+- Dashboard-Ressource auf Version 1.0.7 angehoben
+
 ## 1.0.6
 
 - einzelne SunEnergyXT-Schreib-Timeouts führen nicht mehr sofort zur
