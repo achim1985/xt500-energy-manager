@@ -1,5 +1,13 @@
 # Änderungsprotokoll
 
+## 1.0.3
+
+- erster öffentlicher Betateststand
+- HACS als empfohlenen Installations- und Aktualisierungsweg dokumentiert
+- manuelle Installation als Alternative beibehalten
+- öffentliche Test- und Fehlermeldehinweise ergänzt
+- Dashboard-Ressource auf Version 1.0.3 angehoben
+
 ## 1.0.2
 
 - Batteriesymbol für das aktive Ladeziel korrigiert
@@ -21,4 +29,3 @@
 - normales Ladelimit und temporäre Anhebung während einer Zielladung
 - Niedrig-PV-Sperre mit einstellbarer Hysterese und Startverzögerung
 - automatisch erzeugtes Dashboard mit Standardkarten
-

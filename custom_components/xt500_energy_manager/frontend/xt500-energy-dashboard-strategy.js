@@ -275,5 +275,6 @@ if (!window.customStrategies.some((strategy) => strategy.type === "xt500-energy-
     strategyType: "dashboard",
     name: "XT500 Energiemanager",
     description: "Automatisch erzeugte Bedien- und Diagnoseoberfläche für den XT500 Energiemanager.",
+    documentationURL: "https://github.com/achim1985/xt500-energy-manager#4-dashboard-strategie-einrichten",
   });
 }

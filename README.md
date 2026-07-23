@@ -4,6 +4,13 @@ Home-Assistant-Integration zur produktiven Regelung von SunEnergyXT XT500 und
 XT500 Pro. Sie übernimmt Nulleinspeisung, normales Laden, manuelle Zielladung,
 automatische Zyklusladung und die Begrenzung der Wechselrichterleistung.
 
+> [!NOTE]
+> Dies ist ein unabhängiges Community-Projekt und keine offizielle
+> SunEnergyXT-Integration. Der aktuelle Stand ist als öffentlicher Betatest
+> gedacht. Rückmeldungen bitte über
+> [GitHub Issues](https://github.com/achim1985/xt500-energy-manager/issues)
+> melden.
+
 > [!IMPORTANT]
 > **Zuerst muss die originale Integration
 > [SunEnergyXT 500 Series](https://github.com/SunEnergyXT/SunEnergyXT-500-Series)
@@ -82,15 +89,32 @@ XT500 Energy Manager fortfahren.
 
 ## 2. XT500 Energy Manager installieren
 
-### Private Testphase: manuelle Installation
+### Installation über HACS (empfohlen)
 
-Private GitHub-Repositories können von HACS nicht geladen werden. Solange
-dieses Repository privat ist, erfolgt die Installation deshalb manuell.
+1. In Home Assistant **HACS** öffnen.
+2. Oben rechts das Drei-Punkte-Menü öffnen.
+3. **Benutzerdefinierte Repositories** auswählen.
+4. Als Repository eintragen:
 
-1. Auf GitHub dieses Repository öffnen.
-2. **Code → Download ZIP** auswählen.
+   ```text
+   https://github.com/achim1985/xt500-energy-manager
+   ```
+
+5. Als Typ **Integration** auswählen und das Repository hinzufügen.
+6. In HACS nach **XT500 Energy Manager** suchen.
+7. Die aktuelle Version herunterladen.
+8. Home Assistant neu starten.
+9. **Einstellungen → Geräte & Dienste → Integration hinzufügen** öffnen.
+10. Nach **XT500 Energy Manager** suchen und die Integration auswählen.
+
+### Manuelle Installation
+
+1. Das aktuelle
+   [GitHub-Release](https://github.com/achim1985/xt500-energy-manager/releases)
+   öffnen.
+2. Unter **Assets** den Quellcode als ZIP herunterladen.
 3. Das ZIP-Archiv entpacken.
-4. Den Ordner
+4. Den enthaltenen Ordner
 
    ```text
    custom_components/xt500_energy_manager
@@ -118,18 +142,6 @@ dieses Repository privat ist, erfolgt die Installation deshalb manuell.
 5. Home Assistant neu starten.
 6. **Einstellungen → Geräte & Dienste → Integration hinzufügen** öffnen.
 7. Nach **XT500 Energy Manager** suchen und die Integration auswählen.
-
-### Später nach Veröffentlichung: Installation über HACS
-
-Die Repository-Struktur ist bereits HACS-tauglich vorbereitet. Sobald das
-Repository öffentlich ist:
-
-1. HACS öffnen.
-2. **Benutzerdefinierte Repositories** öffnen.
-3. Die öffentliche Repository-URL eintragen.
-4. Als Typ **Integration** wählen.
-5. **XT500 Energy Manager** herunterladen.
-6. Home Assistant neu starten.
 
 ## 3. Integration einrichten
 
@@ -194,7 +206,7 @@ Karten.
 5. Als URL exakt eintragen:
 
    ```text
-   /xt500_energy_manager/xt500-energy-dashboard-strategy.js?v=1.0.2
+   /xt500_energy_manager/xt500-energy-dashboard-strategy.js?v=1.0.3
    ```
 
 6. Als Ressourcentyp **JavaScript-Modul** auswählen.
@@ -305,10 +317,20 @@ eingestellten AC-Leistung erlaubt.
 
 ## Aktualisieren
 
-### Solange das Repository privat ist
+### Aktualisierung über HACS
 
 1. **Regelung aktiv** ausschalten.
-2. Den neuen Repository-Stand als ZIP herunterladen.
+2. Das von HACS angebotene Update installieren.
+3. Home Assistant neu starten.
+4. Die Versionsnummer der Dashboard-Ressource auf die neue Version ändern.
+5. **Ressourcen neu laden** oder den Browser vollständig neu laden.
+6. Dashboard, Eingangsdaten und Produktivregelung prüfen.
+7. Regelung wieder aktivieren.
+
+### Manuelle Aktualisierung
+
+1. **Regelung aktiv** ausschalten.
+2. Das neue GitHub-Release als ZIP herunterladen.
 3. Den vorhandenen Ordner
    `/config/custom_components/xt500_energy_manager` durch den neuen ersetzen.
 4. Die Versionsnummer der Dashboard-Ressource an die neue Version anpassen.
@@ -351,7 +373,17 @@ eingestellten AC-Leistung erlaubt.
 
 ## Projektstatus
 
-Version 1.0.2 ist der erste private Produktivteststand. Vor einer öffentlichen
-Freigabe sollten weitere Installationen, unterschiedliche XT500-Firmwarestände
-und die Wiederherstellung nach Geräte- oder Netzwerkfehlern getestet werden.
+Version 1.0.3 ist der erste öffentliche Betateststand. Gesucht werden
+Testerinnen und Tester mit unterschiedlichen XT500- und XT500-Pro-Systemen,
+Firmwareständen und Stromzählern.
 
+Bitte bei einem Fehler ein
+[GitHub Issue](https://github.com/achim1985/xt500-energy-manager/issues)
+mit folgenden Angaben erstellen:
+
+- Home-Assistant-Version
+- Version der SunEnergyXT-Integration
+- XT500-Modell und Firmware
+- verwendeter öffentlicher Leistungssensor und dessen Vorzeichenrichtung
+- Statusanzeige des Energiemanagers
+- relevante Protokollmeldung ohne Zugangsdaten oder Seriennummern
