@@ -105,10 +105,7 @@ class XT500EnergyManagerDashboardStrategy extends HTMLElement {
         { type: "section", label: "Zyklusladung" },
         ...namedExisting([
           "cycle_state",
-          "cycle_charge_active",
-          "cycle_due",
           "days_since_full",
-          "cycle_check_time",
         ]),
       );
 
@@ -136,7 +133,6 @@ class XT500EnergyManagerDashboardStrategy extends HTMLElement {
         tile("target_soc", "Ladeziel", [{ type: "numeric-input", style: "buttons" }]),
         tile("charge_power", "AC-Ladeleistung", [{ type: "numeric-input", style: "buttons" }]),
         heading("Zyklusladung", "mdi:battery-sync"),
-        tile("cycle_state", "Zyklusstatus"),
         tile("cycle_start", "Jetzt manuell starten", [{ type: "button" }]),
         tile("cycle_reset", "Zyklustage auf 0 setzen", [{ type: "button" }]),
         tile("automatic_enabled", "Automatische Zyklusüberwachung", [{ type: "toggle" }]),
@@ -266,7 +262,6 @@ class XT500EnergyManagerDashboardStrategy extends HTMLElement {
               tile("regulation_enabled", "Regelung aktiv", [{ type: "toggle" }]),
               tile("automatic_recovery_enabled", "Fehler automatisch beheben", [{ type: "toggle" }]),
               tile("manual_active", "Manuelle Zielladung", [{ type: "toggle" }]),
-              tile("cycle_state", "Zyklusstatus"),
               tile("cycle_start", "Zyklusladung jetzt starten", [{ type: "button" }]),
               tile("automatic_enabled", "Automatische Zyklusüberwachung", [{ type: "toggle" }]),
             ].filter(Boolean),

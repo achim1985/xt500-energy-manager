@@ -18,6 +18,8 @@
   Zyklus erst nach der Prüfzeit fällig, startet er erst am Folgetag
 - Dashboard und Anleitung um Zyklusstatus, Start, Prüfzeit und Rücksetzen
   ergänzt
+- Zyklusstatus, Zyklustage und Prüfzeit werden im Dashboard jeweils nur an
+  einer passenden Stelle angezeigt
 - „Neu berechnen“ aus dem automatisch erzeugten Dashboard entfernt
 
 ## 1.0.7
