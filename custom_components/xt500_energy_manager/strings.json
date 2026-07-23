@@ -105,7 +105,7 @@
           "off": "Ungültig"
         }
       },
-      "cycle_due": { "name": "Automatische Zyklusladung aktiv" },
+      "cycle_due": { "name": "Zyklusladung Automatik aktiv" },
       "charge_request": { "name": "Ladeanforderung aktiv" },
       "control_ready": { "name": "Produktivregelung bereit" },
       "feedback_ready": { "name": "Neue Rückmeldungen eingetroffen" },
@@ -114,7 +114,7 @@
     "switch": {
       "regulation_enabled": { "name": "Energiemanager aktiv" },
       "manual_active": { "name": "Manuelle Zielladung starten" },
-      "automatic_enabled": { "name": "Automatische Vollladung aktivieren" },
+      "automatic_enabled": { "name": "Zyklusladung Automatik" },
       "show_advanced": { "name": "Feinabstimmung anzeigen" }
     },
     "select": {
@@ -123,7 +123,7 @@
         "state": { "grid_charge": "Netzladung", "pv_surplus": "PV-Überschuss", "pv_priority": "PV-Vorrang", "pv_and_grid": "PV + Netz" }
       },
       "automatic_mode": {
-        "name": "Ladeart der automatischen Vollladung",
+        "name": "Ladeart der Zyklusladung Automatik",
         "state": { "grid_charge": "Netzladung", "pv_surplus": "PV-Überschuss", "pv_priority": "PV-Vorrang", "pv_and_grid": "PV + Netz" }
       },
       "base_mode": {
@@ -133,7 +133,7 @@
     },
     "number": {
       "target_soc": { "name": "Ladeziel der manuellen Zielladung" },
-      "automatic_target_soc": { "name": "Ladeziel der automatischen Vollladung" },
+      "automatic_target_soc": { "name": "Ladeziel der Zyklusladung Automatik" },
       "normal_charge_limit": { "name": "Ladelimit im Normalbetrieb" },
       "charge_power": { "name": "Gewünschte AC-Ladeleistung" },
       "cycle_interval_days": { "name": "Abstand zwischen Vollladungen" },

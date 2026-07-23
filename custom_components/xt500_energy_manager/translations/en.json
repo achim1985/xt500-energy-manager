@@ -105,7 +105,7 @@
           "off": "Invalid"
         }
       },
-      "cycle_due": { "name": "Automatic cycle charge active" },
+      "cycle_due": { "name": "Cycle charging automation active" },
       "charge_request": { "name": "Charge request active" },
       "control_ready": { "name": "Production control ready" },
       "feedback_ready": { "name": "Fresh feedback received" },
@@ -114,7 +114,7 @@
     "switch": {
       "regulation_enabled": { "name": "Energy manager enabled" },
       "manual_active": { "name": "Start manual target charging" },
-      "automatic_enabled": { "name": "Enable automatic full charging" },
+      "automatic_enabled": { "name": "Cycle charging automation" },
       "show_advanced": { "name": "Show fine tuning" }
     },
     "select": {
@@ -123,7 +123,7 @@
         "state": { "grid_charge": "Grid charging", "pv_surplus": "PV surplus", "pv_priority": "PV priority", "pv_and_grid": "PV and grid" }
       },
       "automatic_mode": {
-        "name": "Automatic full charging mode",
+        "name": "Cycle charging automation mode",
         "state": { "grid_charge": "Grid charging", "pv_surplus": "PV surplus", "pv_priority": "PV priority", "pv_and_grid": "PV and grid" }
       },
       "base_mode": {
@@ -133,7 +133,7 @@
     },
     "number": {
       "target_soc": { "name": "Manual target charge level" },
-      "automatic_target_soc": { "name": "Automatic full-charge level" },
+      "automatic_target_soc": { "name": "Cycle charging automation target" },
       "normal_charge_limit": { "name": "Normal-operation charge limit" },
       "charge_power": { "name": "Requested AC charging power" },
       "cycle_interval_days": { "name": "Interval between full charges" },

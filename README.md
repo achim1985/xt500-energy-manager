@@ -191,7 +191,8 @@ Messwertes prüfen.
 Die Strategie erzeugt automatisch zwei Ansichten:
 
 - **Speicher:** Status, Speicherstand, Leistungsflüsse und Schnellsteuerung
-- **Einstellungen:** Anleitung, manuelle Zielladung, Zyklusladung,
+  für Regelung, manuelle Zielladung und Zyklusladung Automatik
+- **Einstellungen:** Anleitung, manuelle Zielladung, Zyklusladung Automatik,
   Normalbetrieb und erweiterte Regelparameter
 
 Sie verwendet ausschließlich standardmäßig mit Home Assistant ausgelieferte
@@ -206,7 +207,7 @@ Karten.
 5. Als URL exakt eintragen:
 
    ```text
-   /xt500_energy_manager/xt500-energy-dashboard-strategy.js?v=1.0.3
+   /xt500_energy_manager/xt500-energy-dashboard-strategy.js?v=1.0.4
    ```
 
 6. Als Ressourcentyp **JavaScript-Modul** auswählen.
@@ -373,7 +374,7 @@ eingestellten AC-Leistung erlaubt.
 
 ## Projektstatus
 
-Version 1.0.3 ist der erste öffentliche Betateststand. Gesucht werden
+Version 1.0.4 ist der aktuelle öffentliche Betateststand. Gesucht werden
 Testerinnen und Tester mit unterschiedlichen XT500- und XT500-Pro-Systemen,
 Firmwareständen und Stromzählern.
 

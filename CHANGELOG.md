@@ -1,5 +1,13 @@
 # Änderungsprotokoll
 
+## 1.0.4
+
+- „Zyklusladung“ in der Bedienoberfläche einheitlich in
+  „Zyklusladung Automatik“ umbenannt
+- Schnellsteuerung um Schalter für manuelle Zielladung und
+  Zyklusladung Automatik ergänzt
+- Dashboard-Ressource auf Version 1.0.4 angehoben
+
 ## 1.0.3
 
 - erster öffentlicher Betateststand

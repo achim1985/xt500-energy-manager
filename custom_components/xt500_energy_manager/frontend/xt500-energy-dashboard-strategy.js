@@ -15,7 +15,7 @@ const XT500_DISPLAY_NAMES = {
   feedback_ready: "Neue Rückmeldungen",
   pv_release_active: "PV-Ausgabe",
   active_target_soc: "Aktives Ladeziel",
-  cycle_due: "Zyklusladung",
+  cycle_due: "Zyklusladung Automatik",
   days_since_full: "Tage seit Vollladung",
 };
 
@@ -124,8 +124,8 @@ class XT500EnergyManagerDashboardStrategy extends HTMLElement {
         tile("manual_mode", "Lademodus", [{ type: "select-options" }]),
         tile("target_soc", "Ladeziel", [{ type: "numeric-input", style: "buttons" }]),
         tile("charge_power", "AC-Ladeleistung", [{ type: "numeric-input", style: "buttons" }]),
-        heading("Automatische Vollladung", "mdi:battery-sync"),
-        tile("automatic_enabled", "Zyklusladung", [{ type: "toggle" }]),
+        heading("Zyklusladung Automatik", "mdi:battery-sync"),
+        tile("automatic_enabled", "Zyklusladung Automatik", [{ type: "toggle" }]),
         tile("automatic_mode", "Lademodus", [{ type: "select-options" }]),
         tile("automatic_target_soc", "Vollladeziel", [{ type: "numeric-input", style: "buttons" }]),
         tile("cycle_interval_days", "Intervall", [{ type: "numeric-input", style: "buttons" }]),
@@ -232,6 +232,8 @@ class XT500EnergyManagerDashboardStrategy extends HTMLElement {
               ] : []),
               heading("Schnellsteuerung", "mdi:shield-home"),
               tile("regulation_enabled", "Regelung aktiv", [{ type: "toggle" }]),
+              tile("manual_active", "Manuelle Zielladung", [{ type: "toggle" }]),
+              tile("automatic_enabled", "Zyklusladung Automatik", [{ type: "toggle" }]),
             ].filter(Boolean),
           },
         ],
