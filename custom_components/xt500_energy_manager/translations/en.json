@@ -1,0 +1,162 @@
+{
+  "title": "XT500 Energy Manager",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Set up XT500 Energy Manager",
+        "description": "The integration automatically takes control after startup. Existing setpoint automations must be disabled first.",
+        "data": {
+          "soc_entity": "Battery state of charge",
+          "pv_power_entity": "Total PV input power",
+          "grid_power_entity": "Power at the public grid connection",
+          "grid_port_power_entity": "XT500 grid-port system power",
+          "load_port_power_entity": "XT500 load-port system power",
+          "grid_setpoint_entity": "Grid-port power setpoint",
+          "inverter_setpoint_entity": "Maximum inverter power setpoint",
+          "max_charge_soc_entity": "System charge limit",
+          "battery_input_power_entity": "Battery charging power (total input)",
+          "battery_output_power_entity": "Battery discharging power (total output)",
+          "meter_sign": "Public meter sign convention"
+        }
+      }
+    }
+  },
+  "selector": {
+    "meter_sign": {
+      "options": {
+        "import_positive": "Grid import is positive",
+        "export_positive": "Grid export is positive"
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Change device entities",
+        "description": "Production control writes all setpoints directly to the selected device entities.",
+        "data": {
+          "soc_entity": "Battery state of charge",
+          "pv_power_entity": "Total PV input power",
+          "grid_power_entity": "Power at the public grid connection",
+          "grid_port_power_entity": "XT500 grid-port system power",
+          "load_port_power_entity": "XT500 load-port system power",
+          "grid_setpoint_entity": "Grid-port power setpoint",
+          "inverter_setpoint_entity": "Maximum inverter power setpoint",
+          "max_charge_soc_entity": "System charge limit",
+          "battery_input_power_entity": "Battery charging power (total input)",
+          "battery_output_power_entity": "Battery discharging power (total output)",
+          "meter_sign": "Public meter sign convention"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "status": {
+        "name": "Status",
+        "state": {
+          "invalid_data": "Input data invalid",
+          "disabled": "Energy manager disabled",
+          "starting": "Startup validation in progress",
+          "control_error": "Control stopped after write error",
+          "target_reached": "Charge target reached",
+          "minimum_soc_hold": "Discharge blocked by minimum SOC",
+          "normal": "Normal operation",
+          "pv_surplus": "PV surplus",
+          "manual_grid_charge": "Manual - grid charging",
+          "manual_pv_surplus": "Manual - PV surplus",
+          "manual_pv_priority": "Manual - PV priority",
+          "manual_pv_and_grid": "Manual - PV and grid",
+          "automatic_grid_charge": "Automatic - grid charging",
+          "automatic_pv_surplus": "Automatic - PV surplus",
+          "automatic_pv_priority": "Automatic - PV priority",
+          "automatic_pv_and_grid": "Automatic - PV and grid"
+        }
+      },
+      "active_mode": {
+        "name": "Active charging mode",
+        "state": {
+          "normal": "Normal operation",
+          "grid_charge": "Grid charging",
+          "pv_surplus": "PV surplus",
+          "pv_priority": "PV priority",
+          "pv_and_grid": "PV and grid"
+        }
+      },
+      "recommended_grid_setpoint": { "name": "Grid-port setpoint" },
+      "recommended_inverter_setpoint": { "name": "Inverter ceiling" },
+      "estimated_home_load": { "name": "Estimated home load" },
+      "control_band": {
+        "name": "Active response band",
+        "state": { "small": "Fine", "medium": "Medium", "large": "Fast" }
+      },
+      "control_error": { "name": "Current control deviation" },
+      "control_interval": { "name": "Active control interval" },
+      "control_max_step": { "name": "Active maximum setpoint change" },
+      "active_target_soc": { "name": "Currently used charge target" },
+      "desired_charge_limit": { "name": "Applied system charge limit" },
+      "days_since_full": { "name": "Days since full charge" }
+    },
+    "binary_sensor": {
+      "data_valid": {
+        "name": "Input data valid",
+        "state": {
+          "on": "Valid",
+          "off": "Invalid"
+        }
+      },
+      "cycle_due": { "name": "Automatic cycle charge active" },
+      "charge_request": { "name": "Charge request active" },
+      "control_ready": { "name": "Production control ready" },
+      "feedback_ready": { "name": "Fresh feedback received" },
+      "pv_release_active": { "name": "PV output released" }
+    },
+    "switch": {
+      "regulation_enabled": { "name": "Energy manager enabled" },
+      "manual_active": { "name": "Start manual target charging" },
+      "automatic_enabled": { "name": "Enable automatic full charging" },
+      "show_advanced": { "name": "Show fine tuning" }
+    },
+    "select": {
+      "manual_mode": {
+        "name": "Manual target charging mode",
+        "state": { "grid_charge": "Grid charging", "pv_surplus": "PV surplus", "pv_priority": "PV priority", "pv_and_grid": "PV and grid" }
+      },
+      "automatic_mode": {
+        "name": "Automatic full charging mode",
+        "state": { "grid_charge": "Grid charging", "pv_surplus": "PV surplus", "pv_priority": "PV priority", "pv_and_grid": "PV and grid" }
+      },
+      "base_mode": {
+        "name": "Operation without target charging",
+        "state": { "normal": "Normal operation", "pv_surplus": "PV surplus" }
+      }
+    },
+    "number": {
+      "target_soc": { "name": "Manual target charge level" },
+      "automatic_target_soc": { "name": "Automatic full-charge level" },
+      "normal_charge_limit": { "name": "Normal-operation charge limit" },
+      "charge_power": { "name": "Requested AC charging power" },
+      "cycle_interval_days": { "name": "Interval between full charges" },
+      "minimum_soc": { "name": "Lower discharge limit" },
+      "soc_hysteresis": { "name": "Discharge re-enable margin" },
+      "target_grid_power": { "name": "Public grid connection target" },
+      "maximum_grid_output": { "name": "Maximum power supplied to the home" },
+      "maximum_inverter_output": { "name": "Overall maximum inverter power" },
+      "feedback_settle_time": { "name": "Minimum feedback settling time" },
+      "control_large_max_step": { "name": "Maximum change for a large deviation" },
+      "control_small_error": { "name": "Fine-to-medium response threshold" },
+      "control_large_error": { "name": "Fast-response threshold" },
+      "control_slow_interval": { "name": "Interval for a small deviation" },
+      "control_medium_interval": { "name": "Interval for a medium deviation" },
+      "control_fast_interval": { "name": "Interval for a large deviation" },
+      "control_small_max_step": { "name": "Maximum change for a small deviation" },
+      "control_medium_max_step": { "name": "Maximum change for a medium deviation" },
+      "pv_stop_power": { "name": "PV stop threshold" },
+      "pv_start_power": { "name": "PV restart power" },
+      "pv_start_delay": { "name": "PV restart delay" }
+    },
+    "button": {
+      "recalculate": { "name": "Recalculate now" }
+    }
+  }
+}
