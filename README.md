@@ -195,6 +195,20 @@ Die Strategie erzeugt automatisch zwei Ansichten:
 - **Einstellungen:** Anleitung, manuelle Zielladung, Zyklusladung Automatik,
   Normalbetrieb und erweiterte Regelparameter
 
+### Einstellungsansicht nicht übersehen
+
+Oben im automatisch erzeugten Dashboard gibt es zwei Reiter. Das Haussymbol
+öffnet die Speicherübersicht. Über das **Zahnradsymbol** daneben wird die
+vollständige Einstellungsansicht geöffnet. Je nach Bildschirmbreite werden
+diese Reiter nur als Symbole angezeigt und können deshalb leicht übersehen
+werden.
+
+![XT500-Energiemanager-Dashboard mit markiertem Zahnradsymbol für die Einstellungsansicht](docs/images/dashboard-einstellungen-zugang.png)
+
+> [!TIP]
+> Auf das markierte Zahnradsymbol klicken, um Ladeziele, Zyklusladung,
+> Normalbetrieb und die erweiterten Regelparameter einzustellen.
+
 Sie verwendet ausschließlich standardmäßig mit Home Assistant ausgelieferte
 Karten.
 
