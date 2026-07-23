@@ -19,6 +19,8 @@ from .const import (
     MODE_PV_SURPLUS,
 )
 
+RECOVERY_DELAY_MULTIPLIERS = (1.0, 5.0, 15.0)
+
 
 def normalize_charge_mode(value: str) -> str:
     """Normalize localized charge-mode labels."""
@@ -49,6 +51,20 @@ def normalize_base_mode(value: str) -> str:
 def clamp(value: float, low: float, high: float) -> float:
     """Clamp value to an inclusive range."""
     return max(low, min(value, high))
+
+
+def recovery_delay_seconds(
+    base_delay: float,
+    attempts_completed: int,
+) -> float | None:
+    """Return the guarded delay before the next recovery attempt."""
+    if attempts_completed < 0 or attempts_completed >= len(
+        RECOVERY_DELAY_MULTIPLIERS
+    ):
+        return None
+    return max(float(base_delay), 1.0) * RECOVERY_DELAY_MULTIPLIERS[
+        attempts_completed
+    ]
 
 
 def limit_setpoint_change(

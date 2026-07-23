@@ -73,6 +73,19 @@
           "automatic_pv_and_grid": "Automatic - PV and grid"
         }
       },
+      "recovery_status": {
+        "name": "Error recovery",
+        "state": {
+          "ready": "Ready",
+          "disabled": "Energy manager disabled",
+          "manual_required": "Manual reset required",
+          "waiting_inputs": "Waiting for valid input data",
+          "waiting_feedback": "Waiting for fresh feedback",
+          "waiting_stable": "Stability delay in progress",
+          "attempting": "Write probe in progress",
+          "exhausted": "Automatic attempts exhausted"
+        }
+      },
       "active_mode": {
         "name": "Active charging mode",
         "state": {
@@ -113,6 +126,7 @@
     },
     "switch": {
       "regulation_enabled": { "name": "Energy manager enabled" },
+      "automatic_recovery_enabled": { "name": "Automatic error recovery" },
       "manual_active": { "name": "Start manual target charging" },
       "automatic_enabled": { "name": "Cycle charging automation" },
       "show_advanced": { "name": "Show fine tuning" }
@@ -137,6 +151,7 @@
       "normal_charge_limit": { "name": "Normal-operation charge limit" },
       "charge_power": { "name": "Requested AC charging power" },
       "cycle_interval_days": { "name": "Interval between full charges" },
+      "recovery_stability_time": { "name": "Stability time before recovery" },
       "minimum_soc": { "name": "Lower discharge limit" },
       "soc_hysteresis": { "name": "Discharge re-enable margin" },
       "target_grid_power": { "name": "Public grid connection target" },

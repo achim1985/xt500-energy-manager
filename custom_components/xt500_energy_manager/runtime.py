@@ -35,6 +35,7 @@ from .const import (
     SETTING_AUTO_ENABLED,
     SETTING_AUTO_MODE,
     SETTING_AUTO_TARGET_SOC,
+    SETTING_AUTOMATIC_RECOVERY_ENABLED,
     SETTING_BASE_MODE,
     SETTING_CHARGE_POWER,
     SETTING_CONTROL_FAST_INTERVAL,
@@ -57,6 +58,7 @@ from .const import (
     SETTING_PV_START_DELAY,
     SETTING_PV_START_POWER,
     SETTING_PV_STOP_POWER,
+    SETTING_RECOVERY_STABILITY_TIME,
     SETTING_REGULATION_ENABLED,
     SETTING_SOC_HYSTERESIS,
     SETTING_TARGET_GRID_POWER,
@@ -71,6 +73,8 @@ from .controller import (
     feedback_samples_are_fresh,
     limit_setpoint_change,
     overall_control_error,
+    RECOVERY_DELAY_MULTIPLIERS,
+    recovery_delay_seconds,
     select_adaptive_control_profile,
     select_charge_limit,
     update_pv_release,
@@ -78,6 +82,7 @@ from .controller import (
 
 _LOGGER = logging.getLogger(__name__)
 _STARTUP_STABILITY_SECONDS = 5.0
+_RECOVERY_FEEDBACK_TIMEOUT_SECONDS = 30.0
 
 
 class XT500Runtime:
@@ -95,10 +100,17 @@ class XT500Runtime:
         self.invalid_entities: list[str] = []
         self.control_error_message: str | None = None
         self.last_control_write: str | None = None
+        self.last_recovery_success: str | None = None
 
         self._data_valid_since_monotonic: float | None = None
         self._ha_started = hass.is_running
         self._write_blocked = False
+        self._control_error_at: datetime | None = None
+        self._recovery_attempts = 0
+        self._recovery_status = "ready"
+        self._recovery_stable_since_monotonic: float | None = None
+        self._next_recovery_attempt: str | None = None
+        self._recovery_task: asyncio.Task | None = None
         self._full_soc_latched = False
         self._low_soc_hold = False
         self._listeners: set[Callable[[], None]] = set()
@@ -190,6 +202,7 @@ class XT500Runtime:
             self._control_apply_task,
             self._startup_ready_task,
             self._pv_release_task,
+            self._recovery_task,
         ):
             if task is not None and not task.done():
                 task.cancel()
@@ -216,6 +229,7 @@ class XT500Runtime:
             not self._ha_started
             or not self.data_valid
             or not self.regulation_enabled
+            or self._write_blocked
             or self.control_ready
         ):
             return
@@ -230,6 +244,7 @@ class XT500Runtime:
                 self._ha_started
                 and self.data_valid
                 and self.regulation_enabled
+                and not self._write_blocked
                 and not self.control_ready
             ):
                 await asyncio.sleep(1)
@@ -280,6 +295,8 @@ class XT500Runtime:
         self.data_valid = not self.invalid_entities
         if not self.data_valid:
             self._data_valid_since_monotonic = None
+            self._recovery_stable_since_monotonic = None
+            self._next_recovery_attempt = None
             self._cancel_pv_release_timer()
             self._pv_release_active = False
             self._pv_above_start_since = None
@@ -288,6 +305,7 @@ class XT500Runtime:
             self.active_target_soc = None
             self.desired_charge_limit = None
             self._control_apply_requested = False
+            self._schedule_recovery()
             self._notify()
             return
 
@@ -296,6 +314,8 @@ class XT500Runtime:
         self._update_full_charge(values[CONF_SOC_ENTITY])
 
         if not self.regulation_enabled:
+            self._cancel_recovery_task()
+            self._recovery_status = "disabled"
             self._cancel_pv_release_timer()
             self._pv_release_active = False
             self._pv_above_start_since = None
@@ -382,6 +402,8 @@ class XT500Runtime:
         )
         if self.control_ready:
             self._request_control_apply()
+        elif self._write_blocked:
+            self._schedule_recovery()
         else:
             self._schedule_startup_readiness()
         self._notify()
@@ -424,6 +446,37 @@ class XT500Runtime:
     def regulation_enabled(self) -> bool:
         """Return whether this production controller is enabled."""
         return bool(self.settings[SETTING_REGULATION_ENABLED])
+
+    @property
+    def automatic_recovery_enabled(self) -> bool:
+        """Return whether a latched write error may recover automatically."""
+        return bool(self.settings[SETTING_AUTOMATIC_RECOVERY_ENABLED])
+
+    @property
+    def recovery_status(self) -> str:
+        """Return the current automatic-recovery state."""
+        if not self.regulation_enabled:
+            return "disabled"
+        if not self._write_blocked:
+            return "ready"
+        if not self.automatic_recovery_enabled:
+            return "manual_required"
+        return self._recovery_status
+
+    @property
+    def recovery_attempts(self) -> int:
+        """Return the number of automatic attempts in the current error episode."""
+        return self._recovery_attempts
+
+    @property
+    def recovery_max_attempts(self) -> int:
+        """Return the fixed safety limit for automatic recovery attempts."""
+        return len(RECOVERY_DELAY_MULTIPLIERS)
+
+    @property
+    def next_recovery_attempt(self) -> str | None:
+        """Return the scheduled automatic recovery time, if any."""
+        return self._next_recovery_attempt
 
     @property
     def control_ready(self) -> bool:
@@ -559,29 +612,75 @@ class XT500Runtime:
     @property
     def feedback_ready(self) -> bool:
         """Return whether both feedback sources updated after the last setpoint write."""
-        states = [
-            self.hass.states.get(self.entry.data[key])
-            for key in (CONF_GRID_POWER_ENTITY, CONF_GRID_PORT_POWER_ENTITY)
-        ]
         return feedback_samples_are_fresh(
             self._last_control_write_at,
-            (state.last_updated if state is not None else None for state in states),
+            self._feedback_sample_times(),
+        )
+
+    def _feedback_sample_times(self) -> tuple[datetime | None, datetime | None]:
+        """Return the newest report time for both controller feedback sources."""
+        samples: list[datetime | None] = []
+        for key in (CONF_GRID_POWER_ENTITY, CONF_GRID_PORT_POWER_ENTITY):
+            state = self.hass.states.get(self.entry.data[key])
+            if state is None:
+                samples.append(None)
+                continue
+            samples.append(
+                getattr(state, "last_reported", None) or state.last_updated
+            )
+        return samples[0], samples[1]
+
+    @property
+    def recovery_feedback_ready(self) -> bool:
+        """Return whether both feedback sources reported after the last error."""
+        return feedback_samples_are_fresh(
+            self._control_error_at,
+            self._feedback_sample_times(),
+        )
+
+    @property
+    def recovery_feedback_current(self) -> bool:
+        """Return whether both recovery feedback samples are still recent."""
+        max_age = max(
+            float(self.settings[SETTING_RECOVERY_STABILITY_TIME]) * 1.5,
+            _RECOVERY_FEEDBACK_TIMEOUT_SECONDS,
+        )
+        now = datetime.now(UTC)
+        return all(
+            sample is not None
+            and 0 <= (now - sample).total_seconds() <= max_age
+            for sample in self._feedback_sample_times()
         )
 
     async def async_set_regulation_enabled(self, enabled: bool) -> None:
         """Enable or stop all production writes."""
+        self._cancel_recovery_task()
+        self._recovery_stable_since_monotonic = None
+        self._next_recovery_attempt = None
+        self._recovery_attempts = 0
         if not enabled:
             self._control_apply_requested = False
             if self._control_apply_task and not self._control_apply_task.done():
                 self._control_apply_task.cancel()
             self._last_control_write_at = None
+            self._recovery_status = "disabled"
         else:
             self._write_blocked = False
+            self._control_error_at = None
             self.control_error_message = None
             self._data_valid_since_monotonic = None
+            self._recovery_status = "ready"
         self.settings[SETTING_REGULATION_ENABLED] = enabled
         await self._store.async_save(self.settings)
         self.async_calculate()
+
+    @callback
+    def _cancel_recovery_task(self) -> None:
+        """Cancel a pending automatic recovery without touching the master switch."""
+        if self._recovery_task is not None and not self._recovery_task.done():
+            self._recovery_task.cancel()
+        self._recovery_task = None
+        self._next_recovery_attempt = None
 
     @callback
     def _request_control_apply(self) -> None:
@@ -614,16 +713,216 @@ class XT500Runtime:
             raise
         except Exception as err:
             _LOGGER.exception("XT500 production write failed")
-            self._write_blocked = True
-            self.control_error_message = f"Schreibfehler: {err}"
-            self._control_apply_requested = False
-            self._notify()
+            self._begin_control_error(err)
         finally:
             self._control_apply_task = None
             if self._control_apply_requested and self.control_ready:
                 self._control_apply_task = self.hass.async_create_task(
                     self._async_control_apply_loop()
                 )
+
+    @staticmethod
+    def _error_detail(err: Exception) -> str:
+        """Return a useful error text even for exceptions such as TimeoutError."""
+        detail = str(err).strip()
+        return detail if detail else type(err).__name__
+
+    @callback
+    def _begin_control_error(self, err: Exception) -> None:
+        """Latch a production write error and start the guarded recovery flow."""
+        self._write_blocked = True
+        self._control_error_at = datetime.now(UTC)
+        self.control_error_message = f"Schreibfehler: {self._error_detail(err)}"
+        self._control_apply_requested = False
+        self._recovery_attempts = 0
+        self._recovery_stable_since_monotonic = None
+        self._next_recovery_attempt = None
+        self._recovery_status = (
+            "waiting_feedback"
+            if self.automatic_recovery_enabled
+            else "manual_required"
+        )
+        self._cancel_recovery_task()
+        self._schedule_recovery()
+        self._notify()
+
+    @callback
+    def _schedule_recovery(self) -> None:
+        """Schedule one guarded recovery attempt after stable fresh feedback."""
+        if not self._write_blocked:
+            self._recovery_status = "ready"
+            return
+        if (
+            self._recovery_status == "attempting"
+            and self._recovery_task is not None
+            and not self._recovery_task.done()
+        ):
+            return
+        if not self.regulation_enabled:
+            self._cancel_recovery_task()
+            self._recovery_status = "disabled"
+            return
+        if not self.automatic_recovery_enabled:
+            self._cancel_recovery_task()
+            self._recovery_status = "manual_required"
+            return
+        if self._recovery_attempts >= self.recovery_max_attempts:
+            self._cancel_recovery_task()
+            self._recovery_status = "exhausted"
+            return
+        if (
+            not self._ha_started
+            or not self.data_valid
+            or self.result is None
+        ):
+            self._cancel_recovery_task()
+            self._recovery_stable_since_monotonic = None
+            self._recovery_status = "waiting_inputs"
+            return
+        if (
+            not self.recovery_feedback_ready
+            or not self.recovery_feedback_current
+        ):
+            self._cancel_recovery_task()
+            self._recovery_stable_since_monotonic = None
+            self._recovery_status = "waiting_feedback"
+            return
+
+        now = monotonic()
+        if self._recovery_stable_since_monotonic is None:
+            self._recovery_stable_since_monotonic = now
+        base_delay = max(
+            float(self.settings[SETTING_RECOVERY_STABILITY_TIME]),
+            1.0,
+        )
+        delay = recovery_delay_seconds(base_delay, self._recovery_attempts)
+        if delay is None:
+            self._recovery_status = "exhausted"
+            return
+        remaining = max(
+            delay - (now - self._recovery_stable_since_monotonic),
+            0.0,
+        )
+        self._recovery_status = "waiting_stable"
+        self._next_recovery_attempt = (
+            dt_util.now() + timedelta(seconds=remaining)
+        ).isoformat()
+        if self._recovery_task is None or self._recovery_task.done():
+            self._recovery_task = self.hass.async_create_task(
+                self._async_recovery_wait(remaining)
+            )
+
+    async def _async_recovery_wait(self, delay: float) -> None:
+        """Wait out the stability/backoff period and run one write probe."""
+        current_task = asyncio.current_task()
+        try:
+            if delay > 0:
+                await asyncio.sleep(delay)
+            if (
+                not self._write_blocked
+                or not self.regulation_enabled
+                or not self.automatic_recovery_enabled
+                or not self.data_valid
+                or self.result is None
+                or not self.recovery_feedback_ready
+                or not self.recovery_feedback_current
+            ):
+                return
+            await self._async_attempt_recovery()
+        except asyncio.CancelledError:
+            raise
+        finally:
+            if self._recovery_task is current_task:
+                self._recovery_task = None
+            if self._write_blocked:
+                self._schedule_recovery()
+
+    async def _async_attempt_recovery(self) -> None:
+        """Probe the unchanged inverter value and require fresh feedback."""
+        self._recovery_attempts += 1
+        self._recovery_status = "attempting"
+        self._next_recovery_attempt = None
+        self._notify()
+
+        try:
+            probe_at = await self._async_probe_control_write()
+            feedback_timeout = max(
+                _RECOVERY_FEEDBACK_TIMEOUT_SECONDS,
+                float(self.settings[SETTING_FEEDBACK_SETTLE_TIME]) * 3,
+            )
+            deadline = monotonic() + feedback_timeout
+            while monotonic() < deadline:
+                if not self.data_valid or self.result is None:
+                    raise HomeAssistantError(
+                        "Eingangsdaten während des Schreibtests ungültig"
+                    )
+                if feedback_samples_are_fresh(
+                    probe_at,
+                    self._feedback_sample_times(),
+                ):
+                    break
+                await asyncio.sleep(1)
+            else:
+                raise HomeAssistantError(
+                    "Keine neuen Messrückmeldungen nach dem Schreibtest"
+                )
+        except asyncio.CancelledError:
+            raise
+        except Exception as err:
+            _LOGGER.warning(
+                "XT500 automatic recovery attempt %s/%s failed: %s",
+                self._recovery_attempts,
+                self.recovery_max_attempts,
+                self._error_detail(err),
+            )
+            self._control_error_at = datetime.now(UTC)
+            self.control_error_message = (
+                "Automatische Wiederherstellung "
+                f"{self._recovery_attempts}/{self.recovery_max_attempts} "
+                f"fehlgeschlagen: {self._error_detail(err)}"
+            )
+            self._recovery_stable_since_monotonic = None
+            self._recovery_status = (
+                "exhausted"
+                if self._recovery_attempts >= self.recovery_max_attempts
+                else "waiting_feedback"
+            )
+            self._notify()
+            return
+
+        self._write_blocked = False
+        self._control_error_at = None
+        self.control_error_message = None
+        self._recovery_stable_since_monotonic = None
+        self._next_recovery_attempt = None
+        self._recovery_status = "ready"
+        self.last_recovery_success = dt_util.now().isoformat()
+        self._data_valid_since_monotonic = (
+            monotonic() - _STARTUP_STABILITY_SECONDS
+        )
+        self._notify()
+        self.async_calculate()
+
+    async def _async_probe_control_write(self) -> datetime:
+        """Write the current inverter value unchanged as a harmless reachability probe."""
+        inverter_entity = self.entry.data[CONF_INVERTER_SETPOINT_ENTITY]
+        current = self._float_state(inverter_entity)
+        if current is None:
+            raise HomeAssistantError(
+                f"Sollwert nicht lesbar: {inverter_entity}"
+            )
+        await self.hass.services.async_call(
+            "number",
+            "set_value",
+            {"value": current},
+            blocking=True,
+            target={"entity_id": inverter_entity},
+        )
+        probe_at = datetime.now(UTC)
+        self._last_control_write_at = probe_at
+        self.last_control_write = dt_util.now().isoformat()
+        self._notify()
+        return probe_at
 
     async def _async_apply_control_result(self, maximum_change: float) -> None:
         """Write charge limit, inverter ceiling, and grid setpoint."""
@@ -704,6 +1003,20 @@ class XT500Runtime:
         """Persist an integration-owned setting and recalculate."""
         self.settings[key] = value
         self._store.async_delay_save(lambda: self.settings, 1)
+        if key == SETTING_AUTOMATIC_RECOVERY_ENABLED:
+            self._cancel_recovery_task()
+            self._recovery_stable_since_monotonic = None
+            self._next_recovery_attempt = None
+            if self._write_blocked:
+                if bool(value):
+                    self._recovery_attempts = 0
+                    self._control_error_at = datetime.now(UTC)
+                    self._recovery_status = "waiting_feedback"
+                else:
+                    self._recovery_status = "manual_required"
+        elif key == SETTING_RECOVERY_STABILITY_TIME and self._write_blocked:
+            self._cancel_recovery_task()
+            self._recovery_stable_since_monotonic = None
         self.async_calculate()
 
     @callback

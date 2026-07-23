@@ -1,5 +1,6 @@
 const XT500_DISPLAY_NAMES = {
   status: "Status",
+  recovery_status: "Fehlerwiederherstellung",
   active_mode: "Lademodus",
   data_valid: "Eingangsdaten",
   control_ready: "Produktivregelung",
@@ -81,7 +82,7 @@ class XT500EnergyManagerDashboardStrategy extends HTMLElement {
 
       const statusEntities = [
         ...namedExisting([
-          "status", "control_ready", "active_mode", "charge_request",
+          "status", "control_ready", "recovery_status", "active_mode", "charge_request",
           "active_target_soc", "desired_charge_limit", "pv_release_active", "data_valid",
         ]),
         { type: "section", label: "Sollwerte und Berechnung" },
@@ -116,6 +117,7 @@ class XT500EnergyManagerDashboardStrategy extends HTMLElement {
       const mainControlCards = compact([
         heading("Hauptsteuerung", "mdi:power"),
         tile("regulation_enabled", "Regelung aktiv", [{ type: "toggle" }]),
+        tile("automatic_recovery_enabled", "Automatische Fehlerwiederherstellung", [{ type: "toggle" }]),
         tile("show_advanced", "Feinabstimmung anzeigen", [{ type: "toggle" }]),
       ]);
       const chargeControlCards = compact([
@@ -159,6 +161,8 @@ class XT500EnergyManagerDashboardStrategy extends HTMLElement {
         tile("control_medium_interval", "Bei mittlerer Abweichung", [{ type: "numeric-input", style: "buttons" }]),
         tile("control_fast_interval", "Bei großer Abweichung", [{ type: "numeric-input", style: "buttons" }]),
         tile("feedback_settle_time", "Wartezeit auf Messwerte", [{ type: "numeric-input", style: "buttons" }]),
+        heading("Automatische Fehlerwiederherstellung", "mdi:shield-refresh"),
+        tile("recovery_stability_time", "Stabile Rückmeldungen abwarten", [{ type: "numeric-input", style: "buttons" }]),
         heading("PV-Ausgabe bei geringer Leistung", "mdi:solar-power-variant-outline"),
         tile("pv_stop_power", "Unterhalb sofort auf 0 W", [{ type: "numeric-input", style: "buttons" }]),
         tile("pv_start_power", "Erneut freigeben oberhalb", [{ type: "numeric-input", style: "buttons" }]),
@@ -205,6 +209,7 @@ class XT500EnergyManagerDashboardStrategy extends HTMLElement {
           "- Erreicht der Speicher das automatische Vollladeziel ganz normal durch PV, zählt dies ebenfalls als erfolgreiche Vollladung – auch ohne laufende Zyklusladung.\n" +
           "- Die System-Ladegrenze kehrt danach immer zum **Ladelimit Normalbetrieb** zurück.\n\n" +
           "**Regelruhe und Sicherheit:** Kleine Abweichungen werden fein, mittlere stärker und große Lastsprünge schnell korrigiert. Nach einem Sollwertschreiben wartet die Integration auf neue Messwerte. Im PV-Überschussbetrieb setzt die Niedrig-PV-Sperre beide Sollwerte unterhalb der Abschaltschwelle sofort auf 0 W und gibt sie erst nach der eingestellten Zeit oberhalb der Startleistung wieder frei.\n\n" +
+          "**Fehlerwiederherstellung:** Ein Schreibfehler verriegelt die Regelung sofort. Wenn die automatische Wiederherstellung aktiv ist, müssen beide Rückmeldungen zunächst für die eingestellte Zeit gültig und aktuell bleiben. Danach prüft die Integration die Verbindung mit einem wirkungslosen Schreibtest auf den bereits vorhandenen Wechselrichter-Sollwert und wartet auf neue Messwerte. Bei Erfolg wird die Regelung wieder freigegeben. Es gibt höchstens drei Versuche mit wachsender Wartezeit; danach ist ein manueller Aus-/Ein-Reset von **Regelung aktiv** erforderlich.\n\n" +
           "**Leistungsgrenzen:** Für einen XT500 üblicherweise 800 W als Hausnetz-Limit einstellen. Ein XT500 Pro kann bis zu 2.400 W nutzen. Die Wechselrichter-Obergrenze ist ein technischer Sollwert, kein gemessener Leistungsfluss.\n\n" +
           "</details>",
       };
@@ -232,6 +237,7 @@ class XT500EnergyManagerDashboardStrategy extends HTMLElement {
               ] : []),
               heading("Schnellsteuerung", "mdi:shield-home"),
               tile("regulation_enabled", "Regelung aktiv", [{ type: "toggle" }]),
+              tile("automatic_recovery_enabled", "Fehler automatisch beheben", [{ type: "toggle" }]),
               tile("manual_active", "Manuelle Zielladung", [{ type: "toggle" }]),
               tile("automatic_enabled", "Zyklusladung Automatik", [{ type: "toggle" }]),
             ].filter(Boolean),

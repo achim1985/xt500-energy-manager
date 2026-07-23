@@ -73,6 +73,19 @@
           "automatic_pv_and_grid": "Automatisch – PV + Netz"
         }
       },
+      "recovery_status": {
+        "name": "Fehlerwiederherstellung",
+        "state": {
+          "ready": "Bereit",
+          "disabled": "Energiemanager ausgeschaltet",
+          "manual_required": "Manueller Reset erforderlich",
+          "waiting_inputs": "Wartet auf gültige Eingangsdaten",
+          "waiting_feedback": "Wartet auf neue Rückmeldungen",
+          "waiting_stable": "Stabilitätswartezeit läuft",
+          "attempting": "Schreibtest läuft",
+          "exhausted": "Automatische Versuche ausgeschöpft"
+        }
+      },
       "active_mode": {
         "name": "Aktiver Lademodus",
         "state": {
@@ -113,6 +126,7 @@
     },
     "switch": {
       "regulation_enabled": { "name": "Energiemanager aktiv" },
+      "automatic_recovery_enabled": { "name": "Automatische Fehlerwiederherstellung" },
       "manual_active": { "name": "Manuelle Zielladung starten" },
       "automatic_enabled": { "name": "Zyklusladung Automatik" },
       "show_advanced": { "name": "Feinabstimmung anzeigen" }
@@ -137,6 +151,7 @@
       "normal_charge_limit": { "name": "Ladelimit im Normalbetrieb" },
       "charge_power": { "name": "Gewünschte AC-Ladeleistung" },
       "cycle_interval_days": { "name": "Abstand zwischen Vollladungen" },
+      "recovery_stability_time": { "name": "Stabilitätszeit vor Wiederherstellung" },
       "minimum_soc": { "name": "Untere Entladegrenze" },
       "soc_hysteresis": { "name": "Wiederfreigabe oberhalb der Entladegrenze" },
       "target_grid_power": { "name": "Ziel am öffentlichen Netzanschluss" },

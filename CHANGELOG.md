@@ -1,5 +1,16 @@
 # Änderungsprotokoll
 
+## 1.0.5
+
+- kontrollierte automatische Wiederherstellung nach einem Schreibfehler
+- einstellbare Stabilitätszeit und eigener Ein-/Aus-Schalter
+- wirkungsloser Schreibtest auf den bereits aktuellen Wechselrichter-Sollwert
+- Freigabe erst nach neuen Messrückmeldungen
+- höchstens drei Wiederherstellungsversuche mit wachsender Wartezeit
+- eigener Wiederherstellungsstatus in Integration, Diagnose und Dashboard
+- leere Timeout-Fehlertexte zeigen jetzt mindestens den Exception-Typ
+- Dashboard-Ressource auf Version 1.0.5 angehoben
+
 ## 1.0.4
 
 - „Zyklusladung“ in der Bedienoberfläche einheitlich in

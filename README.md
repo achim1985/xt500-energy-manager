@@ -207,7 +207,7 @@ Karten.
 5. Als URL exakt eintragen:
 
    ```text
-   /xt500_energy_manager/xt500-energy-dashboard-strategy.js?v=1.0.4
+   /xt500_energy_manager/xt500-energy-dashboard-strategy.js?v=1.0.5
    ```
 
 6. Als Ressourcentyp **JavaScript-Modul** auswählen.
@@ -307,8 +307,14 @@ eingestellten AC-Leistung erlaubt.
   vollständig läuft und alle Eingangsdaten mindestens fünf Sekunden gültig
   waren.
 - Ungültige Eingangsdaten stoppen Sollwertschreibvorgänge.
-- Nach einem Schreibfehler bleibt die Regelung gestoppt, bis der Hauptschalter
-  aus- und wieder eingeschaltet wird.
+- Nach einem Schreibfehler wird die Regelung sofort verriegelt. Ist die
+  automatische Fehlerwiederherstellung aktiv, wartet sie zunächst auf stabile
+  neue Rückmeldungen, prüft die Verbindung mit einem wirkungslosen Schreibtest
+  auf den bereits vorhandenen Wechselrichter-Sollwert und gibt erst nach
+  weiteren Messrückmeldungen wieder frei.
+- Es gibt höchstens drei automatische Versuche mit wachsender Wartezeit.
+  Danach bleibt die Regelung verriegelt, bis der Hauptschalter aus- und wieder
+  eingeschaltet wird.
 - Kleine, mittlere und große Regelabweichungen verwenden unterschiedliche
   Zeitabstände und maximale Sollwertänderungen.
 - Nach jedem Schreibvorgang wartet die Integration auf neue Messwerte.
@@ -374,7 +380,7 @@ eingestellten AC-Leistung erlaubt.
 
 ## Projektstatus
 
-Version 1.0.4 ist der aktuelle öffentliche Betateststand. Gesucht werden
+Version 1.0.5 ist der aktuelle öffentliche Betateststand. Gesucht werden
 Testerinnen und Tester mit unterschiedlichen XT500- und XT500-Pro-Systemen,
 Firmwareständen und Stromzählern.
 

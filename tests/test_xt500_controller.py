@@ -296,6 +296,16 @@ class ControllerTest(unittest.TestCase):
             )
         )
 
+    def test_recovery_delays_use_limited_backoff(self):
+        self.assertEqual(controller.recovery_delay_seconds(60, 0), 60)
+        self.assertEqual(controller.recovery_delay_seconds(60, 1), 300)
+        self.assertEqual(controller.recovery_delay_seconds(60, 2), 900)
+        self.assertIsNone(controller.recovery_delay_seconds(60, 3))
+
+    def test_recovery_delay_never_drops_below_one_second(self):
+        self.assertEqual(controller.recovery_delay_seconds(0, 0), 1)
+        self.assertIsNone(controller.recovery_delay_seconds(60, -1))
+
     def test_low_pv_stops_release_immediately(self):
         decision = controller.update_pv_release(
             active=True,

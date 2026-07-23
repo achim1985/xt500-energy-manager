@@ -31,6 +31,23 @@ STATUS_OPTIONS = (
 
 SENSORS = (
     XT500SensorDescription(key="status", translation_key="status", icon="mdi:shield-search", device_class=SensorDeviceClass.ENUM, options=STATUS_OPTIONS, value_fn=lambda r: r.display_status),
+    XT500SensorDescription(
+        key="recovery_status",
+        translation_key="recovery_status",
+        icon="mdi:shield-refresh",
+        device_class=SensorDeviceClass.ENUM,
+        options=(
+            "ready",
+            "disabled",
+            "manual_required",
+            "waiting_inputs",
+            "waiting_feedback",
+            "waiting_stable",
+            "attempting",
+            "exhausted",
+        ),
+        value_fn=lambda r: r.recovery_status,
+    ),
     XT500SensorDescription(key="active_mode", translation_key="active_mode", icon="mdi:battery-sync", device_class=SensorDeviceClass.ENUM, options=("normal", "grid_charge", "pv_surplus", "pv_priority", "pv_and_grid"), value_fn=lambda r: r.result.active_mode if r.result else None),
     XT500SensorDescription(key="recommended_grid_setpoint", translation_key="recommended_grid_setpoint", icon="mdi:transmission-tower", native_unit_of_measurement=UnitOfPower.WATT, value_fn=lambda r: r.result.recommended_grid_setpoint if r.result else None),
     XT500SensorDescription(key="recommended_inverter_setpoint", translation_key="recommended_inverter_setpoint", icon="mdi:solar-power", native_unit_of_measurement=UnitOfPower.WATT, value_fn=lambda r: r.result.recommended_inverter_setpoint if r.result else None),
@@ -68,6 +85,21 @@ class XT500Sensor(XT500Entity, SensorEntity):
                     "effective_interval_s": self.runtime.effective_control_interval,
                     "maximum_change_w": self.runtime.control_profile.maximum_change,
                     "feedback_ready": self.runtime.feedback_ready,
+                    "recovery_status": self.runtime.recovery_status,
+                    "recovery_attempts": self.runtime.recovery_attempts,
+                    "recovery_max_attempts": self.runtime.recovery_max_attempts,
+                    "next_recovery_attempt": self.runtime.next_recovery_attempt,
+                    "last_recovery_success": self.runtime.last_recovery_success,
+                }
+            )
+        elif self.key == "recovery_status":
+            attrs.update(
+                {
+                    "attempts": self.runtime.recovery_attempts,
+                    "maximum_attempts": self.runtime.recovery_max_attempts,
+                    "next_attempt": self.runtime.next_recovery_attempt,
+                    "last_success": self.runtime.last_recovery_success,
+                    "error": self.runtime.control_error_message,
                 }
             )
         return attrs

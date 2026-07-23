@@ -1,4 +1,4 @@
-# XT500 Energy Manager 1.0.4
+# XT500 Energy Manager 1.0.5
 
 Production-ready Home Assistant controller for SunEnergyXT XT500 and XT500 Pro
 systems. The integration directly controls the grid-port setpoint, inverter
@@ -13,7 +13,10 @@ ceiling, and system charge limit.
 - After a control write, fresh public-meter and XT500 grid-port feedback is
   required before another correction.
 - Invalid input data stops writes. A write error latches the controller in a
-  stopped state until the master switch is turned off and on again.
+  stopped state. Optional automatic recovery waits for stable fresh feedback,
+  probes the unchanged inverter setpoint, and requires new measurements before
+  releasing the latch. Three failed attempts still require a manual master
+  switch reset.
 - In PV-surplus mode, low PV clamps both setpoints to zero immediately. Output
   is released only after PV stayed above the restart threshold for the
   configured delay.
@@ -64,7 +67,7 @@ base mode after completion.
 ## Generated dashboard
 
 Register
-`/xt500_energy_manager/xt500-energy-dashboard-strategy.js?v=1.0.4` once as a
+`/xt500_energy_manager/xt500-energy-dashboard-strategy.js?v=1.0.5` once as a
 JavaScript module under Settings → Dashboards → Resources. Then add the
 **XT500 Energiemanager** community dashboard.
 
