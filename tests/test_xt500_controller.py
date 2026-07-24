@@ -314,6 +314,15 @@ class ControllerTest(unittest.TestCase):
         self.assertEqual(controller.decode_signed_16(65500), -36)
         self.assertEqual(controller.decode_signed_16(300), 300)
 
+    def test_battery_flows_show_only_actual_net_discharge(self):
+        self.assertEqual(controller.net_battery_flows(200, 300), (0.0, 100.0))
+
+    def test_battery_flows_show_only_actual_net_charge(self):
+        self.assertEqual(controller.net_battery_flows(500, 120), (380.0, 0.0))
+
+    def test_battery_flows_never_return_negative_values(self):
+        self.assertEqual(controller.net_battery_flows(-20, -10), (0.0, 0.0))
+
     def test_xt500_grid_output_is_limited_to_800_watts(self):
         result = controller.calculate_control(
             self.input(grid_power=2000, grid_port_power=300),

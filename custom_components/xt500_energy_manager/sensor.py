@@ -62,6 +62,8 @@ SENSORS = (
     XT500SensorDescription(key="control_max_step", translation_key="control_max_step", icon="mdi:delta", native_unit_of_measurement=UnitOfPower.WATT, value_fn=lambda r: r.control_profile.maximum_change),
     XT500SensorDescription(key="active_target_soc", translation_key="active_target_soc", icon="mdi:battery-charging", native_unit_of_measurement=PERCENTAGE, value_fn=lambda r: r.active_target_soc),
     XT500SensorDescription(key="desired_charge_limit", translation_key="desired_charge_limit", icon="mdi:battery-lock", native_unit_of_measurement=PERCENTAGE, value_fn=lambda r: r.desired_charge_limit),
+    XT500SensorDescription(key="battery_charge_power", translation_key="battery_charge_power", icon="mdi:battery-arrow-up", device_class=SensorDeviceClass.POWER, native_unit_of_measurement=UnitOfPower.WATT, value_fn=lambda r: r.battery_charge_power),
+    XT500SensorDescription(key="battery_discharge_power", translation_key="battery_discharge_power", icon="mdi:battery-arrow-down", device_class=SensorDeviceClass.POWER, native_unit_of_measurement=UnitOfPower.WATT, value_fn=lambda r: r.battery_discharge_power),
     XT500SensorDescription(
         key="cycle_state",
         translation_key="cycle_state",
@@ -78,6 +80,7 @@ SENSORS = (
         value_fn=lambda r: r.cycle_state,
     ),
     XT500SensorDescription(key="days_since_full", translation_key="days_since_full", icon="mdi:calendar-clock", value_fn=lambda r: r.days_since_full),
+    XT500SensorDescription(key="next_cycle_at", translation_key="next_cycle_at", icon="mdi:calendar-clock", device_class=SensorDeviceClass.TIMESTAMP, value_fn=lambda r: r.next_cycle_datetime),
 )
 
 

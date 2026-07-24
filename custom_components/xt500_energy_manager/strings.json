@@ -14,6 +14,7 @@
           "grid_setpoint_entity": "Sollwert Leistung Netzanschluss",
           "inverter_setpoint_entity": "Sollwert max. Wechselrichterleistung",
           "max_charge_soc_entity": "System-Ladegrenze",
+          "load_discharge_limit_entity": "Systemlastanschluss-Entladegrenze",
           "battery_input_power_entity": "Batterie-Ladeleistung (Gesamteingang)",
           "battery_output_power_entity": "Batterie-Entladeleistung (Gesamtausgang)",
           "meter_sign": "Vorzeichen des öffentlichen Zählers"
@@ -43,6 +44,7 @@
           "grid_setpoint_entity": "Sollwert Leistung Netzanschluss",
           "inverter_setpoint_entity": "Sollwert max. Wechselrichterleistung",
           "max_charge_soc_entity": "System-Ladegrenze",
+          "load_discharge_limit_entity": "Systemlastanschluss-Entladegrenze",
           "battery_input_power_entity": "Batterie-Ladeleistung (Gesamteingang)",
           "battery_output_power_entity": "Batterie-Entladeleistung (Gesamtausgang)",
           "meter_sign": "Vorzeichen des öffentlichen Zählers"
@@ -116,6 +118,8 @@
       "control_max_step": { "name": "Aktive maximale Sollwertänderung" },
       "active_target_soc": { "name": "Aktuell verwendetes Ladeziel" },
       "desired_charge_limit": { "name": "Verwendete System-Ladegrenze" },
+      "battery_charge_power": { "name": "Batterie lädt tatsächlich" },
+      "battery_discharge_power": { "name": "Batterie entlädt tatsächlich" },
       "cycle_state": {
         "name": "Zyklusstatus",
         "state": {
@@ -127,7 +131,8 @@
           "paused": "Zyklusladung angehalten"
         }
       },
-      "days_since_full": { "name": "Tage im aktuellen Zyklus" }
+      "days_since_full": { "name": "Tage im aktuellen Zyklus" },
+      "next_cycle_at": { "name": "Nächste Zyklusladung" }
     },
     "binary_sensor": {
       "data_valid": {

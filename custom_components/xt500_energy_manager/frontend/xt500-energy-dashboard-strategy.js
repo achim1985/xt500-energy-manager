@@ -21,6 +21,9 @@ const XT500_DISPLAY_NAMES = {
   cycle_due: "Zyklus fällig",
   cycle_check_time: "Tägliche Prüfzeit",
   days_since_full: "Tage im aktuellen Zyklus",
+  next_cycle_at: "Nächste Zyklusladung",
+  battery_charge_power: "Batterie lädt",
+  battery_discharge_power: "Batterie entlädt",
 };
 
 const XT500_DISPLAY_ICONS = {
@@ -65,6 +68,8 @@ class XT500EnergyManagerDashboardStrategy extends HTMLElement {
       const socEntity = sourceAttributes.source_soc_entity;
       const actualGridSetpoint = sourceAttributes.source_grid_setpoint_entity;
       const actualChargeLimit = sourceAttributes.source_max_charge_soc_entity;
+      const actualLoadDischargeLimit =
+        sourceAttributes.source_load_discharge_limit_entity;
       const existing = (keys) => keys.map((key) => entities[key]).filter(Boolean);
       const namedExisting = (keys) => keys
         .filter((key) => entities[key])
@@ -106,12 +111,13 @@ class XT500EnergyManagerDashboardStrategy extends HTMLElement {
         ...namedExisting([
           "cycle_state",
           "days_since_full",
+          "next_cycle_at",
         ]),
       );
 
       const flowEntities = [
-        [sourceAttributes.source_battery_input_power_entity, "Batterie lädt"],
-        [sourceAttributes.source_battery_output_power_entity, "Batterie entlädt"],
+        [entities.battery_charge_power, "Batterie lädt"],
+        [entities.battery_discharge_power, "Batterie entlädt"],
         [sourceAttributes.source_pv_power_entity, "PV-Eingang"],
         [sourceAttributes.source_public_grid_power_entity, "Öffentliches Netz (+ Bezug)"],
         [sourceAttributes.source_grid_port_power_entity, "XT500 Netzanschluss"],
@@ -153,6 +159,13 @@ class XT500EnergyManagerDashboardStrategy extends HTMLElement {
         heading("Normalbetrieb und Grenzen", "mdi:tune-variant"),
         tile("base_mode", "Grundmodus", [{ type: "select-options" }]),
         tile("normal_charge_limit", "Ladelimit Normalbetrieb", [{ type: "numeric-input", style: "buttons" }]),
+        actualLoadDischargeLimit && hass.states[actualLoadDischargeLimit] ? {
+          type: "tile",
+          entity: actualLoadDischargeLimit,
+          name: "Lastanschluss-Entladegrenze",
+          features: [{ type: "numeric-input", style: "buttons" }],
+          grid_options: { columns: "full", rows: "auto" },
+        } : null,
         tile("minimum_soc", "Entladegrenze", [{ type: "numeric-input", style: "buttons" }]),
         tile("soc_hysteresis", "Wiederfreigabe", [{ type: "numeric-input", style: "buttons" }]),
         tile("target_grid_power", "Netzziel", [{ type: "numeric-input", style: "buttons" }]),
@@ -213,6 +226,8 @@ class XT500EnergyManagerDashboardStrategy extends HTMLElement {
           "- **Normalbetrieb:** Der Speicher gleicht den Hausverbrauch aus und hält das eingestellte Netzziel ein. Oberhalb der Entladegrenze darf er Energie ins Haus abgeben.\n" +
           "- **PV-Überschuss als Grundmodus:** Nur aktuell verfügbare PV-Leistung wird bis zum Hausbedarf freigegeben. Nicht benötigte PV-Leistung bleibt zum Laden im Akku; zusätzliche Batterieentladung wird vermieden.\n" +
           "- **Ladelimit Normalbetrieb:** Dieser Wert wird als echte System-Ladegrenze an den Speicher geschrieben. Der auswählbare Bereich folgt dem Gerät; beim hier verwendeten System sind das 70 bis 100 %.\n" +
+          "- **Lastanschluss-Entladegrenze:** Das ist die originale Geräte-Einstellung für den gesonderten XT500-Lastanschluss. Sie wird direkt am Speicher geändert und ist von der Entladegrenze der Energiemanager-Regelung getrennt.\n" +
+          "- **Entladegrenze:** Unterhalb dieses SOC stoppt der Energiemanager die geregelte Batterieabgabe ins Hausnetz. Die Wiederfreigabe erfolgt erst oberhalb der zusätzlich eingestellten Hysterese.\n" +
           "- Startet eine manuelle oder automatische Zielladung oberhalb des normalen Limits, hebt die Integration die System-Ladegrenze vorübergehend auf das benötigte Ziel an. Nach Zielerreichung stellt sie automatisch das normale Ladelimit wieder her.\n\n" +
           "**Lademodi für manuelle und automatische Ladung**\n\n" +
           "- **Netzladung:** Lädt mit der eingestellten AC-Leistung; Netzbezug ist erlaubt. Beispiel: 1.200 W und Ziel 100 % erreichen das Ziel auch nachts.\n" +
@@ -224,6 +239,7 @@ class XT500EnergyManagerDashboardStrategy extends HTMLElement {
           "- Ist das Intervall abgelaufen, zeigt der Zyklusstatus **Fällig – wartet auf tägliche Prüfzeit**. Erst zur eingestellten **täglichen Prüfzeit** startet die Integration die Ladung im gewählten Zyklus-Lademodus.\n" +
           "- **Jetzt manuell starten** beginnt die Zyklusladung sofort – unabhängig davon, ob sie bereits fällig ist. Dafür werden ebenfalls der Zyklus-Lademodus und das Vollladeziel verwendet. Die automatische Überwachung bleibt unverändert ein- oder ausgeschaltet.\n" +
           "- Der **Zyklusstatus** unterscheidet eindeutig zwischen Überwachung, fälligem Zyklus, manueller Zyklusladung, automatischer Zyklusladung und einer angehaltenen Ladung.\n" +
+          "- **Nächste Zyklusladung** zeigt den aktuell berechneten Termin aus letzter Vollladung bzw. Rücksetzzeitpunkt, Intervall und täglicher Prüfzeit.\n" +
           "- **Zyklustage auf 0 setzen** beginnt das Intervall ab jetzt neu und beendet eine eventuell laufende Zyklusladung. Es wird dabei keine künstliche Vollladung eingetragen.\n\n" +
           "**Ziel erreicht**\n\n" +
           "- Beim manuellen Ziel wird die manuelle Zielladung ausgeschaltet und der Grundmodus wieder aktiv.\n" +
@@ -232,6 +248,7 @@ class XT500EnergyManagerDashboardStrategy extends HTMLElement {
           "- Erreicht der Speicher das automatische Vollladeziel ganz normal durch PV, zählt dies ebenfalls als erfolgreiche Vollladung – auch ohne laufende Zyklusladung.\n" +
           "- Die System-Ladegrenze kehrt danach immer zum **Ladelimit Normalbetrieb** zurück.\n\n" +
           "**Regelruhe und Sicherheit:** Kleine Abweichungen werden fein, mittlere stärker und große Lastsprünge schnell korrigiert. Nach einem Sollwertschreiben wartet die Integration auf neue Messwerte. Im PV-Überschussbetrieb setzt die Niedrig-PV-Sperre beide Sollwerte unterhalb der Abschaltschwelle sofort auf 0 W und gibt sie erst nach der eingestellten Zeit oberhalb der Startleistung wieder frei.\n\n" +
+          "**Leistungsflüsse:** Batterie lädt und Batterie entlädt sind Nettowerte aus den originalen XT500-Gesamteingangs- und Gesamtausgangsleistungen. Beispiel: 200 W Eingang und 300 W Ausgang werden als 0 W Laden und 100 W tatsächliches Entladen angezeigt.\n\n" +
           "**Fehlerwiederherstellung:** Ein Schreibfehler verriegelt die Regelung sofort. Wenn die automatische Wiederherstellung aktiv ist, müssen beide Rückmeldungen zunächst für die eingestellte Zeit gültig und aktuell bleiben. Danach prüft die Integration die Verbindung mit einem wirkungslosen Schreibtest auf den bereits vorhandenen Wechselrichter-Sollwert und wartet auf neue Messwerte. Bei Erfolg wird die Regelung wieder freigegeben. Es gibt höchstens drei Versuche mit wachsender Wartezeit; danach ist ein manueller Aus-/Ein-Reset von **Regelung aktiv** erforderlich.\n\n" +
           "**Leistungsgrenzen:** Für einen XT500 üblicherweise 800 W als Hausnetz-Limit einstellen. Ein XT500 Pro kann bis zu 2.400 W nutzen. Die Wechselrichter-Obergrenze ist ein technischer Sollwert, kein gemessener Leistungsfluss.\n\n" +
           "</details>",

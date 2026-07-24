@@ -44,6 +44,10 @@ async def async_get_config_entry_diagnostics(_hass: HomeAssistant, entry: XT500C
             "reference": runtime.settings["cycle_reference"],
             "next_cycle": runtime.next_cycle_at,
         },
+        "battery_flows": {
+            "net_charge_w": runtime.battery_charge_power,
+            "net_discharge_w": runtime.battery_discharge_power,
+        },
         "data_valid": runtime.data_valid,
         "adaptive_control": {
             "band": runtime.control_profile.band,

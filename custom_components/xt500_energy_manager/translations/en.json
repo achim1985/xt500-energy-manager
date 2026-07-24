@@ -14,6 +14,7 @@
           "grid_setpoint_entity": "Grid-port power setpoint",
           "inverter_setpoint_entity": "Maximum inverter power setpoint",
           "max_charge_soc_entity": "System charge limit",
+          "load_discharge_limit_entity": "System load-port discharge limit",
           "battery_input_power_entity": "Battery charging power (total input)",
           "battery_output_power_entity": "Battery discharging power (total output)",
           "meter_sign": "Public meter sign convention"
@@ -43,6 +44,7 @@
           "grid_setpoint_entity": "Grid-port power setpoint",
           "inverter_setpoint_entity": "Maximum inverter power setpoint",
           "max_charge_soc_entity": "System charge limit",
+          "load_discharge_limit_entity": "System load-port discharge limit",
           "battery_input_power_entity": "Battery charging power (total input)",
           "battery_output_power_entity": "Battery discharging power (total output)",
           "meter_sign": "Public meter sign convention"
@@ -116,6 +118,8 @@
       "control_max_step": { "name": "Active maximum setpoint change" },
       "active_target_soc": { "name": "Currently used charge target" },
       "desired_charge_limit": { "name": "Applied system charge limit" },
+      "battery_charge_power": { "name": "Actual battery charging power" },
+      "battery_discharge_power": { "name": "Actual battery discharging power" },
       "cycle_state": {
         "name": "Cycle status",
         "state": {
@@ -127,7 +131,8 @@
           "paused": "Cycle charging paused"
         }
       },
-      "days_since_full": { "name": "Days in current cycle" }
+      "days_since_full": { "name": "Days in current cycle" },
+      "next_cycle_at": { "name": "Next cycle charge" }
     },
     "binary_sensor": {
       "data_valid": {

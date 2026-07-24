@@ -18,6 +18,7 @@ from .const import (
     CONF_GRID_POWER_ENTITY,
     CONF_GRID_SETPOINT_ENTITY,
     CONF_INVERTER_SETPOINT_ENTITY,
+    CONF_LOAD_DISCHARGE_LIMIT_ENTITY,
     CONF_LOAD_PORT_POWER_ENTITY,
     CONF_MAX_CHARGE_SOC_ENTITY,
     CONF_METER_SIGN,
@@ -60,6 +61,7 @@ def _schema(defaults: dict[str, Any] | None = None) -> vol.Schema:
             required(CONF_GRID_SETPOINT_ENTITY): _entity_selector("number"),
             required(CONF_INVERTER_SETPOINT_ENTITY): _entity_selector("number"),
             required(CONF_MAX_CHARGE_SOC_ENTITY): _entity_selector("number"),
+            optional(CONF_LOAD_DISCHARGE_LIMIT_ENTITY): _entity_selector("number"),
             optional(CONF_BATTERY_INPUT_POWER_ENTITY): _entity_selector("sensor"),
             optional(CONF_BATTERY_OUTPUT_POWER_ENTITY): _entity_selector("sensor"),
             required(CONF_METER_SIGN, METER_IMPORT_POSITIVE): selector.SelectSelector(

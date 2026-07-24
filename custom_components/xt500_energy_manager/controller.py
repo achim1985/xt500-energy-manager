@@ -272,6 +272,15 @@ def decode_signed_16(value: float) -> float:
     return value - 65536 if value > 32767 else value
 
 
+def net_battery_flows(
+    input_power: float,
+    output_power: float,
+) -> tuple[float, float]:
+    """Return mutually exclusive net charging and discharging power."""
+    net_power = max(float(input_power), 0.0) - max(float(output_power), 0.0)
+    return round(max(net_power, 0.0), 1), round(max(-net_power, 0.0), 1)
+
+
 @dataclass(slots=True, frozen=True)
 class ControlInput:
     """Current measurements used by the production controller."""

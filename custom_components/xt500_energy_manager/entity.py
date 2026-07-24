@@ -10,6 +10,7 @@ from .const import (
     CONF_BATTERY_OUTPUT_POWER_ENTITY,
     CONF_GRID_PORT_POWER_ENTITY,
     CONF_GRID_POWER_ENTITY,
+    CONF_LOAD_DISCHARGE_LIMIT_ENTITY,
     CONF_LOAD_PORT_POWER_ENTITY,
     CONF_MAX_CHARGE_SOC_ENTITY,
     CONF_PV_POWER_ENTITY,
@@ -32,7 +33,7 @@ class XT500Entity(Entity):
             name=runtime.entry.title,
             manufacturer="Community",
             model="XT500 energy manager",
-            sw_version="1.1.0",
+            sw_version="1.2.0",
         )
 
     @property
@@ -49,6 +50,9 @@ class XT500Entity(Entity):
             "source_inverter_setpoint_entity": self.runtime.entry.data["inverter_setpoint_entity"],
             "source_max_charge_soc_entity": self.runtime.entry.data.get(
                 CONF_MAX_CHARGE_SOC_ENTITY
+            ),
+            "source_load_discharge_limit_entity": self.runtime.entry.data.get(
+                CONF_LOAD_DISCHARGE_LIMIT_ENTITY
             ),
             "source_battery_input_power_entity": self.runtime.entry.data.get(CONF_BATTERY_INPUT_POWER_ENTITY),
             "source_battery_output_power_entity": self.runtime.entry.data.get(CONF_BATTERY_OUTPUT_POWER_ENTITY),

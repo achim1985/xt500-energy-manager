@@ -11,6 +11,11 @@
 - schnell wechselnde Regelwerte werden nicht mehr zusätzlich als Attribute des
   Statussensors gespeichert; sie bleiben als eigene Live-Entitäten und im
   Diagnosebericht verfügbar
+- originale Systemlastanschluss-Entladegrenze kann bei der Einrichtung
+  zugeordnet und im Einstellungs-Dashboard direkt verändert werden
+- Statusblock zeigt den nächsten berechneten Termin der Zyklusladung
+- Batterie lädt/entlädt werden aus den originalen Gesamtleistungen als
+  gegenseitig ausschließende Nettowerte angezeigt
 
 ## 1.1.0
 

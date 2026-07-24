@@ -80,6 +80,7 @@ from .controller import (
     cycle_is_due,
     feedback_samples_are_fresh,
     limit_setpoint_change,
+    net_battery_flows,
     next_cycle_check_at,
     overall_control_error,
     RECOVERY_DELAY_MULTIPLIERS,
@@ -492,6 +493,12 @@ class XT500Runtime:
     @property
     def next_cycle_at(self) -> str | None:
         """Return the next daily check at which a due cycle may start."""
+        next_cycle = self.next_cycle_datetime
+        return next_cycle.isoformat() if next_cycle is not None else None
+
+    @property
+    def next_cycle_datetime(self) -> datetime | None:
+        """Return the next scheduled cycle check as a timezone-aware datetime."""
         baseline = self._setting_datetime(
             SETTING_LAST_FULL
         ) or self._setting_datetime(SETTING_CYCLE_REFERENCE)
@@ -501,7 +508,31 @@ class XT500Runtime:
             baseline=baseline,
             interval_days=float(self.settings[SETTING_CYCLE_INTERVAL_DAYS]),
             check_time=self.cycle_check_time,
-        ).isoformat()
+        )
+
+    def _battery_flows(self) -> tuple[float, float] | None:
+        """Return actual net charge/discharge derived from original XT500 totals."""
+        input_entity = self.entry.data.get(CONF_BATTERY_INPUT_POWER_ENTITY)
+        output_entity = self.entry.data.get(CONF_BATTERY_OUTPUT_POWER_ENTITY)
+        if not input_entity or not output_entity:
+            return None
+        input_power = self._float_state(input_entity)
+        output_power = self._float_state(output_entity)
+        if input_power is None or output_power is None:
+            return None
+        return net_battery_flows(input_power, output_power)
+
+    @property
+    def battery_charge_power(self) -> float | None:
+        """Return actual net battery charging power."""
+        flows = self._battery_flows()
+        return flows[0] if flows is not None else None
+
+    @property
+    def battery_discharge_power(self) -> float | None:
+        """Return actual net battery discharging power."""
+        flows = self._battery_flows()
+        return flows[1] if flows is not None else None
 
     @property
     def cycle_check_time(self) -> time:

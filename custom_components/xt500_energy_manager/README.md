@@ -1,4 +1,4 @@
-# XT500 Energy Manager 1.0.7
+# XT500 Energy Manager 1.2.0
 
 Production-ready Home Assistant controller for SunEnergyXT XT500 and XT500 Pro
 systems. The integration directly controls the grid-port setpoint, inverter
@@ -58,8 +58,9 @@ base mode after completion.
    custom repository of type **Integration** and download it.
 3. Restart Home Assistant.
 4. Add **XT500 Energy Manager** under Settings → Devices & services.
-5. Select the measurement entities and the three writable number entities:
-   grid-port setpoint, inverter ceiling, and system charge limit.
+5. Select the measurement entities and the writable number entities:
+   grid-port setpoint, inverter ceiling, system charge limit, and optionally
+   the original load-port discharge limit.
 6. Confirm the public meter sign convention.
 7. Ensure no other automation writes those same number entities, then enable
    the energy manager.
@@ -67,13 +68,17 @@ base mode after completion.
 ## Generated dashboard
 
 Register
-`/xt500_energy_manager/xt500-energy-dashboard-strategy.js?v=1.0.7` once as a
+`/xt500_energy_manager/xt500-energy-dashboard-strategy.js?v=1.2.0` once as a
 JavaScript module under Settings → Dashboards → Resources. Then add the
 **XT500 Energiemanager** community dashboard.
 
 The generated dashboard uses only built-in Home Assistant cards. It includes
 status, power flows, manual and automatic charging, normal-operation limits,
 adaptive tuning, and a collapsible operating guide.
+
+Battery charging and discharging are displayed as mutually exclusive net
+values derived from the original XT500 total input and total output sensors.
+The cycle status also shows the next calculated cycle-charge date.
 
 Use a maximum home-grid output of about 800 W for an XT500 unless the local
 installation permits another value. XT500 Pro systems can use up to 2400 W.

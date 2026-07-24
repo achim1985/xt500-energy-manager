@@ -84,6 +84,8 @@ Die Integration wurde mit Home Assistant 2026.7 und der SunEnergyXT-Integration
    - Sollwert Leistung Netzanschluss (`GS`)
    - Sollwert maximale Wechselrichterleistung (`IS`)
    - System-Ladegrenze (`SA`)
+   - Systemlastanschluss-Entladegrenze
+   - Gesamteingangs- und Gesamtausgangsleistung des Systems
 
 Erst wenn diese Entitäten verfügbar und nicht `unavailable` sind, mit dem
 XT500 Energy Manager fortfahren.
@@ -159,8 +161,13 @@ zugeordnet.
 | Sollwert Leistung Netzanschluss | SunEnergyXT **Sollwert Leistung Netzanschluss** (`GS`) |
 | Sollwert max. Wechselrichterleistung | SunEnergyXT **Sollwert max. Wechselrichterleistung** (`IS`) |
 | System-Ladegrenze | SunEnergyXT **System-Ladegrenze** (`SA`) |
-| Batterie-Ladeleistung | optionaler vorhandener Sensor für die Ladeleistung |
-| Batterie-Entladeleistung | optionaler vorhandener Sensor für die Entladeleistung |
+| Systemlastanschluss-Entladegrenze | SunEnergyXT **Systemlastanschluss-Entladegrenze**; wird im Dashboard direkt am Gerät eingestellt |
+| Batterie-Ladeleistung | SunEnergyXT **Gesamteingangsleistung des Systems** |
+| Batterie-Entladeleistung | SunEnergyXT **Gesamtausgangsleistung des Systems** |
+
+Aus Gesamt-Eingang und Gesamt-Ausgang berechnet der Energiemanager zwei
+gegenseitig ausschließende Nettowerte. Bei 200 W Eingang und 300 W Ausgang
+zeigt das Dashboard daher `0 W` Laden und `100 W` tatsächliches Entladen.
 
 ### Öffentlichen Netzsensor richtig auswählen
 
@@ -223,7 +230,7 @@ Karten.
 5. Als URL exakt eintragen:
 
    ```text
-   /xt500_energy_manager/xt500-energy-dashboard-strategy.js?v=1.1.0
+   /xt500_energy_manager/xt500-energy-dashboard-strategy.js?v=1.2.0
    ```
 
 6. Als Ressourcentyp **JavaScript-Modul** auswählen.
@@ -427,7 +434,7 @@ Der separate **Zyklusstatus** unterscheidet:
 
 ## Projektstatus
 
-Version 1.1.0 ist der aktuelle Betateststand. Gesucht werden
+Version 1.2.0 ist der aktuelle Betateststand. Gesucht werden
 Testerinnen und Tester mit unterschiedlichen XT500- und XT500-Pro-Systemen,
 Firmwareständen und Stromzählern.
 
