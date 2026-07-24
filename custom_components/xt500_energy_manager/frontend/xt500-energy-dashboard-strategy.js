@@ -77,6 +77,7 @@ class XT500EnergyManagerDashboardStrategy extends HTMLElement {
           entity: entities[key],
           name: XT500_DISPLAY_NAMES[key] || key,
           ...(XT500_DISPLAY_ICONS[key] ? { icon: XT500_DISPLAY_ICONS[key] } : {}),
+          ...(key === "next_cycle_at" ? { format: "datetime" } : {}),
         }));
       const heading = (text, icon) => ({ type: "heading", heading: text, icon });
       const tile = (key, name, features = []) => entities[key] ? {

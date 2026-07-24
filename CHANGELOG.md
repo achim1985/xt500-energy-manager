@@ -14,6 +14,8 @@
 - originale Systemlastanschluss-Entladegrenze kann bei der Einrichtung
   zugeordnet und im Einstellungs-Dashboard direkt verändert werden
 - Statusblock zeigt den nächsten berechneten Termin der Zyklusladung
+- der Termin wird als festes Datum mit Uhrzeit statt als relativer Zeitraum
+  angezeigt
 - Batterie lädt/entlädt werden aus den originalen Gesamtleistungen als
   gegenseitig ausschließende Nettowerte angezeigt
 
