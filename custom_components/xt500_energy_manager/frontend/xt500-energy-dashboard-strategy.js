@@ -32,6 +32,24 @@ const XT500_DISPLAY_ICONS = {
 
 const XT500_STRATEGY_TYPE = "custom:xt500-energy-manager";
 
+const XT500_DASHBOARD_BLOCKS = {
+  overview: [
+    { key: "storage", label: "Speicherstand" },
+    { key: "regulation_status", label: "Regelungsstatus" },
+    { key: "setpoints", label: "Sollwerte und Berechnung" },
+    { key: "cycle", label: "Zyklusladung" },
+    { key: "flows", label: "Aktuelle Leistungsflüsse" },
+    { key: "quick_controls", label: "Schnellsteuerung" },
+  ],
+  settings: [
+    { key: "guide", label: "Bedienung und Sicherheit" },
+    { key: "main_control", label: "Hauptsteuerung" },
+    { key: "target_charge", label: "Zielladung und Zyklusladung" },
+    { key: "normal_limits", label: "Normalbetrieb und Grenzen" },
+    { key: "advanced", label: "Feinabstimmung" },
+  ],
+};
+
 const cloneConfig = (value) => JSON.parse(JSON.stringify(value));
 
 const escapeHtml = (value) => String(value ?? "")
@@ -43,6 +61,40 @@ const escapeHtml = (value) => String(value ?? "")
 
 const sourceViewKey = (view, index) =>
   view.path ? `path:${view.path}` : `index:${index}`;
+
+const blockConfigKey = (page, suffix) => `${page}_block_${suffix}`;
+
+const normalizedBlockOrder = (config, page) => {
+  const knownKeys = XT500_DASHBOARD_BLOCKS[page].map((block) => block.key);
+  const configured = Array.isArray(config?.[blockConfigKey(page, "order")])
+    ? config[blockConfigKey(page, "order")]
+    : [];
+  return [
+    ...configured.filter(
+      (key, index) => knownKeys.includes(key) && configured.indexOf(key) === index,
+    ),
+    ...knownKeys.filter((key) => !configured.includes(key)),
+  ];
+};
+
+const normalizedHiddenBlocks = (config, page) => {
+  const knownKeys = new Set(
+    XT500_DASHBOARD_BLOCKS[page].map((block) => block.key),
+  );
+  const configured = Array.isArray(config?.[blockConfigKey(page, "hidden")])
+    ? config[blockConfigKey(page, "hidden")]
+    : [];
+  return configured.filter(
+    (key, index) => knownKeys.has(key) && configured.indexOf(key) === index,
+  );
+};
+
+const orderedVisibleBlocks = (config, page, blocks) => {
+  const hidden = new Set(normalizedHiddenBlocks(config, page));
+  return normalizedBlockOrder(config, page)
+    .filter((key) => !hidden.has(key) && blocks[key])
+    .map((key) => blocks[key]);
+};
 
 const additionalViewPath = (entry, sourceView, usedPaths) => {
   const rawPath = [
@@ -144,6 +196,12 @@ class XT500EnergyManagerStrategyEditor extends HTMLElement {
     this._config = cloneConfig(config || {});
     if (!Array.isArray(this._config.additional_views)) {
       this._config.additional_views = [];
+    }
+    for (const page of Object.keys(XT500_DASHBOARD_BLOCKS)) {
+      this._config[blockConfigKey(page, "order")] =
+        normalizedBlockOrder(this._config, page);
+      this._config[blockConfigKey(page, "hidden")] =
+        normalizedHiddenBlocks(this._config, page);
     }
     this._render();
     for (const entry of this._config.additional_views) {
@@ -271,6 +329,101 @@ class XT500EnergyManagerStrategyEditor extends HTMLElement {
     this._render();
   }
 
+  _moveBlock(page, key, direction) {
+    const orderKey = blockConfigKey(page, "order");
+    const order = normalizedBlockOrder(this._config, page);
+    const currentIndex = order.indexOf(key);
+    const targetIndex = currentIndex + direction;
+    if (
+      currentIndex < 0 ||
+      targetIndex < 0 ||
+      targetIndex >= order.length
+    ) {
+      return;
+    }
+    [order[currentIndex], order[targetIndex]] =
+      [order[targetIndex], order[currentIndex]];
+    this._config[orderKey] = order;
+    this._changed();
+    this._render();
+  }
+
+  _setBlockVisible(page, key, visible) {
+    const hiddenKey = blockConfigKey(page, "hidden");
+    const hidden = new Set(normalizedHiddenBlocks(this._config, page));
+    if (visible) {
+      hidden.delete(key);
+    } else {
+      hidden.add(key);
+    }
+    this._config[hiddenKey] = [...hidden];
+    this._changed();
+    this._render();
+  }
+
+  _resetBlockLayout(page) {
+    this._config[blockConfigKey(page, "order")] =
+      XT500_DASHBOARD_BLOCKS[page].map((block) => block.key);
+    this._config[blockConfigKey(page, "hidden")] = [];
+    this._changed();
+    this._render();
+  }
+
+  _blockEditor(page, title) {
+    const order = normalizedBlockOrder(this._config, page);
+    const hidden = new Set(normalizedHiddenBlocks(this._config, page));
+    const labels = new Map(
+      XT500_DASHBOARD_BLOCKS[page].map((block) => [block.key, block.label]),
+    );
+    const rows = order.map((key, index) => `
+      <div class="block-row">
+        <label class="block-visible">
+          <input
+            type="checkbox"
+            data-block-visible="${escapeHtml(key)}"
+            data-block-page="${escapeHtml(page)}"
+            ${hidden.has(key) ? "" : "checked"}
+          >
+          <span>${escapeHtml(labels.get(key) || key)}</span>
+        </label>
+        <div class="block-actions">
+          <button
+            type="button"
+            class="move"
+            data-block-move="-1"
+            data-block-key="${escapeHtml(key)}"
+            data-block-page="${escapeHtml(page)}"
+            aria-label="${escapeHtml(labels.get(key) || key)} nach oben"
+            ${index === 0 ? "disabled" : ""}
+          >↑</button>
+          <button
+            type="button"
+            class="move"
+            data-block-move="1"
+            data-block-key="${escapeHtml(key)}"
+            data-block-page="${escapeHtml(page)}"
+            aria-label="${escapeHtml(labels.get(key) || key)} nach unten"
+            ${index === order.length - 1 ? "disabled" : ""}
+          >↓</button>
+        </div>
+      </div>
+    `).join("");
+    return `
+      <section class="entry block-editor">
+        <div class="entry-heading">
+          <strong>${escapeHtml(title)}</strong>
+          <button
+            type="button"
+            class="reset"
+            data-block-reset="${escapeHtml(page)}"
+          >Standard wiederherstellen</button>
+        </div>
+        <p class="hint">Haken entfernt einen Block aus der Ansicht. Mit den Pfeilen änderst du seine Position.</p>
+        ${rows}
+      </section>
+    `;
+  }
+
   _dashboardOptions(selected) {
     const options = [
       '<option value="">Dashboard auswählen</option>',
@@ -375,7 +528,7 @@ class XT500EnergyManagerStrategyEditor extends HTMLElement {
           margin: 12px 0;
           font-size: 14px;
         }
-        select, input, button {
+        select, input:not([type="checkbox"]), button {
           box-sizing: border-box;
           min-height: 44px;
           padding: 10px 12px;
@@ -385,7 +538,7 @@ class XT500EnergyManagerStrategyEditor extends HTMLElement {
           background: var(--card-background-color);
           font: inherit;
         }
-        select, input {
+        select, input:not([type="checkbox"]) {
           width: 100%;
         }
         button {
@@ -402,6 +555,48 @@ class XT500EnergyManagerStrategyEditor extends HTMLElement {
           padding: 6px 10px;
           color: var(--error-color);
           background: transparent;
+        }
+        .reset {
+          min-height: 36px;
+          padding: 6px 10px;
+          color: var(--primary-color);
+          background: transparent;
+        }
+        .block-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          min-height: 52px;
+          border-top: 1px solid var(--divider-color);
+        }
+        .block-visible {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          flex: 1;
+          margin: 0;
+          cursor: pointer;
+        }
+        .block-visible input {
+          width: 20px;
+          height: 20px;
+          accent-color: var(--primary-color);
+        }
+        .block-actions {
+          display: flex;
+          gap: 6px;
+        }
+        .move {
+          min-width: 42px;
+          min-height: 36px;
+          padding: 6px 10px;
+          font-size: 18px;
+          background: transparent;
+        }
+        .move:disabled {
+          opacity: 0.35;
+          cursor: default;
         }
         .two-columns {
           display: grid;
@@ -422,6 +617,10 @@ class XT500EnergyManagerStrategyEditor extends HTMLElement {
           }
         }
       </style>
+      <h3>Aufbau der Energiemanager-Seiten</h3>
+      <p class="intro">Lege fest, in welcher Reihenfolge die einzelnen Blöcke erscheinen. Die Anordnung wird auf schmalen Bildschirmen von oben nach unten und auf breiten Bildschirmen im Home-Assistant-Raster verwendet.</p>
+      ${this._blockEditor("overview", "Seite „Speicher“")}
+      ${this._blockEditor("settings", "Seite „Einstellungen“")}
       <h3>Zusätzliche Dashboard-Ansichten</h3>
       <p class="intro">Binde einzelne Seiten aus anderen, in Home Assistant gespeicherten Dashboards als echte Reiter ein. Änderungen an der Quellseite werden nach einem Neuladen automatisch übernommen.</p>
       ${this._loadingDashboards ? '<p class="empty">Dashboards werden geladen …</p>' : ""}
@@ -446,6 +645,29 @@ class XT500EnergyManagerStrategyEditor extends HTMLElement {
           input.dataset.field,
           input.value,
         ),
+      );
+    }
+    for (const button of this.shadowRoot.querySelectorAll("[data-block-move]")) {
+      button.addEventListener("click", () =>
+        this._moveBlock(
+          button.dataset.blockPage,
+          button.dataset.blockKey,
+          Number(button.dataset.blockMove),
+        ),
+      );
+    }
+    for (const input of this.shadowRoot.querySelectorAll("[data-block-visible]")) {
+      input.addEventListener("change", () =>
+        this._setBlockVisible(
+          input.dataset.blockPage,
+          input.dataset.blockVisible,
+          input.checked,
+        ),
+      );
+    }
+    for (const button of this.shadowRoot.querySelectorAll("[data-block-reset]")) {
+      button.addEventListener("click", () =>
+        this._resetBlockLayout(button.dataset.blockReset),
       );
     }
   }
@@ -514,32 +736,27 @@ class XT500EnergyManagerDashboardStrategy extends HTMLElement {
       } : null;
       const compact = (cards) => cards.filter(Boolean);
 
-      const statusEntities = [
-        ...namedExisting([
-          "status", "control_ready", "recovery_status", "active_mode", "charge_request",
-          "active_target_soc", "desired_charge_limit", "pv_release_active", "data_valid",
-        ]),
-        { type: "section", label: "Sollwerte und Berechnung" },
-      ];
+      const regulationStatusEntities = namedExisting([
+        "status", "control_ready", "recovery_status", "active_mode", "charge_request",
+        "active_target_soc", "pv_release_active", "data_valid",
+      ]);
+      const setpointEntities = namedExisting(["desired_charge_limit"]);
       if (actualGridSetpoint && hass.states[actualGridSetpoint]) {
-        statusEntities.push({ entity: actualGridSetpoint, name: "Netz-Sollwert am Gerät" });
+        setpointEntities.push({ entity: actualGridSetpoint, name: "Netz-Sollwert am Gerät" });
       }
       if (actualChargeLimit && hass.states[actualChargeLimit]) {
-        statusEntities.push({ entity: actualChargeLimit, name: "System-Ladegrenze am Gerät" });
+        setpointEntities.push({ entity: actualChargeLimit, name: "System-Ladegrenze am Gerät" });
       }
-      statusEntities.push(...namedExisting([
+      setpointEntities.push(...namedExisting([
         "recommended_grid_setpoint",
         "recommended_inverter_setpoint",
         "estimated_home_load",
       ]));
-      statusEntities.push(
-        { type: "section", label: "Zyklusladung" },
-        ...namedExisting([
-          "cycle_state",
-          "days_since_full",
-          "next_cycle_at",
-        ]),
-      );
+      const cycleEntities = namedExisting([
+        "cycle_state",
+        "days_since_full",
+        "next_cycle_at",
+      ]);
 
       const flowEntities = [
         [entities.battery_charge_power, "Batterie lädt"],
@@ -624,23 +841,17 @@ class XT500EnergyManagerDashboardStrategy extends HTMLElement {
         tile("pv_start_delay", "Startleistung muss anliegen", [{ type: "numeric-input", style: "buttons" }]),
       ]);
 
-      const topCards = [];
+      let storageGauge = null;
       if (socEntity && hass.states[socEntity]) {
-        topCards.push({
+        storageGauge = {
           type: "gauge",
           entity: socEntity,
           name: "Speicherstand",
           min: 0,
           max: 100,
           severity: { red: 0, yellow: 20, green: 60 },
-        });
+        };
       }
-      topCards.push({
-        type: "entities",
-        title: "Regelungsstatus",
-        show_header_toggle: false,
-        entities: statusEntities,
-      });
 
       const guideCard = {
         type: "markdown",
@@ -680,36 +891,107 @@ class XT500EnergyManagerDashboardStrategy extends HTMLElement {
           "</details>",
       };
 
+      const quickControlCards = compact([
+        heading("Schnellsteuerung", "mdi:shield-home"),
+        tile("regulation_enabled", "Regelung aktiv", [{ type: "toggle" }]),
+        tile("automatic_recovery_enabled", "Fehler automatisch beheben", [{ type: "toggle" }]),
+        tile("manual_active", "Manuelle Zielladung", [{ type: "toggle" }]),
+        tile("cycle_start", "Zyklusladung jetzt starten", [{ type: "button" }]),
+        tile("automatic_enabled", "Automatische Zyklusüberwachung", [{ type: "toggle" }]),
+      ]);
+      const overviewBlocks = {
+        storage: storageGauge ? {
+          type: "grid",
+          cards: [
+            heading("Speicherstand", "mdi:home-battery"),
+            storageGauge,
+          ],
+        } : null,
+        regulation_status: regulationStatusEntities.length ? {
+          type: "grid",
+          cards: [
+            heading("Regelungsstatus", "mdi:shield-check"),
+            {
+              type: "entities",
+              show_header_toggle: false,
+              entities: regulationStatusEntities,
+            },
+          ],
+        } : null,
+        setpoints: setpointEntities.length ? {
+          type: "grid",
+          cards: [
+            heading("Sollwerte und Berechnung", "mdi:tune-vertical"),
+            {
+              type: "entities",
+              show_header_toggle: false,
+              entities: setpointEntities,
+            },
+          ],
+        } : null,
+        cycle: cycleEntities.length ? {
+          type: "grid",
+          cards: [
+            heading("Zyklusladung", "mdi:battery-sync"),
+            {
+              type: "entities",
+              show_header_toggle: false,
+              entities: cycleEntities,
+            },
+          ],
+        } : null,
+        flows: flowEntities.length ? {
+          type: "grid",
+          cards: [
+            heading("Aktuelle Leistungsflüsse", "mdi:transmission-tower"),
+            {
+              type: "entities",
+              show_header_toggle: false,
+              entities: flowEntities,
+            },
+          ],
+        } : null,
+        quick_controls: quickControlCards.length > 1 ? {
+          type: "grid",
+          cards: quickControlCards,
+        } : null,
+      };
+      const settingsBlocks = {
+        guide: {
+          type: "grid",
+          column_span: 3,
+          cards: [guideCard],
+        },
+        main_control: mainControlCards.length > 1 ? {
+          type: "grid",
+          cards: mainControlCards,
+        } : null,
+        target_charge: chargeControlCards.length > 2 ? {
+          type: "grid",
+          cards: chargeControlCards,
+        } : null,
+        normal_limits: normalControlCards.length > 1 ? {
+          type: "grid",
+          cards: normalControlCards,
+        } : null,
+        advanced: entities.show_advanced ? {
+          type: "grid",
+          cards: advancedControlCards,
+          visibility: [{
+            condition: "state",
+            entity: entities.show_advanced,
+            state: "on",
+          }],
+        } : null,
+      };
+
       views.push({
         title: managers.size > 1 ? `XT500 ${index}` : "Speicher",
         path: managers.size > 1 ? `speicher-${index}` : "speicher",
         icon: "mdi:home-battery",
         type: "sections",
         max_columns: 2,
-        sections: [
-          {
-            type: "grid",
-            cards: [
-              { type: "heading", heading: "Status und Regelung", icon: "mdi:shield-check" },
-              ...topCards,
-            ],
-          },
-          {
-            type: "grid",
-            cards: [
-              ...(flowEntities.length ? [
-                { type: "heading", heading: "Aktuelle Leistungsflüsse", icon: "mdi:transmission-tower" },
-                { type: "entities", show_header_toggle: false, entities: flowEntities },
-              ] : []),
-              heading("Schnellsteuerung", "mdi:shield-home"),
-              tile("regulation_enabled", "Regelung aktiv", [{ type: "toggle" }]),
-              tile("automatic_recovery_enabled", "Fehler automatisch beheben", [{ type: "toggle" }]),
-              tile("manual_active", "Manuelle Zielladung", [{ type: "toggle" }]),
-              tile("cycle_start", "Zyklusladung jetzt starten", [{ type: "button" }]),
-              tile("automatic_enabled", "Automatische Zyklusüberwachung", [{ type: "toggle" }]),
-            ].filter(Boolean),
-          },
-        ],
+        sections: orderedVisibleBlocks(config, "overview", overviewBlocks),
       });
 
       views.push({
@@ -718,17 +1000,7 @@ class XT500EnergyManagerDashboardStrategy extends HTMLElement {
         icon: "mdi:cog-outline",
         type: "sections",
         max_columns: 3,
-        sections: [
-          { type: "grid", column_span: 3, cards: [guideCard] },
-          { type: "grid", cards: mainControlCards },
-          { type: "grid", cards: chargeControlCards },
-          { type: "grid", cards: normalControlCards },
-          ...(entities.show_advanced ? [{
-            type: "grid",
-            cards: advancedControlCards,
-            visibility: [{ condition: "state", entity: entities.show_advanced, state: "on" }],
-          }] : []),
-        ],
+        sections: orderedVisibleBlocks(config, "settings", settingsBlocks),
       });
     }
 

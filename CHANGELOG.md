@@ -2,6 +2,16 @@
 
 ## Unveröffentlicht
 
+- Inhalte der Seiten **Speicher** und **Einstellungen** sind in eigenständige,
+  frei anordenbare Blöcke aufgeteilt
+- grafischer Strategy-Editor kann jeden Block mit Pfeiltasten verschieben oder
+  über einen Sichtbarkeitsschalter ausblenden
+- getrennte Reihenfolgen für Speicherübersicht und Einstellungsseite
+- Schaltfläche **Standard wiederherstellen** setzt Reihenfolge und Sichtbarkeit
+  einer Seite sicher zurück
+- bestehende Dashboard-Konfigurationen verwenden automatisch die bisherige
+  Standardreihenfolge
+
 ## 1.3.0 – 2026-07-25
 
 - grafischer Strategy-Editor zum Einbinden einzelner Ansichten aus anderen

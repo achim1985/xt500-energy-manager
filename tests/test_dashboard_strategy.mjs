@@ -35,6 +35,9 @@ vm.runInContext(strategySource, context);
 const Strategy = customElementRegistry.get(
   "ll-strategy-dashboard-xt500-energy-manager",
 );
+const StrategyEditor = customElementRegistry.get(
+  "xt500-energy-manager-strategy-editor",
+);
 
 const plain = (value) => JSON.parse(JSON.stringify(value));
 
@@ -60,6 +63,43 @@ const createHass = (dashboards, userId = "user-1") => ({
     return dashboards[message.url_path];
   },
 });
+
+const createLayoutHass = () => {
+  const hass = createHass({});
+  hass.states["sensor.xt500_status"] = {
+    ...managerState,
+    attributes: {
+      ...managerState.attributes,
+      source_soc_entity: "sensor.xt500_soc",
+      source_pv_power_entity: "sensor.xt500_pv",
+    },
+  };
+  hass.states["sensor.xt500_soc"] = { state: "72", attributes: {} };
+  hass.states["sensor.xt500_pv"] = { state: "500", attributes: {} };
+  for (const key of [
+    "recommended_grid_setpoint",
+    "cycle_state",
+    "battery_charge_power",
+    "regulation_enabled",
+    "manual_active",
+    "base_mode",
+    "show_advanced",
+  ]) {
+    hass.states[`sensor.xt500_${key}`] = {
+      state: "0",
+      attributes: {
+        integration: "xt500_energy_manager",
+        xt500_manager_id: "manager-1",
+        xt500_key: key,
+      },
+    };
+  }
+  return hass;
+};
+
+const sectionHeadings = (view) => view.sections.map((section) =>
+  section.cards[0].heading || section.cards[0].title,
+);
 
 test("bindet genau die ausgewählte Quellansicht als echten Reiter ein", async () => {
   const source = {
@@ -182,4 +222,104 @@ test("stellt einen grafischen Strategy-Editor bereit", () => {
     tagName: "xt500-energy-manager-strategy-editor",
   });
   assert.ok(customElementRegistry.has("xt500-energy-manager-strategy-editor"));
+});
+
+test("Editor verschiebt, versteckt und setzt Blöcke zurück", () => {
+  let changes = 0;
+  const editor = {
+    _config: {},
+    _changed: () => {
+      changes += 1;
+    },
+    _render: () => {},
+  };
+
+  StrategyEditor.prototype._moveBlock.call(
+    editor,
+    "overview",
+    "regulation_status",
+    -1,
+  );
+  assert.deepEqual(plain(editor._config.overview_block_order.slice(0, 2)), [
+    "regulation_status",
+    "storage",
+  ]);
+
+  StrategyEditor.prototype._setBlockVisible.call(
+    editor,
+    "overview",
+    "setpoints",
+    false,
+  );
+  assert.deepEqual(plain(editor._config.overview_block_hidden), ["setpoints"]);
+
+  StrategyEditor.prototype._resetBlockLayout.call(editor, "overview");
+  assert.deepEqual(plain(editor._config.overview_block_hidden), []);
+  assert.deepEqual(plain(editor._config.overview_block_order), [
+    "storage",
+    "regulation_status",
+    "setpoints",
+    "cycle",
+    "flows",
+    "quick_controls",
+  ]);
+  assert.equal(changes, 3);
+});
+
+test("teilt die Speicheransicht standardmäßig in einzeln anordenbare Blöcke", async () => {
+  const result = await Strategy.generate({}, createLayoutHass());
+
+  assert.deepEqual(plain(sectionHeadings(result.views[0])), [
+    "Speicherstand",
+    "Regelungsstatus",
+    "Sollwerte und Berechnung",
+    "Zyklusladung",
+    "Aktuelle Leistungsflüsse",
+    "Schnellsteuerung",
+  ]);
+  assert.deepEqual(plain(sectionHeadings(result.views[1])), [
+    "Bedienung und Sicherheit",
+    "Hauptsteuerung",
+    "Manuelle Zielladung",
+    "Normalbetrieb und Grenzen",
+    "Adaptive Regelung",
+  ]);
+});
+
+test("wendet Reihenfolge und ausgeblendete Blöcke für beide Seiten an", async () => {
+  const result = await Strategy.generate(
+    {
+      overview_block_order: [
+        "quick_controls",
+        "flows",
+        "storage",
+        "regulation_status",
+        "setpoints",
+        "cycle",
+      ],
+      overview_block_hidden: ["flows"],
+      settings_block_order: [
+        "normal_limits",
+        "target_charge",
+        "main_control",
+        "advanced",
+        "guide",
+      ],
+      settings_block_hidden: ["guide", "advanced"],
+    },
+    createLayoutHass(),
+  );
+
+  assert.deepEqual(plain(sectionHeadings(result.views[0])), [
+    "Schnellsteuerung",
+    "Speicherstand",
+    "Regelungsstatus",
+    "Sollwerte und Berechnung",
+    "Zyklusladung",
+  ]);
+  assert.deepEqual(plain(sectionHeadings(result.views[1])), [
+    "Normalbetrieb und Grenzen",
+    "Manuelle Zielladung",
+    "Hauptsteuerung",
+  ]);
 });

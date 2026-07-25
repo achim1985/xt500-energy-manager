@@ -236,7 +236,7 @@ Neuladen auch im Energiemanager-Dashboard.
 5. Als URL exakt eintragen:
 
    ```text
-   /xt500_energy_manager/xt500-energy-dashboard-strategy.js?v=1.3.0
+   /xt500_energy_manager/xt500-energy-dashboard-strategy.js?v=1.4.0
    ```
 
 6. Als Ressourcentyp **JavaScript-Modul** auswählen.
@@ -291,6 +291,27 @@ Auswahldialog erscheint.
 Die Karten und Ansichten dürfen bei einem Strategie-Dashboard nicht zusätzlich
 manuell in die Rohkonfiguration kopiert werden. Sie werden bei jedem Öffnen aus
 den vorhandenen XT500-Energy-Manager-Entitäten erzeugt.
+
+### Blöcke anordnen und ausblenden
+
+1. Unter **Einstellungen → Dashboards** beim
+   **XT500 Energiemanager** die Dashboard-Einstellungen öffnen.
+2. Im grafischen Strategy-Editor den Bereich
+   **Aufbau der Energiemanager-Seiten** öffnen.
+3. Für **Speicher** oder **Einstellungen**:
+
+   - mit `↑` und `↓` einen Block verschieben
+   - den Haken entfernen, um einen Block auszublenden
+   - **Standard wiederherstellen** wählen, um alle Blöcke wieder einzublenden
+     und die ursprüngliche Reihenfolge herzustellen
+
+4. Speichern und das Dashboard vollständig neu laden.
+
+Die Reihenfolge wird auf Smartphones von oben nach unten verwendet. Auf
+breiten Bildschirmen verteilt Home Assistant dieselbe Reihenfolge automatisch
+auf sein mehrspaltiges Raster. Speicherstand, Regelungsstatus, Sollwerte,
+Zyklusladung, Leistungsflüsse und Schnellsteuerung bleiben dabei eigenständige
+Blöcke.
 
 ### Ansichten anderer Dashboards ergänzen
 
@@ -470,7 +491,7 @@ Der separate **Zyklusstatus** unterscheidet:
 
 ## Projektstatus
 
-Version 1.3.0 ist der aktuelle Betateststand. Gesucht werden
+Version 1.4.0 ist der aktuelle Betateststand. Gesucht werden
 Testerinnen und Tester mit unterschiedlichen XT500- und XT500-Pro-Systemen,
 Firmwareständen und Stromzählern.
 
