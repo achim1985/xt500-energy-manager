@@ -2,6 +2,16 @@
 
 ## Unveröffentlicht
 
+- grafischer Strategy-Editor zum Einbinden einzelner Ansichten aus anderen
+  Home-Assistant-Dashboards
+- eingebundene Ansichten erscheinen als echte Reiter in der oberen
+  Dashboard-Leiste und werden beim Neuladen aus ihrer Quelle aktualisiert
+- optionaler eigener Titel und eigenes Symbol sowie zusätzliche Sichtbarkeit
+  „Nur für mich“
+- bestehende Benutzerbeschränkungen der Quellansicht bleiben erhalten
+- Schutz vor Doppelimport, Selbstimport und verschachtelten Ansichtsstrategien
+- eine nicht erreichbare Quellansicht beeinträchtigt die beiden
+  Energiemanager-Ansichten nicht
 - Normalbetrieb gleicht jetzt zusätzlich die Differenz zwischen angefordertem
   XT500-Sollwert und tatsächlich gemessener Netzanschlussleistung aus
 - dauerhafter kleiner Netzbezug durch Wandlungsverluste, Verzögerung oder

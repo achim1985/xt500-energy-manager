@@ -1,4 +1,4 @@
-# XT500 Energy Manager 1.2.0
+# XT500 Energy Manager 1.3.0
 
 Production-ready Home Assistant controller for SunEnergyXT XT500 and XT500 Pro
 systems. The integration directly controls the grid-port setpoint, inverter
@@ -68,13 +68,19 @@ base mode after completion.
 ## Generated dashboard
 
 Register
-`/xt500_energy_manager/xt500-energy-dashboard-strategy.js?v=1.2.0` once as a
+`/xt500_energy_manager/xt500-energy-dashboard-strategy.js?v=1.3.0` once as a
 JavaScript module under Settings → Dashboards → Resources. Then add the
 **XT500 Energiemanager** community dashboard.
 
 The generated dashboard uses only built-in Home Assistant cards. It includes
 status, power flows, manual and automatic charging, normal-operation limits,
 adaptive tuning, and a collapsible operating guide.
+
+The graphical strategy editor can add individual views from other
+storage-mode Home Assistant dashboards as native top-level tabs. The source
+view remains authoritative and is reloaded with the strategy. Existing source
+visibility restrictions are preserved; an imported view can additionally be
+limited to the user who configured it.
 
 Battery charging and discharging are displayed as mutually exclusive net
 values derived from the original XT500 total input and total output sensors.

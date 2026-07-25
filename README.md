@@ -221,6 +221,12 @@ werden.
 Sie verwendet ausschließlich standardmäßig mit Home Assistant ausgelieferte
 Karten.
 
+Zusätzlich lassen sich über einen grafischen Strategy-Editor einzelne
+Ansichten aus anderen, in Home Assistant gespeicherten Dashboards als echte
+Reiter in die obere Leiste aufnehmen. Die Quellansicht bleibt dabei die
+führende Konfiguration: Änderungen an ihr erscheinen nach einem vollständigen
+Neuladen auch im Energiemanager-Dashboard.
+
 ### Schritt 1: JavaScript-Ressource registrieren
 
 1. **Einstellungen → Dashboards** öffnen.
@@ -230,7 +236,7 @@ Karten.
 5. Als URL exakt eintragen:
 
    ```text
-   /xt500_energy_manager/xt500-energy-dashboard-strategy.js?v=1.2.0
+   /xt500_energy_manager/xt500-energy-dashboard-strategy.js?v=1.3.0
    ```
 
 6. Als Ressourcentyp **JavaScript-Modul** auswählen.
@@ -285,6 +291,36 @@ Auswahldialog erscheint.
 Die Karten und Ansichten dürfen bei einem Strategie-Dashboard nicht zusätzlich
 manuell in die Rohkonfiguration kopiert werden. Sie werden bei jedem Öffnen aus
 den vorhandenen XT500-Energy-Manager-Entitäten erzeugt.
+
+### Ansichten anderer Dashboards ergänzen
+
+1. Das XT500-Energiemanager-Dashboard öffnen.
+2. Oben rechts **Dashboard bearbeiten** auswählen.
+3. Die Konfiguration der Dashboard-Strategie öffnen.
+4. Unter **Zusätzliche Dashboard-Ansichten** auf
+   **Ansicht hinzufügen** klicken.
+5. Das Quell-Dashboard und anschließend die gewünschte Quell-Ansicht
+   auswählen.
+6. Optional einen kürzeren Titel und ein anderes `mdi:`-Symbol für den neuen
+   Reiter eintragen.
+7. Die Sichtbarkeit wählen:
+
+   - **Für alle berechtigten Benutzer:** Vorhandene Benutzerbeschränkungen der
+     Quellansicht bleiben unverändert erhalten.
+   - **Nur für mich:** Die Ansicht wird zusätzlich auf das Benutzerkonto
+     beschränkt, das diese Einstellung speichert.
+
+8. Speichern und das Dashboard vollständig neu laden.
+
+Die eingebundene Ansicht erscheint als normaler Reiter neben **Speicher** und
+**Einstellungen**. Es wird keine unabhängige Kopie angelegt. Dadurch bleiben
+spätere Änderungen an der ursprünglichen Ansicht wirksam.
+
+> [!NOTE]
+> Einbindbar sind einzelne, fest konfigurierte Ansichten aus Dashboards im
+> Speichermodus. Ein anderes XT500-Energiemanager-Strategie-Dashboard oder eine
+> Ansicht mit eigener dynamischer Strategie wird zum Schutz vor verschachtelten
+> Strategien nicht angeboten.
 
 ## Bedienung und Lademodi
 
@@ -434,7 +470,7 @@ Der separate **Zyklusstatus** unterscheidet:
 
 ## Projektstatus
 
-Version 1.2.0 ist der aktuelle Betateststand. Gesucht werden
+Version 1.3.0 ist der aktuelle Betateststand. Gesucht werden
 Testerinnen und Tester mit unterschiedlichen XT500- und XT500-Pro-Systemen,
 Firmwareständen und Stromzählern.
 
