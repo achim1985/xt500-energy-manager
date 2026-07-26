@@ -81,7 +81,10 @@ const createLayoutHass = () => {
     "cycle_state",
     "battery_charge_power",
     "regulation_enabled",
+    "automatic_recovery_enabled",
     "manual_active",
+    "automatic_enabled",
+    "cycle_start",
     "base_mode",
     "show_advanced",
   ]) {
@@ -134,13 +137,14 @@ test("bindet genau die ausgewählte Quellansicht als echten Reiter ein", async (
   );
 
   assert.equal(result.views.length, 3);
-  const imported = result.views[2];
+  const imported = result.views[1];
   assert.equal(imported.title, "PV");
   assert.equal(imported.icon, "mdi:solar-power");
   assert.equal(imported.path, "zusatz-dashboard-achim-strom");
   assert.equal(imported.subview, false);
   assert.deepEqual(plain(imported.visible), [{ user: "existing-user" }]);
   assert.deepEqual(plain(imported.sections), source.views[1].sections);
+  assert.equal(result.views.at(-1).path, "einstellungen");
   assert.deepEqual(source, originalSource);
 });
 
@@ -161,7 +165,8 @@ test("Nur für mich setzt die Ansicht auf den beim Speichern erfassten Benutzer"
     }),
   );
 
-  assert.deepEqual(plain(result.views[2].visible), [{ user: "saved-user" }]);
+  assert.deepEqual(plain(result.views[1].visible), [{ user: "saved-user" }]);
+  assert.equal(result.views.at(-1).path, "einstellungen");
 });
 
 test("ignoriert doppelte Einträge und Strategie-Ansichten", async () => {
@@ -322,4 +327,42 @@ test("wendet Reihenfolge und ausgeblendete Blöcke für beide Seiten an", async 
     "Manuelle Zielladung",
     "Hauptsteuerung",
   ]);
+});
+
+test("ordnet die Schnellsteuerung eindeutig und zeigt Fehlerbehebung nur in Einstellungen", async () => {
+  const result = await Strategy.generate({}, createLayoutHass());
+  const overview = result.views.find((view) => view.path === "speicher");
+  const settings = result.views.find((view) => view.path === "einstellungen");
+  const quickControls = overview.sections.find(
+    (section) => section.cards[0].heading === "Schnellsteuerung",
+  );
+  const mainControl = settings.sections.find(
+    (section) => section.cards[0].heading === "Hauptsteuerung",
+  );
+  const targetCharge = settings.sections.find(
+    (section) => section.cards[0].heading === "Manuelle Zielladung",
+  );
+
+  assert.deepEqual(plain(quickControls.cards.slice(1).map((card) => card.name)), [
+    "Regelung aktiv",
+    "Manuelle Zielladung",
+    "Automatische Zyklusüberwachung",
+    "Zyklusladung jetzt starten",
+  ]);
+  assert.equal(
+    quickControls.cards.some((card) => card.entity?.includes("automatic_recovery")),
+    false,
+  );
+  assert.equal(
+    mainControl.cards.some((card) => card.entity?.includes("automatic_recovery")),
+    true,
+  );
+
+  const cycleMonitorIndex = targetCharge.cards.findIndex(
+    (card) => card.name === "Automatische Zyklusüberwachung",
+  );
+  const cycleStartIndex = targetCharge.cards.findIndex(
+    (card) => card.name === "Jetzt manuell starten",
+  );
+  assert.equal(cycleStartIndex, cycleMonitorIndex + 1);
 });

@@ -94,8 +94,14 @@ from .controller import (
 
 _LOGGER = logging.getLogger(__name__)
 _STARTUP_STABILITY_SECONDS = 5.0
+_COMMUNICATION_STABILITY_SECONDS = 15.0
+_COMMUNICATION_FAILURE_SECONDS = 90.0
 _RECOVERY_FEEDBACK_TIMEOUT_SECONDS = 30.0
 _WRITE_MAX_ATTEMPTS = len(WRITE_RETRY_DELAY_MULTIPLIERS) + 1
+
+
+class TransientCommunicationError(HomeAssistantError):
+    """Signal a temporary loss of readable XT500 entities."""
 
 
 class XT500Runtime:
@@ -117,10 +123,16 @@ class XT500Runtime:
         self.last_transient_write_error: str | None = None
         self.last_transient_write_recovery: str | None = None
         self.transient_write_timeouts = 0
+        self.communication_pause_message: str | None = None
 
         self._data_valid_since_monotonic: float | None = None
         self._ha_started = hass.is_running
         self._write_blocked = False
+        self._communication_pause_active = False
+        self._communication_pause_at: datetime | None = None
+        self._communication_pause_started_monotonic: float | None = None
+        self._communication_stable_since_monotonic: float | None = None
+        self._communication_pause_task: asyncio.Task | None = None
         self._control_error_at: datetime | None = None
         self._recovery_attempts = 0
         self._recovery_status = "ready"
@@ -233,6 +245,7 @@ class XT500Runtime:
             self._startup_ready_task,
             self._pv_release_task,
             self._recovery_task,
+            self._communication_pause_task,
         ):
             if task is not None and not task.done():
                 task.cancel()
@@ -327,6 +340,16 @@ class XT500Runtime:
 
         self.data_valid = not self.invalid_entities
         if not self.data_valid:
+            if (
+                self.regulation_enabled
+                and self._ha_started
+                and (self.result is not None or self._communication_pause_active)
+            ):
+                self._begin_communication_pause(
+                    TransientCommunicationError(
+                        "XT500-Eingangsdaten vorübergehend nicht lesbar"
+                    )
+                )
             self._data_valid_since_monotonic = None
             self._recovery_stable_since_monotonic = None
             self._next_recovery_attempt = None
@@ -688,6 +711,7 @@ class XT500Runtime:
             and self.data_valid
             and self.result is not None
             and not self._write_blocked
+            and not self._communication_pause_active
             and self._data_valid_since_monotonic is not None
             and monotonic() - self._data_valid_since_monotonic
             >= _STARTUP_STABILITY_SECONDS
@@ -698,6 +722,8 @@ class XT500Runtime:
         """Return the user-facing production state."""
         if not self.regulation_enabled:
             return "disabled"
+        if self._communication_pause_active:
+            return "communication_pause"
         if not self.data_valid or self.result is None:
             return "invalid_data"
         if self._write_blocked:
@@ -856,6 +882,7 @@ class XT500Runtime:
     async def async_set_regulation_enabled(self, enabled: bool) -> None:
         """Enable or stop all production writes."""
         self._cancel_recovery_task()
+        self._clear_communication_pause()
         self._recovery_stable_since_monotonic = None
         self._next_recovery_attempt = None
         self._recovery_attempts = 0
@@ -912,6 +939,12 @@ class XT500Runtime:
                 )
         except asyncio.CancelledError:
             raise
+        except TransientCommunicationError as err:
+            _LOGGER.warning(
+                "XT500 communication interrupted; production writes paused: %s",
+                self._error_detail(err),
+            )
+            self._begin_communication_pause(err)
         except Exception as err:
             _LOGGER.exception("XT500 production write failed")
             self._begin_control_error(err)
@@ -931,6 +964,7 @@ class XT500Runtime:
     @callback
     def _begin_control_error(self, err: Exception) -> None:
         """Latch a production write error and start the guarded recovery flow."""
+        self._clear_communication_pause()
         self._write_blocked = True
         self._control_error_at = datetime.now(UTC)
         self.control_error_message = f"Schreibfehler: {self._error_detail(err)}"
@@ -946,6 +980,115 @@ class XT500Runtime:
         self._cancel_recovery_task()
         self._schedule_recovery()
         self._notify()
+
+    @property
+    def communication_pause_active(self) -> bool:
+        """Return whether writes wait for stable communication."""
+        return self._communication_pause_active
+
+    @property
+    def communication_pause_since(self) -> str | None:
+        """Return the beginning of the current communication pause."""
+        return (
+            self._communication_pause_at.isoformat()
+            if self._communication_pause_at is not None
+            else None
+        )
+
+    @callback
+    def _begin_communication_pause(self, err: Exception) -> None:
+        """Pause writes for a transient outage without latching immediately."""
+        if self._write_blocked or not self.regulation_enabled:
+            return
+        if not self._communication_pause_active:
+            self._communication_pause_active = True
+            self._communication_pause_at = datetime.now(UTC)
+            self._communication_pause_started_monotonic = monotonic()
+            self._communication_stable_since_monotonic = None
+        self.communication_pause_message = self._error_detail(err)
+        self._control_apply_requested = False
+        self._data_valid_since_monotonic = None
+        if (
+            self._communication_pause_task is None
+            or self._communication_pause_task.done()
+        ):
+            self._communication_pause_task = self.hass.async_create_task(
+                self._async_monitor_communication_pause()
+            )
+        self._notify()
+
+    @callback
+    def _clear_communication_pause(self) -> None:
+        """Clear the transient pause and cancel its watchdog when appropriate."""
+        task = self._communication_pause_task
+        current_task = asyncio.current_task()
+        if (
+            task is not None
+            and not task.done()
+            and task is not current_task
+        ):
+            task.cancel()
+        if task is not current_task:
+            self._communication_pause_task = None
+        self._communication_pause_active = False
+        self._communication_pause_at = None
+        self._communication_pause_started_monotonic = None
+        self._communication_stable_since_monotonic = None
+        self.communication_pause_message = None
+
+    async def _async_monitor_communication_pause(self) -> None:
+        """Resume after stable fresh feedback or hard-stop a long outage."""
+        current_task = asyncio.current_task()
+        try:
+            while (
+                self._communication_pause_active
+                and self.regulation_enabled
+                and not self._write_blocked
+            ):
+                now = monotonic()
+                feedback_fresh = (
+                    self._communication_pause_at is not None
+                    and feedback_samples_are_fresh(
+                        self._communication_pause_at,
+                        self._feedback_sample_times(),
+                    )
+                )
+                if self.data_valid and self.result is not None and feedback_fresh:
+                    if self._communication_stable_since_monotonic is None:
+                        self._communication_stable_since_monotonic = now
+                    elif (
+                        now - self._communication_stable_since_monotonic
+                        >= _COMMUNICATION_STABILITY_SECONDS
+                    ):
+                        self._clear_communication_pause()
+                        self._data_valid_since_monotonic = (
+                            monotonic() - _STARTUP_STABILITY_SECONDS
+                        )
+                        self._notify()
+                        self.async_calculate()
+                        return
+                else:
+                    self._communication_stable_since_monotonic = None
+
+                if (
+                    self._communication_pause_started_monotonic is not None
+                    and now - self._communication_pause_started_monotonic
+                    >= _COMMUNICATION_FAILURE_SECONDS
+                ):
+                    self._begin_control_error(
+                        HomeAssistantError(
+                            "XT500-Kommunikation länger als "
+                            f"{_COMMUNICATION_FAILURE_SECONDS:g} Sekunden "
+                            "nicht stabil"
+                        )
+                    )
+                    return
+                await asyncio.sleep(1)
+        except asyncio.CancelledError:
+            raise
+        finally:
+            if self._communication_pause_task is current_task:
+                self._communication_pause_task = None
 
     @callback
     def _schedule_recovery(self) -> None:
@@ -1156,7 +1299,9 @@ class XT500Runtime:
             current = self._float_state(entity_id)
             state = self.hass.states.get(entity_id)
             if current is None or state is None:
-                raise HomeAssistantError(f"Sollwert nicht lesbar: {entity_id}")
+                raise TransientCommunicationError(
+                    f"Sollwert vorübergehend nicht lesbar: {entity_id}"
+                )
             step = float(state.attributes.get("step", 1) or 1)
             if abs(target - current) < max(step / 2, 0.5):
                 continue
@@ -1197,6 +1342,11 @@ class XT500Runtime:
                     attempt,
                 )
                 if delay is None:
+                    if self._float_state(entity_id) is None:
+                        raise TransientCommunicationError(
+                            f"Sollwert nach Zeitüberschreitungen nicht lesbar: "
+                            f"{entity_id}"
+                        ) from err
                     raise HomeAssistantError(
                         f"Zeitüberschreitung beim Schreiben von {target:g} "
                         f"auf {entity_id} nach {_WRITE_MAX_ATTEMPTS} Versuchen"
@@ -1222,7 +1372,17 @@ class XT500Runtime:
                     self._notify()
                     return
                 continue
+            except HomeAssistantError as err:
+                if self._float_state(entity_id) is None:
+                    raise TransientCommunicationError(
+                        f"Sollwert vorübergehend nicht lesbar: {entity_id}"
+                    ) from err
+                raise
 
+            if self._float_state(entity_id) is None:
+                raise TransientCommunicationError(
+                    f"Sollwert nach dem Schreiben nicht lesbar: {entity_id}"
+                )
             if attempt > 1:
                 self.last_transient_write_recovery = (
                     f"{dt_util.now().isoformat()} · {entity_id} · "
@@ -1262,7 +1422,9 @@ class XT500Runtime:
         state = self.hass.states.get(entity_id)
         current = self._float_state(entity_id)
         if state is None or current is None:
-            raise HomeAssistantError(f"Sollwert nicht lesbar: {entity_id}")
+            raise TransientCommunicationError(
+                f"Sollwert vorübergehend nicht lesbar: {entity_id}"
+            )
         low = float(state.attributes.get("min", requested))
         high = float(state.attributes.get("max", requested))
         step = max(float(state.attributes.get("step", 1) or 1), 1)

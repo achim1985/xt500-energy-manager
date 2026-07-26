@@ -708,6 +708,7 @@ class XT500EnergyManagerDashboardStrategy extends HTMLElement {
     }
 
     const views = [];
+    const settingsViews = [];
     let index = 0;
     for (const entities of managers.values()) {
       index += 1;
@@ -772,7 +773,7 @@ class XT500EnergyManagerDashboardStrategy extends HTMLElement {
       const mainControlCards = compact([
         heading("Hauptsteuerung", "mdi:power"),
         tile("regulation_enabled", "Regelung aktiv", [{ type: "toggle" }]),
-        tile("automatic_recovery_enabled", "Automatische Fehlerwiederherstellung", [{ type: "toggle" }]),
+        tile("automatic_recovery_enabled", "Fehler automatisch beheben", [{ type: "toggle" }]),
         tile("show_advanced", "Feinabstimmung anzeigen", [{ type: "toggle" }]),
       ]);
       const chargeControlCards = compact([
@@ -782,9 +783,9 @@ class XT500EnergyManagerDashboardStrategy extends HTMLElement {
         tile("target_soc", "Ladeziel", [{ type: "numeric-input", style: "buttons" }]),
         tile("charge_power", "AC-Ladeleistung", [{ type: "numeric-input", style: "buttons" }]),
         heading("Zyklusladung", "mdi:battery-sync"),
+        tile("automatic_enabled", "Automatische Zyklusüberwachung", [{ type: "toggle" }]),
         tile("cycle_start", "Jetzt manuell starten", [{ type: "button" }]),
         tile("cycle_reset", "Zyklustage auf 0 setzen", [{ type: "button" }]),
-        tile("automatic_enabled", "Automatische Zyklusüberwachung", [{ type: "toggle" }]),
         entities.cycle_check_time ? {
           type: "entities",
           show_header_toggle: false,
@@ -886,7 +887,7 @@ class XT500EnergyManagerDashboardStrategy extends HTMLElement {
           "- Die System-Ladegrenze kehrt danach immer zum **Ladelimit Normalbetrieb** zurück.\n\n" +
           "**Regelruhe und Sicherheit:** Kleine Abweichungen werden fein, mittlere stärker und große Lastsprünge schnell korrigiert. Nach einem Sollwertschreiben wartet die Integration auf neue Messwerte. Im PV-Überschussbetrieb setzt die Niedrig-PV-Sperre beide Sollwerte unterhalb der Abschaltschwelle sofort auf 0 W und gibt sie erst nach der eingestellten Zeit oberhalb der Startleistung wieder frei.\n\n" +
           "**Leistungsflüsse:** Batterie lädt und Batterie entlädt sind Nettowerte aus den originalen XT500-Gesamteingangs- und Gesamtausgangsleistungen. Beispiel: 200 W Eingang und 300 W Ausgang werden als 0 W Laden und 100 W tatsächliches Entladen angezeigt.\n\n" +
-          "**Fehlerwiederherstellung:** Ein Schreibfehler verriegelt die Regelung sofort. Wenn die automatische Wiederherstellung aktiv ist, müssen beide Rückmeldungen zunächst für die eingestellte Zeit gültig und aktuell bleiben. Danach prüft die Integration die Verbindung mit einem wirkungslosen Schreibtest auf den bereits vorhandenen Wechselrichter-Sollwert und wartet auf neue Messwerte. Bei Erfolg wird die Regelung wieder freigegeben. Es gibt höchstens drei Versuche mit wachsender Wartezeit; danach ist ein manueller Aus-/Ein-Reset von **Regelung aktiv** erforderlich.\n\n" +
+          "**Kommunikationspause und Fehlerwiederherstellung:** Ein kurzzeitig nicht lesbarer XT500-Sollwert oder Verbindungsabbruch pausiert die Regelung zunächst, ohne sie sofort zu verriegeln. Erst nach 15 Sekunden stabilen, frischen Messrückmeldungen wird automatisch weitergeregelt. Bleibt die Verbindung 90 Sekunden lang instabil oder schlagen drei echte Schreibversuche trotz lesbarer Sollwerte fehl, wird die Regelung sicher verriegelt. Ist **Fehler automatisch beheben** aktiv, startet danach die geschützte Wiederherstellung mit stabilem Feedback und einem wirkungslosen Schreibtest. Nach höchstens drei erfolglosen Wiederherstellungsversuchen ist ein manueller Aus-/Ein-Reset von **Regelung aktiv** erforderlich.\n\n" +
           "**Leistungsgrenzen:** Für einen XT500 üblicherweise 800 W als Hausnetz-Limit einstellen. Ein XT500 Pro kann bis zu 2.400 W nutzen. Die Wechselrichter-Obergrenze ist ein technischer Sollwert, kein gemessener Leistungsfluss.\n\n" +
           "</details>",
       };
@@ -894,10 +895,9 @@ class XT500EnergyManagerDashboardStrategy extends HTMLElement {
       const quickControlCards = compact([
         heading("Schnellsteuerung", "mdi:shield-home"),
         tile("regulation_enabled", "Regelung aktiv", [{ type: "toggle" }]),
-        tile("automatic_recovery_enabled", "Fehler automatisch beheben", [{ type: "toggle" }]),
         tile("manual_active", "Manuelle Zielladung", [{ type: "toggle" }]),
-        tile("cycle_start", "Zyklusladung jetzt starten", [{ type: "button" }]),
         tile("automatic_enabled", "Automatische Zyklusüberwachung", [{ type: "toggle" }]),
+        tile("cycle_start", "Zyklusladung jetzt starten", [{ type: "button" }]),
       ]);
       const overviewBlocks = {
         storage: storageGauge ? {
@@ -994,7 +994,7 @@ class XT500EnergyManagerDashboardStrategy extends HTMLElement {
         sections: orderedVisibleBlocks(config, "overview", overviewBlocks),
       });
 
-      views.push({
+      settingsViews.push({
         title: managers.size > 1 ? `Einstellungen ${index}` : "Einstellungen",
         path: managers.size > 1 ? `einstellungen-${index}` : "einstellungen",
         icon: "mdi:cog-outline",
@@ -1005,6 +1005,7 @@ class XT500EnergyManagerDashboardStrategy extends HTMLElement {
     }
 
     views.push(...await loadAdditionalViews(config, hass, views));
+    views.push(...settingsViews);
     return { title: config.title || "XT500 Energiemanager", views };
   }
 }

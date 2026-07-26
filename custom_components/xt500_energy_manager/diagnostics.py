@@ -15,6 +15,13 @@ async def async_get_config_entry_diagnostics(_hass: HomeAssistant, entry: XT500C
         "control_mode": "production" if runtime.regulation_enabled else "disabled",
         "control_ready": runtime.control_ready,
         "control_error": runtime.control_error_message,
+        "communication_pause": {
+            "active": runtime.communication_pause_active,
+            "since": runtime.communication_pause_since,
+            "message": runtime.communication_pause_message,
+            "resume_after_stable_seconds": 15,
+            "hard_stop_after_seconds": 90,
+        },
         "automatic_recovery": {
             "enabled": runtime.automatic_recovery_enabled,
             "status": runtime.recovery_status,

@@ -58,6 +58,7 @@
         "name": "Status",
         "state": {
           "invalid_data": "Input data invalid",
+          "communication_pause": "Communication pause - checking connection",
           "disabled": "Energy manager disabled",
           "starting": "Startup validation in progress",
           "control_error": "Control stopped after write error",

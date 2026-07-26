@@ -22,7 +22,8 @@ class XT500SensorDescription(SensorEntityDescription):
 
 
 STATUS_OPTIONS = (
-    "disabled", "invalid_data", "starting", "control_error", "target_reached",
+    "disabled", "invalid_data", "communication_pause", "starting",
+    "control_error", "target_reached",
     "minimum_soc_hold", "normal", "pv_surplus", "manual_grid_charge",
     "manual_pv_surplus", "manual_pv_priority", "manual_pv_and_grid",
     "automatic_grid_charge", "automatic_pv_surplus", "automatic_pv_priority",
@@ -108,6 +109,9 @@ class XT500Sensor(XT500Entity, SensorEntity):
                     "transient_write_timeouts": self.runtime.transient_write_timeouts,
                     "last_transient_write_error": self.runtime.last_transient_write_error,
                     "last_transient_write_recovery": self.runtime.last_transient_write_recovery,
+                    "communication_pause": self.runtime.communication_pause_active,
+                    "communication_pause_since": self.runtime.communication_pause_since,
+                    "communication_pause_message": self.runtime.communication_pause_message,
                 }
             )
         elif self.key == "recovery_status":

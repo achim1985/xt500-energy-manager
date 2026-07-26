@@ -333,9 +333,10 @@ Blöcke.
 
 8. Speichern und das Dashboard vollständig neu laden.
 
-Die eingebundene Ansicht erscheint als normaler Reiter neben **Speicher** und
-**Einstellungen**. Es wird keine unabhängige Kopie angelegt. Dadurch bleiben
-spätere Änderungen an der ursprünglichen Ansicht wirksam.
+Die eingebundene Ansicht erscheint als normaler Reiter zwischen **Speicher** und
+**Einstellungen**. **Einstellungen** bleibt dabei immer der ganz rechte Reiter.
+Es wird keine unabhängige Kopie angelegt. Dadurch bleiben spätere Änderungen an
+der ursprünglichen Ansicht wirksam.
 
 > [!NOTE]
 > Einbindbar sind einzelne, fest konfigurierte Ansichten aus Dashboards im
@@ -417,8 +418,12 @@ Der separate **Zyklusstatus** unterscheidet:
 - Nach einem Home-Assistant-Start wartet die Integration, bis Home Assistant
   vollständig läuft und alle Eingangsdaten mindestens fünf Sekunden gültig
   waren.
-- Ungültige Eingangsdaten stoppen Sollwertschreibvorgänge.
-- Nach einem Schreibfehler wird die Regelung sofort verriegelt. Ist die
+- Kurzzeitig ungültige Eingangsdaten oder nicht lesbare XT500-Sollwerte starten
+  zunächst nur eine Kommunikationspause. Die Regelung fährt automatisch fort,
+  sobald alle Werte und frischen Messrückmeldungen 15 Sekunden stabil sind.
+- Bleibt die Kommunikation 90 Sekunden instabil oder schlagen drei
+  Schreibversuche trotz weiterhin lesbarer Sollwerte fehl, wird die Regelung
+  verriegelt. Ist die
   automatische Fehlerwiederherstellung aktiv, wartet sie zunächst auf stabile
   neue Rückmeldungen, prüft die Verbindung mit einem wirkungslosen Schreibtest
   auf den bereits vorhandenen Wechselrichter-Sollwert und gibt erst nach

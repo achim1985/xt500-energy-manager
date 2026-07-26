@@ -58,6 +58,7 @@
         "name": "Status",
         "state": {
           "invalid_data": "Eingangsdaten ungültig",
+          "communication_pause": "Kommunikationspause – Verbindung wird geprüft",
           "disabled": "Energiemanager ausgeschaltet",
           "starting": "Startprüfung läuft",
           "control_error": "Regelung wegen Schreibfehler gestoppt",
