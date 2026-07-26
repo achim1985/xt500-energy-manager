@@ -377,11 +377,27 @@ def calculate_control(data: ControlInput, cfg: ControlSettings) -> ControlResult
         pv_direct_target = 0.0
     raw_is_target = desired_load_output + max(raw_grid_target, 0.0)
 
-    if charge_active and active_mode in (MODE_GRID, MODE_PV_PRIORITY, MODE_PV_GRID):
-        requested = -clamp(cfg.charge_power, 0.0, cfg.grid_limit)
-        if active_mode == MODE_PV_PRIORITY:
-            requested = 0.0
-        grid_target = min(raw_grid_target, requested)
+    charge_request = max(float(cfg.charge_power), 0.0)
+    grid_charge_request = charge_request
+    if charge_active and active_mode == MODE_PV_GRID:
+        # In hybrid mode, charge_power is the desired net battery charging
+        # power. PV first supplies the planned inverter output; only the PV
+        # remainder can charge the battery. The grid supplies that shortfall.
+        pv_battery_contribution = max(
+            max(data.pv_power, 0.0) - raw_is_target,
+            0.0,
+        )
+        grid_charge_request = max(
+            charge_request - pv_battery_contribution,
+            0.0,
+        )
+    if charge_active and active_mode in (MODE_GRID, MODE_PV_GRID):
+        # The positive house-grid output limit must not restrict charging.
+        # The runtime still clamps the negative request to the source entity's
+        # real device range.
+        grid_target = -grid_charge_request
+    elif charge_active and active_mode == MODE_PV_PRIORITY:
+        grid_target = 0.0
     elif pv_direct:
         grid_target = pv_direct_target
     else:
@@ -389,6 +405,8 @@ def calculate_control(data: ControlInput, cfg: ControlSettings) -> ControlResult
 
     min_grid = -cfg.grid_limit
     max_grid = cfg.grid_limit
+    if charge_active and active_mode in (MODE_GRID, MODE_PV_GRID):
+        min_grid = -grid_charge_request
     if pv_direct or charge_blocked or (load_backfeed > 0 and raw_grid_target >= 0):
         min_grid = 0.0
     if discharge_blocked:

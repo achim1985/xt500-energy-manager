@@ -189,9 +189,11 @@ Messwertes prüfen.
 
 1. Alte Nulleinspeisungs-Automationen oder Blueprints deaktivieren.
 2. Prüfen, dass kein anderer Regler `GS`, `IS` oder `SA` beschreibt.
-3. Für einen normalen XT500 das **Hausnetz-Limit** üblicherweise auf maximal
-   `800 W` setzen.
-4. Für einen XT500 Pro sind je nach Installation bis zu `2400 W` möglich.
+3. Für einen normalen XT500 die **Maximale Leistung ins Hausnetz** üblicherweise
+   auf maximal `800 W` setzen. Dieser Wert begrenzt ausschließlich die positive
+   Abgabe und nicht die Netzladung.
+4. Die **Gewünschte Ladeleistung** separat festlegen. Beim XT500 Pro sind
+   abhängig vom Gerätebereich bis zu `2400 W` Netzladung möglich.
 5. Erst danach **Regelung aktiv** einschalten.
 
 ## 4. Dashboard-Strategie einrichten
@@ -403,13 +405,20 @@ währenddessen zurückgehalten. Bei schlechten PV-Tagen bleibt die Anforderung
 
 ### Netzladung
 
-Der Speicher darf mit der eingestellten AC-Ladeleistung aus dem Netz laden.
+Der Speicher darf mit der eingestellten Ladeleistung aus dem Netz laden.
 Damit kann das Ziel auch nachts oder bei schlechtem Wetter erreicht werden.
+Die Einstellung **Maximale Leistung ins Hausnetz** begrenzt diese Ladeleistung
+nicht. Der negative Ladesollwert wird nur durch die gewünschte Ladeleistung
+und den echten Wertebereich des ausgewählten Gerätes begrenzt.
 
 ### PV + Netz
 
-Vorhandene PV-Leistung wird genutzt und zusätzlich ist Netzladung mit der
-eingestellten AC-Leistung erlaubt.
+Die eingestellte Ladeleistung ist hier das Ziel für die gesamte Batterieladung.
+Zuerst wird der nach Versorgung des Hauses verbleibende PV-Anteil angerechnet.
+Nur die noch fehlende Leistung wird aus dem Netz angefordert. Beispiel:
+`1200 W` Ladeziel und `700 W` tatsächlich für den Akku verfügbare PV ergeben
+`500 W` Netzladung. Deckt PV das Ladeziel vollständig, wird keine Netzladung
+angefordert.
 
 ### Zyklusladung
 

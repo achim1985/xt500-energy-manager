@@ -70,6 +70,101 @@ class ControllerTest(unittest.TestCase):
         self.assertEqual(result.recommended_grid_setpoint, -1200)
         self.assertIn("automatic", result.status)
 
+    def test_grid_charge_is_not_limited_by_positive_house_output_limit(self):
+        result = controller.calculate_control(
+            self.input(),
+            controller.ControlSettings(
+                charge_active=True,
+                charge_source="manual",
+                charge_mode="grid_charge",
+                charge_power=2400,
+                grid_limit=800,
+                inverter_limit=2400,
+                meter_export_positive=False,
+            ),
+        )
+        self.assertEqual(result.recommended_grid_setpoint, -2400)
+        self.assertEqual(result.active_mode, "grid_charge")
+
+    def test_pv_and_grid_charge_uses_independent_charge_power_limit(self):
+        result = controller.calculate_control(
+            self.input(),
+            controller.ControlSettings(
+                charge_active=True,
+                charge_source="manual",
+                charge_mode="pv_and_grid",
+                charge_power=1800,
+                grid_limit=800,
+                inverter_limit=2400,
+                meter_export_positive=False,
+            ),
+        )
+        self.assertEqual(result.recommended_grid_setpoint, -1800)
+
+    def test_pv_and_grid_subtracts_pv_available_for_battery(self):
+        result = controller.calculate_control(
+            self.input(
+                pv_power=1400,
+                grid_power=0,
+                grid_port_power=300,
+                load_port_power=0,
+            ),
+            controller.ControlSettings(
+                charge_active=True,
+                charge_source="manual",
+                charge_mode="pv_and_grid",
+                charge_power=1200,
+                grid_limit=800,
+                inverter_limit=2400,
+                target_grid_power=0,
+                meter_export_positive=False,
+            ),
+        )
+        # 300 W PV supplies the house, 1100 W PV remains for charging, and
+        # the grid provides only the missing 100 W of the 1200 W target.
+        self.assertEqual(result.recommended_inverter_setpoint, 300)
+        self.assertEqual(result.recommended_grid_setpoint, -100)
+
+    def test_pv_and_grid_needs_no_grid_when_pv_covers_charge_target(self):
+        result = controller.calculate_control(
+            self.input(
+                pv_power=1600,
+                grid_power=0,
+                grid_port_power=300,
+                load_port_power=0,
+            ),
+            controller.ControlSettings(
+                charge_active=True,
+                charge_source="automatic",
+                charge_mode="pv_and_grid",
+                charge_power=1200,
+                target_grid_power=0,
+                meter_export_positive=False,
+            ),
+        )
+        self.assertEqual(result.recommended_grid_setpoint, 0)
+
+    def test_grid_charge_keeps_fixed_grid_request_with_available_pv(self):
+        result = controller.calculate_control(
+            self.input(
+                pv_power=1600,
+                grid_power=0,
+                grid_port_power=300,
+                load_port_power=0,
+            ),
+            controller.ControlSettings(
+                charge_active=True,
+                charge_source="manual",
+                charge_mode="grid_charge",
+                charge_power=1200,
+                grid_limit=800,
+                inverter_limit=2400,
+                target_grid_power=0,
+                meter_export_positive=False,
+            ),
+        )
+        self.assertEqual(result.recommended_grid_setpoint, -1200)
+
     def test_pv_surplus_cannot_exceed_available_pv(self):
         result = controller.calculate_control(
             self.input(pv_power=740, grid_power=-50, grid_port_power=500),

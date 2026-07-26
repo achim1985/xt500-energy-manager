@@ -175,7 +175,7 @@
       "target_soc": { "name": "Manual target charge level" },
       "automatic_target_soc": { "name": "Cycle full-charge target" },
       "normal_charge_limit": { "name": "Normal-operation charge limit" },
-      "charge_power": { "name": "Requested AC charging power" },
+      "charge_power": { "name": "Requested charging power" },
       "cycle_interval_days": { "name": "Interval between full charges" },
       "recovery_stability_time": { "name": "Stability time before recovery" },
       "minimum_soc": { "name": "Lower discharge limit" },

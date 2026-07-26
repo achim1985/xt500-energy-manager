@@ -1069,7 +1069,7 @@ class XT500EnergyManagerDashboardStrategy extends HTMLElement {
         tile("manual_active", "Zielladung starten", [{ type: "toggle" }]),
         tile("manual_mode", "Lademodus", [{ type: "select-options" }]),
         tile("target_soc", "Ladeziel", [{ type: "numeric-input", style: "buttons" }]),
-        tile("charge_power", "AC-Ladeleistung", [{ type: "numeric-input", style: "buttons" }]),
+        tile("charge_power", "Gewünschte Ladeleistung", [{ type: "numeric-input", style: "buttons" }]),
         heading("Zyklusladung", "mdi:battery-sync"),
         tile("automatic_enabled", "Automatische Zyklusüberwachung", [{ type: "toggle" }]),
         tile("cycle_start", "Jetzt manuell starten", [{ type: "button" }]),
@@ -1156,10 +1156,10 @@ class XT500EnergyManagerDashboardStrategy extends HTMLElement {
           "- **Entladegrenze:** Unterhalb dieses SOC stoppt der Energiemanager die geregelte Batterieabgabe ins Hausnetz. Die Wiederfreigabe erfolgt erst oberhalb der zusätzlich eingestellten Hysterese.\n" +
           "- Startet eine manuelle oder automatische Zielladung oberhalb des normalen Limits, hebt die Integration die System-Ladegrenze vorübergehend auf das benötigte Ziel an. Nach Zielerreichung stellt sie automatisch das normale Ladelimit wieder her.\n\n" +
           "**Lademodi für manuelle und automatische Ladung**\n\n" +
-          "- **Netzladung:** Lädt mit der eingestellten AC-Leistung; Netzbezug ist erlaubt. Beispiel: 1.200 W und Ziel 100 % erreichen das Ziel auch nachts.\n" +
+          "- **Netzladung:** Fordert die eingestellte Ladeleistung fest aus dem Netz an. Vorhandene PV versorgt dabei vorrangig das Haus. Beispiel: 1.200 W und Ziel 100 % erreichen das Ziel auch nachts.\n" +
           "- **PV-Überschuss:** Gibt aktuelle PV-Leistung nur passend zum Hausverbrauch weiter; der Rest kann den Akku laden. Es wird keine Netzladung angefordert. Das Ziel kann mehrere Tage aktiv bleiben.\n" +
           "- **PV-Vorrang:** Verfolgt das Ziel ausschließlich mit PV und hält die Batterieentladung zurück. Bei schlechtem Wetter läuft die Anforderung über mehrere Tage weiter.\n" +
-          "- **PV + Netz:** Nutzt vorhandene PV und fordert zusätzlich die eingestellte AC-Ladeleistung aus dem Netz an. Damit wird das Ziel auch an schlechten Tagen erreicht.\n\n" +
+          "- **PV + Netz:** Die eingestellte Ladeleistung ist das Ziel für die gesamte Batterieladung. Der nach Hausversorgung für den Akku verbleibende PV-Anteil wird davon abgezogen; nur die Differenz kommt aus dem Netz. Beispiel: 1.200 W Ziel und 700 W PV-Anteil ergeben 500 W Netzladung. Reicht PV allein aus, bleibt die Netzladung bei 0 W.\n\n" +
           "**Zyklusladung: Überwachung, Start und Rücksetzen**\n\n" +
           "- **Automatische Zyklusüberwachung** beobachtet nur den Zeitabstand. Sie bedeutet nicht, dass gerade geladen wird.\n" +
           "- Ist das Intervall abgelaufen, zeigt der Zyklusstatus **Fällig – wartet auf tägliche Prüfzeit**. Erst zur eingestellten **täglichen Prüfzeit** startet die Integration die Ladung im gewählten Zyklus-Lademodus.\n" +
@@ -1176,7 +1176,7 @@ class XT500EnergyManagerDashboardStrategy extends HTMLElement {
           "**Regelruhe und Sicherheit:** Kleine Abweichungen werden fein, mittlere stärker und große Lastsprünge schnell korrigiert. Nach einem Sollwertschreiben wartet die Integration auf neue Messwerte. Im PV-Überschussbetrieb setzt die Niedrig-PV-Sperre beide Sollwerte unterhalb der Abschaltschwelle sofort auf 0 W und gibt sie erst nach der eingestellten Zeit oberhalb der Startleistung wieder frei.\n\n" +
           "**Leistungsflüsse:** Batterie lädt und Batterie entlädt sind Nettowerte aus den originalen XT500-Gesamteingangs- und Gesamtausgangsleistungen. Beispiel: 200 W Eingang und 300 W Ausgang werden als 0 W Laden und 100 W tatsächliches Entladen angezeigt.\n\n" +
           "**Kommunikationspause und Fehlerwiederherstellung:** Ein kurzzeitig nicht lesbarer XT500-Sollwert oder Verbindungsabbruch pausiert die Regelung zunächst, ohne sie sofort zu verriegeln. Erst nach 15 Sekunden stabilen, frischen Messrückmeldungen wird automatisch weitergeregelt. Bleibt die Verbindung 90 Sekunden lang instabil oder schlagen drei echte Schreibversuche trotz lesbarer Sollwerte fehl, wird die Regelung sicher verriegelt. Ist **Fehler automatisch beheben** aktiv, startet danach die geschützte Wiederherstellung mit stabilem Feedback und einem wirkungslosen Schreibtest. Nach höchstens drei erfolglosen Wiederherstellungsversuchen ist ein manueller Aus-/Ein-Reset von **Regelung aktiv** erforderlich.\n\n" +
-          "**Leistungsgrenzen:** Für einen XT500 üblicherweise 800 W als Hausnetz-Limit einstellen. Ein XT500 Pro kann bis zu 2.400 W nutzen. Die Wechselrichter-Obergrenze ist ein technischer Sollwert, kein gemessener Leistungsfluss.\n\n" +
+          "**Leistungsgrenzen:** **Maximale Leistung ins Hausnetz** begrenzt nur die positive Abgabe des Speichers; für einen XT500 sind hier üblicherweise 800 W einzustellen. Diese Grenze reduziert nicht die Netzladung. Bei **Netzladung** richtet sich deren negativer Sollwert nach **Gewünschte Ladeleistung**. Bei **PV + Netz** wird nur die nach Anrechnung des PV-Anteils fehlende Leistung aus dem Netz bezogen. Der echte Gerätebereich bleibt die technische Obergrenze – beim XT500 Pro sind bis zu 2.400 W Netzladung möglich. Die Wechselrichter-Obergrenze ist ein technischer Sollwert, kein gemessener Leistungsfluss.\n\n" +
           "</details>",
       };
 

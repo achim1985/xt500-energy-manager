@@ -175,7 +175,7 @@
       "target_soc": { "name": "Ladeziel der manuellen Zielladung" },
       "automatic_target_soc": { "name": "Vollladeziel der Zyklusladung" },
       "normal_charge_limit": { "name": "Ladelimit im Normalbetrieb" },
-      "charge_power": { "name": "Gewünschte AC-Ladeleistung" },
+      "charge_power": { "name": "Gewünschte Ladeleistung" },
       "cycle_interval_days": { "name": "Abstand zwischen Vollladungen" },
       "recovery_stability_time": { "name": "Stabilitätszeit vor Wiederherstellung" },
       "minimum_soc": { "name": "Untere Entladegrenze" },

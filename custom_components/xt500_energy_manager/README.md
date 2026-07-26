@@ -39,12 +39,13 @@ ceiling, and system charge limit.
 
 ## Charging modes
 
-- **Grid charging:** requests the configured AC charging power from the grid.
+- **Grid charging:** requests the configured charging power from the grid.
 - **PV surplus:** passes current PV through only up to home demand and leaves the
   remainder for battery charging, without intentional grid charging.
 - **PV priority:** uses PV only and prevents intentional battery discharge while
   the target remains active.
-- **PV and grid:** uses PV and permits the configured AC grid charge.
+- **PV and grid:** treats the configured power as the total battery charging
+  target and requests only the shortfall after available PV from the grid.
 
 Manual charging overrides an automatic due state. Both return to the selected
 base mode after completion.
@@ -90,5 +91,8 @@ Battery charging and discharging are displayed as mutually exclusive net
 values derived from the original XT500 total input and total output sensors.
 The cycle status also shows the next calculated cycle-charge date.
 
-Use a maximum home-grid output of about 800 W for an XT500 unless the local
-installation permits another value. XT500 Pro systems can use up to 2400 W.
+Use a maximum positive home-grid output of about 800 W for an XT500 unless the
+local installation permits another value. This output setting does not limit
+the negative grid-charging setpoint. Grid charging follows the configured
+charging power and the source entity's real device range; XT500 Pro systems can
+charge at up to 2400 W.
