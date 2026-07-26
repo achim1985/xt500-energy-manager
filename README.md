@@ -196,18 +196,29 @@ Messwertes prüfen.
 
 ## 4. Dashboard-Strategie einrichten
 
-Die Strategie erzeugt automatisch zwei Ansichten:
+Die Strategie erzeugt in der ausführlichen Standarddarstellung fünf Ansichten:
 
 - **Speicher:** Status, Speicherstand, Leistungsflüsse und Schnellsteuerung
   für Regelung, manuelle Zielladung und Zyklusladung
+- **Energie:** Energiefluss, Netzbilanz, Eigenverbrauch, Autarkie sowie
+  Quellen- und Kostentabelle
+- **Verlauf:** Hausverbrauch, PV-Erzeugung und Leistung nach Energiequelle
+- **Verbraucher:** Energie-Sankey, größte Verbraucher und detaillierter
+  Geräteverbrauch
 - **Einstellungen:** Anleitung, manuelle Zielladung, Zyklusüberwachung,
   tägliche Prüfzeit, manueller Zyklusstart, Normalbetrieb und erweiterte
   Regelparameter
 
+Die drei Energieseiten verwenden ausschließlich die in Home Assistant unter
+**Energie** konfigurierten Quellen und Statistikdaten. Ihre Datumsauswahl und
+der Vergleichszeitraum sind über alle drei Reiter synchron. Im Strategy-Editor
+lassen sie sich alternativ zu einer kompakten Seite zusammenfassen oder
+vollständig ausblenden.
+
 ### Einstellungsansicht nicht übersehen
 
-Oben im automatisch erzeugten Dashboard gibt es zwei Reiter. Das Haussymbol
-öffnet die Speicherübersicht. Über das **Zahnradsymbol** daneben wird die
+Oben im automatisch erzeugten Dashboard gibt es mehrere Reiter. Das Haussymbol
+öffnet die Speicherübersicht. Über das **Zahnradsymbol** ganz rechts wird die
 vollständige Einstellungsansicht geöffnet. Je nach Bildschirmbreite werden
 diese Reiter nur als Symbole angezeigt und können deshalb leicht übersehen
 werden.
@@ -236,7 +247,7 @@ Neuladen auch im Energiemanager-Dashboard.
 5. Als URL exakt eintragen:
 
    ```text
-   /xt500_energy_manager/xt500-energy-dashboard-strategy.js?v=1.4.0
+   /xt500_energy_manager/xt500-energy-dashboard-strategy.js?v=1.5.0
    ```
 
 6. Als Ressourcentyp **JavaScript-Modul** auswählen.
@@ -260,8 +271,9 @@ Dieser Weg steht ab Home Assistant 2026.5 zur Verfügung.
    - In der Seitenleiste anzeigen: nach Wunsch aktivieren
 
 5. Dashboard erstellen.
-6. Das neue Dashboard öffnen. Die Ansichten **Speicher** und
-   **Einstellungen** werden automatisch erzeugt.
+6. Das neue Dashboard öffnen. Die Ansichten **Speicher**, **Energie**,
+   **Verlauf**, **Verbraucher** und **Einstellungen** werden automatisch
+   erzeugt.
 
 ### Schritt 2B: Manuelle Erstellung über die Rohkonfiguration
 
@@ -313,6 +325,25 @@ auf sein mehrspaltiges Raster. Speicherstand, Regelungsstatus, Sollwerte,
 Zyklusladung, Leistungsflüsse und Schnellsteuerung bleiben dabei eigenständige
 Blöcke.
 
+### Energieseiten auswählen
+
+1. Unter **Einstellungen → Dashboards** beim
+   **XT500 Energiemanager** die Dashboard-Einstellungen öffnen.
+2. Im Strategy-Editor unter **Energie-Dashboard** die gewünschte Darstellung
+   wählen:
+
+   - **Ausführlich – drei Reiter:** Energie, Verlauf und Verbraucher
+   - **Kompakt – ein Reiter:** die wichtigsten Karten auf einer Seite
+   - **Nicht anzeigen:** keine zusätzlichen Energieseiten
+
+3. Speichern und das Dashboard vollständig neu laden.
+
+Die Datumsauswahl, frei gewählte Zeiträume und der Vergleich mit dem vorherigen
+Zeitraum bleiben in der ausführlichen Darstellung über alle drei Reiter
+synchron. Voraussetzung sind unter **Energie** eingerichtete Netz-, PV-,
+Speicher- oder Verbraucherquellen. Fehlende Quellen erzeugt der Energiemanager
+nicht künstlich.
+
 ### Ansichten anderer Dashboards ergänzen
 
 1. Das XT500-Energiemanager-Dashboard öffnen.
@@ -333,8 +364,9 @@ Blöcke.
 
 8. Speichern und das Dashboard vollständig neu laden.
 
-Die eingebundene Ansicht erscheint als normaler Reiter zwischen **Speicher** und
-**Einstellungen**. **Einstellungen** bleibt dabei immer der ganz rechte Reiter.
+Die eingebundene Ansicht erscheint als normaler Reiter nach **Speicher** und vor
+den automatisch erzeugten Energieseiten. **Einstellungen** bleibt dabei immer
+der ganz rechte Reiter.
 Es wird keine unabhängige Kopie angelegt. Dadurch bleiben spätere Änderungen an
 der ursprünglichen Ansicht wirksam.
 
@@ -496,7 +528,7 @@ Der separate **Zyklusstatus** unterscheidet:
 
 ## Projektstatus
 
-Version 1.4.0 ist der aktuelle Betateststand. Gesucht werden
+Version 1.5.0 ist der aktuelle Entwicklungsstand. Gesucht werden
 Testerinnen und Tester mit unterschiedlichen XT500- und XT500-Pro-Systemen,
 Firmwareständen und Stromzählern.
 

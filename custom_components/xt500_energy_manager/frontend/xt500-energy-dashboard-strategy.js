@@ -31,6 +31,8 @@ const XT500_DISPLAY_ICONS = {
 };
 
 const XT500_STRATEGY_TYPE = "custom:xt500-energy-manager";
+const XT500_ENERGY_COLLECTION = "energy_xt500_manager";
+const XT500_ENERGY_VIEW_MODES = new Set(["detailed", "compact", "hidden"]);
 
 const XT500_DASHBOARD_BLOCKS = {
   overview: [
@@ -175,6 +177,209 @@ const loadAdditionalViews = async (config, hass, existingViews) => {
   return importedViews;
 };
 
+const normalizedEnergyViewMode = (config) =>
+  XT500_ENERGY_VIEW_MODES.has(config?.energy_views_mode)
+    ? config.energy_views_mode
+    : "detailed";
+
+const energyCard = (type, options = {}, gridOptions = null) => ({
+  type,
+  collection_key: XT500_ENERGY_COLLECTION,
+  ...options,
+  ...(gridOptions ? { grid_options: gridOptions } : {}),
+});
+
+const energyHeading = (heading, icon) => ({
+  type: "heading",
+  heading,
+  icon,
+});
+
+const energyDateSection = () => ({
+  type: "grid",
+  column_span: 3,
+  cards: [
+    energyHeading("Zeitraum und Vergleich", "mdi:calendar-range"),
+    energyCard(
+      "energy-date-selection",
+      { opening_direction: "auto", vertical_opening_direction: "auto" },
+      { columns: "full", rows: "auto" },
+    ),
+  ],
+});
+
+const detailedEnergyViews = () => [
+  {
+    title: "Energie",
+    path: "energie",
+    icon: "mdi:lightning-bolt",
+    type: "sections",
+    max_columns: 3,
+    sections: [
+      energyDateSection(),
+      {
+        type: "grid",
+        cards: [
+          energyHeading("Energiefluss", "mdi:transmission-tower"),
+          energyCard(
+            "energy-distribution",
+            { title: "Energieverteilung", link_dashboard: false },
+            { columns: "full", rows: "auto" },
+          ),
+          energyCard(
+            "energy-grid-balance",
+            {},
+            { columns: "full", rows: "auto" },
+          ),
+        ],
+      },
+      {
+        type: "grid",
+        cards: [
+          energyHeading("Bilanz", "mdi:chart-donut"),
+          energyCard(
+            "energy-grid-neutrality-gauge",
+            {},
+            { columns: 6, rows: "auto" },
+          ),
+          energyCard(
+            "energy-solar-consumed-gauge",
+            {},
+            { columns: 6, rows: "auto" },
+          ),
+          energyCard(
+            "energy-self-sufficiency-gauge",
+            {},
+            { columns: 6, rows: "auto" },
+          ),
+        ],
+      },
+      {
+        type: "grid",
+        cards: [
+          energyHeading("Quellen, Speicher und Kosten", "mdi:table-large"),
+          energyCard(
+            "energy-sources-table",
+            {},
+            { columns: "full", rows: "auto" },
+          ),
+        ],
+      },
+    ],
+  },
+  {
+    title: "Verlauf",
+    path: "energie-verlauf",
+    icon: "mdi:chart-areaspline",
+    type: "sections",
+    max_columns: 3,
+    sections: [
+      energyDateSection(),
+      {
+        type: "grid",
+        column_span: 2,
+        cards: [
+          energyHeading("Verbrauch und Herkunft", "mdi:home-lightning-bolt"),
+          energyCard(
+            "energy-usage-graph",
+            { title: "Hausverbrauch", show_legend: true },
+            { columns: "full", rows: 7 },
+          ),
+          energyCard(
+            "energy-solar-graph",
+            { title: "PV-Erzeugung" },
+            { columns: "full", rows: 6 },
+          ),
+        ],
+      },
+      {
+        type: "grid",
+        cards: [
+          energyHeading("Leistungsverlauf", "mdi:chart-line"),
+          energyCard(
+            "power-sources-graph",
+            { title: "Leistung nach Quelle", show_legend: true },
+            { columns: "full", rows: 7 },
+          ),
+        ],
+      },
+    ],
+  },
+  {
+    title: "Verbraucher",
+    path: "energie-verbraucher",
+    icon: "mdi:home-lightning-bolt-outline",
+    type: "sections",
+    max_columns: 3,
+    sections: [
+      energyDateSection(),
+      {
+        type: "grid",
+        column_span: 2,
+        cards: [
+          energyHeading("Energiefluss zu den Verbrauchern", "mdi:sitemap"),
+          energyCard(
+            "energy-sankey",
+            {
+              title: "Energie-Sankey",
+              layout: "auto",
+              group_by_area: true,
+              group_by_floor: true,
+            },
+            { columns: "full", rows: 8 },
+          ),
+        ],
+      },
+      {
+        type: "grid",
+        cards: [
+          energyHeading("Größte Verbraucher", "mdi:sort-descending"),
+          energyCard(
+            "energy-devices-graph",
+            { title: "Verbrauch nach Gerät", hide_compound_stats: false },
+            { columns: "full", rows: 8 },
+          ),
+        ],
+      },
+      {
+        type: "grid",
+        column_span: 3,
+        cards: [
+          energyHeading("Verbraucher im Zeitverlauf", "mdi:chart-timeline-variant"),
+          energyCard(
+            "energy-devices-detail-graph",
+            { title: "Detaillierter Geräteverbrauch" },
+            { columns: "full", rows: 8 },
+          ),
+        ],
+      },
+    ],
+  },
+];
+
+const compactEnergyView = () => {
+  const [overview, history, consumers] = detailedEnergyViews();
+  return {
+    title: "Energie",
+    path: "energie",
+    icon: "mdi:lightning-bolt",
+    type: "sections",
+    max_columns: 3,
+    sections: [
+      energyDateSection(),
+      ...overview.sections.slice(1),
+      history.sections[1],
+      consumers.sections[2],
+    ],
+  };
+};
+
+const energyViews = (config) => {
+  const mode = normalizedEnergyViewMode(config);
+  if (mode === "hidden") return [];
+  return mode === "compact" ? [compactEnergyView()] : detailedEnergyViews();
+};
+
 class XT500EnergyManagerStrategyEditor extends HTMLElement {
   constructor() {
     super();
@@ -194,6 +399,7 @@ class XT500EnergyManagerStrategyEditor extends HTMLElement {
 
   setConfig(config) {
     this._config = cloneConfig(config || {});
+    this._config.energy_views_mode = normalizedEnergyViewMode(this._config);
     if (!Array.isArray(this._config.additional_views)) {
       this._config.additional_views = [];
     }
@@ -325,6 +531,14 @@ class XT500EnergyManagerStrategyEditor extends HTMLElement {
         delete entry.user_id;
       }
     }
+    this._changed();
+    this._render();
+  }
+
+  _setEnergyViewMode(value) {
+    this._config.energy_views_mode = XT500_ENERGY_VIEW_MODES.has(value)
+      ? value
+      : "detailed";
     this._changed();
     this._render();
   }
@@ -621,6 +835,19 @@ class XT500EnergyManagerStrategyEditor extends HTMLElement {
       <p class="intro">Lege fest, in welcher Reihenfolge die einzelnen Blöcke erscheinen. Die Anordnung wird auf schmalen Bildschirmen von oben nach unten und auf breiten Bildschirmen im Home-Assistant-Raster verwendet.</p>
       ${this._blockEditor("overview", "Seite „Speicher“")}
       ${this._blockEditor("settings", "Seite „Einstellungen“")}
+      <h3>Energie-Dashboard</h3>
+      <p class="intro">Die originalen Home-Assistant-Energiekarten verwenden direkt die unter „Energie“ eingerichteten Quellen. Datum und Vergleichszeitraum bleiben über alle erzeugten Energiereiter synchron.</p>
+      <section class="entry">
+        <label>
+          Energieseiten anzeigen
+          <select data-energy-view-mode>
+            <option value="detailed"${normalizedEnergyViewMode(this._config) === "detailed" ? " selected" : ""}>Ausführlich – drei Reiter</option>
+            <option value="compact"${normalizedEnergyViewMode(this._config) === "compact" ? " selected" : ""}>Kompakt – ein Reiter</option>
+            <option value="hidden"${normalizedEnergyViewMode(this._config) === "hidden" ? " selected" : ""}>Nicht anzeigen</option>
+          </select>
+        </label>
+        <p class="hint">Ausführlich erzeugt „Energie“, „Verlauf“ und „Verbraucher“. Nicht konfigurierte Energiequellen bleiben in den Home-Assistant-Karten leer.</p>
+      </section>
       <h3>Zusätzliche Dashboard-Ansichten</h3>
       <p class="intro">Binde einzelne Seiten aus anderen, in Home Assistant gespeicherten Dashboards als echte Reiter ein. Änderungen an der Quellseite werden nach einem Neuladen automatisch übernommen.</p>
       ${this._loadingDashboards ? '<p class="empty">Dashboards werden geladen …</p>' : ""}
@@ -632,6 +859,10 @@ class XT500EnergyManagerStrategyEditor extends HTMLElement {
     this.shadowRoot.querySelector(".add")?.addEventListener(
       "click",
       () => this._addView(),
+    );
+    this.shadowRoot.querySelector("[data-energy-view-mode]")?.addEventListener(
+      "change",
+      (event) => this._setEnergyViewMode(event.target.value),
     );
     for (const button of this.shadowRoot.querySelectorAll("[data-remove]")) {
       button.addEventListener("click", () =>
@@ -1005,6 +1236,7 @@ class XT500EnergyManagerDashboardStrategy extends HTMLElement {
     }
 
     views.push(...await loadAdditionalViews(config, hass, views));
+    views.push(...energyViews(config));
     views.push(...settingsViews);
     return { title: config.title || "XT500 Energiemanager", views };
   }

@@ -136,7 +136,7 @@ test("bindet genau die ausgewählte Quellansicht als echten Reiter ein", async (
     createHass({ "dashboard-achim": source }),
   );
 
-  assert.equal(result.views.length, 3);
+  assert.equal(result.views.length, 6);
   const imported = result.views[1];
   assert.equal(imported.title, "PV");
   assert.equal(imported.icon, "mdi:solar-power");
@@ -144,6 +144,14 @@ test("bindet genau die ausgewählte Quellansicht als echten Reiter ein", async (
   assert.equal(imported.subview, false);
   assert.deepEqual(plain(imported.visible), [{ user: "existing-user" }]);
   assert.deepEqual(plain(imported.sections), source.views[1].sections);
+  assert.deepEqual(plain(result.views.map((view) => view.path)), [
+    "speicher",
+    "zusatz-dashboard-achim-strom",
+    "energie",
+    "energie-verlauf",
+    "energie-verbraucher",
+    "einstellungen",
+  ]);
   assert.equal(result.views.at(-1).path, "einstellungen");
   assert.deepEqual(source, originalSource);
 });
@@ -191,7 +199,7 @@ test("ignoriert doppelte Einträge und Strategie-Ansichten", async () => {
     }),
   );
 
-  assert.equal(result.views.length, 3);
+  assert.equal(result.views.length, 6);
 });
 
 test("verhindert Selbstimport und lässt das Energiemanager-Dashboard benutzbar", async () => {
@@ -217,9 +225,9 @@ test("verhindert Selbstimport und lässt das Energiemanager-Dashboard benutzbar"
     }),
   );
 
-  assert.equal(result.views.length, 2);
+  assert.equal(result.views.length, 5);
   assert.equal(result.views[0].path, "speicher");
-  assert.equal(result.views[1].path, "einstellungen");
+  assert.equal(result.views.at(-1).path, "einstellungen");
 });
 
 test("stellt einen grafischen Strategy-Editor bereit", () => {
@@ -271,6 +279,25 @@ test("Editor verschiebt, versteckt und setzt Blöcke zurück", () => {
   assert.equal(changes, 3);
 });
 
+test("Editor schaltet zwischen ausführlichen, kompakten und verborgenen Energieseiten um", () => {
+  let changes = 0;
+  const editor = {
+    _config: {},
+    _changed: () => {
+      changes += 1;
+    },
+    _render: () => {},
+  };
+
+  StrategyEditor.prototype._setEnergyViewMode.call(editor, "compact");
+  assert.equal(editor._config.energy_views_mode, "compact");
+  StrategyEditor.prototype._setEnergyViewMode.call(editor, "hidden");
+  assert.equal(editor._config.energy_views_mode, "hidden");
+  StrategyEditor.prototype._setEnergyViewMode.call(editor, "invalid");
+  assert.equal(editor._config.energy_views_mode, "detailed");
+  assert.equal(changes, 3);
+});
+
 test("teilt die Speicheransicht standardmäßig in einzeln anordenbare Blöcke", async () => {
   const result = await Strategy.generate({}, createLayoutHass());
 
@@ -282,7 +309,8 @@ test("teilt die Speicheransicht standardmäßig in einzeln anordenbare Blöcke",
     "Aktuelle Leistungsflüsse",
     "Schnellsteuerung",
   ]);
-  assert.deepEqual(plain(sectionHeadings(result.views[1])), [
+  const settings = result.views.find((view) => view.path === "einstellungen");
+  assert.deepEqual(plain(sectionHeadings(settings)), [
     "Bedienung und Sicherheit",
     "Hauptsteuerung",
     "Manuelle Zielladung",
@@ -322,7 +350,8 @@ test("wendet Reihenfolge und ausgeblendete Blöcke für beide Seiten an", async 
     "Sollwerte und Berechnung",
     "Zyklusladung",
   ]);
-  assert.deepEqual(plain(sectionHeadings(result.views[1])), [
+  const settings = result.views.find((view) => view.path === "einstellungen");
+  assert.deepEqual(plain(sectionHeadings(settings)), [
     "Normalbetrieb und Grenzen",
     "Manuelle Zielladung",
     "Hauptsteuerung",
@@ -365,4 +394,57 @@ test("ordnet die Schnellsteuerung eindeutig und zeigt Fehlerbehebung nur in Eins
     (card) => card.name === "Jetzt manuell starten",
   );
   assert.equal(cycleStartIndex, cycleMonitorIndex + 1);
+});
+
+test("erzeugt drei synchronisierte Energieansichten vor der Einstellungsseite", async () => {
+  const result = await Strategy.generate({}, createLayoutHass());
+  const energyViews = result.views.filter((view) =>
+    view.path.startsWith("energie"),
+  );
+
+  assert.deepEqual(plain(energyViews.map((view) => view.path)), [
+    "energie",
+    "energie-verlauf",
+    "energie-verbraucher",
+  ]);
+  assert.equal(result.views.at(-1).path, "einstellungen");
+
+  const cards = energyViews.flatMap((view) =>
+    view.sections.flatMap((section) => section.cards),
+  );
+  const linkedCards = cards.filter((card) =>
+    card.type.startsWith("energy-") || card.type === "power-sources-graph",
+  );
+  assert.ok(linkedCards.length > 10);
+  assert.ok(linkedCards.every(
+    (card) => card.collection_key === "energy_xt500_manager",
+  ));
+  assert.ok(energyViews.every((view) =>
+    view.sections[0].cards.some((card) => card.type === "energy-date-selection"),
+  ));
+  assert.ok(energyViews.every((view) =>
+    !view.sections.flatMap((section) => section.cards)
+      .some((card) => card.type === "energy-compare-card"),
+  ));
+});
+
+test("unterstützt kompakte und ausgeblendete Energieseiten", async () => {
+  const compact = await Strategy.generate(
+    { energy_views_mode: "compact" },
+    createLayoutHass(),
+  );
+  assert.deepEqual(plain(compact.views.map((view) => view.path)), [
+    "speicher",
+    "energie",
+    "einstellungen",
+  ]);
+
+  const hidden = await Strategy.generate(
+    { energy_views_mode: "hidden" },
+    createLayoutHass(),
+  );
+  assert.deepEqual(plain(hidden.views.map((view) => view.path)), [
+    "speicher",
+    "einstellungen",
+  ]);
 });
