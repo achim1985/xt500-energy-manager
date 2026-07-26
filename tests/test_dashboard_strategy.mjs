@@ -443,10 +443,19 @@ test("erzeugt historische und aktuelle Energieansichten vor der Einstellungsseit
   assert.ok(liveCards.filter((card) => card.type.startsWith("power-")).every(
     (card) => card.collection_key === "energy_xt500_manager_live",
   ));
-  assert.deepEqual(plain(liveView.badges), [{
-    type: "power-total",
-    collection_key: "energy_xt500_manager_live",
-  }]);
+  assert.deepEqual(plain(liveView.badges), [
+    {
+      type: "power-total",
+      collection_key: "energy_xt500_manager_live",
+    },
+    {
+      type: "entity",
+      entity: "sensor.xt500_soc",
+      show_name: false,
+      show_icon: true,
+      show_state: true,
+    },
+  ]);
 });
 
 test("unterstützt kompakte und ausgeblendete Energieseiten", async () => {
@@ -463,6 +472,7 @@ test("unterstützt kompakte und ausgeblendete Energieseiten", async () => {
     .flatMap((section) => section.cards)
     .some((card) => card.type === "power-sankey"));
   assert.equal(compact.views[1].badges[0].type, "power-total");
+  assert.equal(compact.views[1].badges[1].entity, "sensor.xt500_soc");
 
   const hidden = await Strategy.generate(
     { energy_views_mode: "hidden" },

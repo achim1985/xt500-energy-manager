@@ -209,7 +209,7 @@ const energyDateSection = () => ({
   ],
 });
 
-const detailedEnergyViews = () => [
+const detailedEnergyViews = (socEntities = []) => [
   {
     title: "Energie",
     path: "energie",
@@ -356,6 +356,13 @@ const detailedEnergyViews = () => [
         type: "power-total",
         collection_key: XT500_LIVE_ENERGY_COLLECTION,
       },
+      ...socEntities.map((entity) => ({
+        type: "entity",
+        entity,
+        show_name: false,
+        show_icon: true,
+        show_state: true,
+      })),
     ],
     sections: [
       {
@@ -395,8 +402,8 @@ const detailedEnergyViews = () => [
   },
 ];
 
-const compactEnergyView = () => {
-  const [overview, history, consumers, live] = detailedEnergyViews();
+const compactEnergyView = (socEntities) => {
+  const [overview, history, consumers, live] = detailedEnergyViews(socEntities);
   return {
     title: "Energie",
     path: "energie",
@@ -414,10 +421,12 @@ const compactEnergyView = () => {
   };
 };
 
-const energyViews = (config) => {
+const energyViews = (config, socEntities = []) => {
   const mode = normalizedEnergyViewMode(config);
   if (mode === "hidden") return [];
-  return mode === "compact" ? [compactEnergyView()] : detailedEnergyViews();
+  return mode === "compact"
+    ? [compactEnergyView(socEntities)]
+    : detailedEnergyViews(socEntities);
 };
 
 class XT500EnergyManagerStrategyEditor extends HTMLElement {
@@ -980,11 +989,19 @@ class XT500EnergyManagerDashboardStrategy extends HTMLElement {
 
     const views = [];
     const settingsViews = [];
+    const socEntities = [];
     let index = 0;
     for (const entities of managers.values()) {
       index += 1;
       const sourceAttributes = hass.states[entities.status]?.attributes || {};
       const socEntity = sourceAttributes.source_soc_entity;
+      if (
+        socEntity &&
+        hass.states[socEntity] &&
+        !socEntities.includes(socEntity)
+      ) {
+        socEntities.push(socEntity);
+      }
       const actualGridSetpoint = sourceAttributes.source_grid_setpoint_entity;
       const actualChargeLimit = sourceAttributes.source_max_charge_soc_entity;
       const actualLoadDischargeLimit =
@@ -1276,7 +1293,7 @@ class XT500EnergyManagerDashboardStrategy extends HTMLElement {
     }
 
     views.push(...await loadAdditionalViews(config, hass, views));
-    views.push(...energyViews(config));
+    views.push(...energyViews(config, socEntities));
     views.push(...settingsViews);
     return { title: config.title || "XT500 Energiemanager", views };
   }

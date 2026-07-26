@@ -205,8 +205,8 @@ Die Strategie erzeugt in der ausführlichen Standarddarstellung sechs Ansichten:
 - **Verlauf:** Hausverbrauch und PV-Erzeugung im gewählten Zeitraum
 - **Verbraucher:** Energie-Sankey, größte Verbraucher und detaillierter
   Geräteverbrauch
-- **Live:** aktueller Gesamtverbrauch, Leistung nach Quelle und momentaner
-  Leistungsfluss als Sankey-Diagramm
+- **Live:** aktueller Gesamtverbrauch, Akkustand, Leistung nach Quelle und
+  momentaner Leistungsfluss als Sankey-Diagramm
 - **Einstellungen:** Anleitung, manuelle Zielladung, Zyklusüberwachung,
   tägliche Prüfzeit, manueller Zyklusstart, Normalbetrieb und erweiterte
   Regelparameter
@@ -343,8 +343,8 @@ Blöcke.
 
 Die Datumsauswahl, frei gewählte Zeiträume und der Vergleich mit dem vorherigen
 Zeitraum bleiben in der ausführlichen Darstellung über die drei historischen
-Reiter synchron. **Live** zeigt den aktuellen Gesamtverbrauch, den
-Leistungsverlauf des Tages und den momentanen Leistungsfluss. Voraussetzung
+Reiter synchron. **Live** zeigt den aktuellen Gesamtverbrauch, den Akkustand,
+den Leistungsverlauf des Tages und den momentanen Leistungsfluss. Voraussetzung
 sind unter **Energie** eingerichtete Netz-, PV-, Speicher- oder
 Verbraucherquellen einschließlich der jeweiligen Leistungssensoren. Fehlende
 Quellen erzeugt der Energiemanager nicht künstlich.
