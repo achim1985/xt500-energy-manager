@@ -32,6 +32,7 @@ const XT500_DISPLAY_ICONS = {
 
 const XT500_STRATEGY_TYPE = "custom:xt500-energy-manager";
 const XT500_ENERGY_COLLECTION = "energy_xt500_manager";
+const XT500_LIVE_ENERGY_COLLECTION = "energy_xt500_manager_live";
 const XT500_ENERGY_VIEW_MODES = new Set(["detailed", "compact", "hidden"]);
 
 const XT500_DASHBOARD_BLOCKS = {
@@ -292,17 +293,6 @@ const detailedEnergyViews = () => [
           ),
         ],
       },
-      {
-        type: "grid",
-        cards: [
-          energyHeading("Leistungsverlauf", "mdi:chart-line"),
-          energyCard(
-            "power-sources-graph",
-            { title: "Leistung nach Quelle", show_legend: true },
-            { columns: "full", rows: 7 },
-          ),
-        ],
-      },
     ],
   },
   {
@@ -355,21 +345,71 @@ const detailedEnergyViews = () => [
       },
     ],
   },
+  {
+    title: "Live",
+    path: "energie-live",
+    icon: "mdi:flash",
+    type: "sections",
+    max_columns: 3,
+    badges: [
+      {
+        type: "power-total",
+        collection_key: XT500_LIVE_ENERGY_COLLECTION,
+      },
+    ],
+    sections: [
+      {
+        type: "grid",
+        cards: [
+          energyHeading("Stromquellen", "mdi:chart-line"),
+          energyCard(
+            "power-sources-graph",
+            {
+              collection_key: XT500_LIVE_ENERGY_COLLECTION,
+              title: "Leistung nach Quelle",
+              show_legend: true,
+            },
+            { columns: "full", rows: 7 },
+          ),
+        ],
+      },
+      {
+        type: "grid",
+        column_span: 2,
+        cards: [
+          energyHeading("Aktueller Leistungsfluss", "mdi:transmission-tower"),
+          energyCard(
+            "power-sankey",
+            {
+              collection_key: XT500_LIVE_ENERGY_COLLECTION,
+              title: "Aktueller Leistungsfluss",
+              layout: "auto",
+              group_by_area: true,
+              group_by_floor: true,
+            },
+            { columns: "full", rows: 8 },
+          ),
+        ],
+      },
+    ],
+  },
 ];
 
 const compactEnergyView = () => {
-  const [overview, history, consumers] = detailedEnergyViews();
+  const [overview, history, consumers, live] = detailedEnergyViews();
   return {
     title: "Energie",
     path: "energie",
     icon: "mdi:lightning-bolt",
     type: "sections",
     max_columns: 3,
+    badges: live.badges,
     sections: [
       energyDateSection(),
       ...overview.sections.slice(1),
       history.sections[1],
       consumers.sections[2],
+      ...live.sections,
     ],
   };
 };
@@ -841,12 +881,12 @@ class XT500EnergyManagerStrategyEditor extends HTMLElement {
         <label>
           Energieseiten anzeigen
           <select data-energy-view-mode>
-            <option value="detailed"${normalizedEnergyViewMode(this._config) === "detailed" ? " selected" : ""}>Ausführlich – drei Reiter</option>
+            <option value="detailed"${normalizedEnergyViewMode(this._config) === "detailed" ? " selected" : ""}>Ausführlich – vier Reiter</option>
             <option value="compact"${normalizedEnergyViewMode(this._config) === "compact" ? " selected" : ""}>Kompakt – ein Reiter</option>
             <option value="hidden"${normalizedEnergyViewMode(this._config) === "hidden" ? " selected" : ""}>Nicht anzeigen</option>
           </select>
         </label>
-        <p class="hint">Ausführlich erzeugt „Energie“, „Verlauf“ und „Verbraucher“. Nicht konfigurierte Energiequellen bleiben in den Home-Assistant-Karten leer.</p>
+        <p class="hint">Ausführlich erzeugt „Energie“, „Verlauf“, „Verbraucher“ und „Live“. Nicht konfigurierte Energie- oder Leistungsquellen bleiben in den Home-Assistant-Karten leer.</p>
       </section>
       <h3>Zusätzliche Dashboard-Ansichten</h3>
       <p class="intro">Binde einzelne Seiten aus anderen, in Home Assistant gespeicherten Dashboards als echte Reiter ein. Änderungen an der Quellseite werden nach einem Neuladen automatisch übernommen.</p>

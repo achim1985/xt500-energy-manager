@@ -136,7 +136,7 @@ test("bindet genau die ausgewählte Quellansicht als echten Reiter ein", async (
     createHass({ "dashboard-achim": source }),
   );
 
-  assert.equal(result.views.length, 6);
+  assert.equal(result.views.length, 7);
   const imported = result.views[1];
   assert.equal(imported.title, "PV");
   assert.equal(imported.icon, "mdi:solar-power");
@@ -150,6 +150,7 @@ test("bindet genau die ausgewählte Quellansicht als echten Reiter ein", async (
     "energie",
     "energie-verlauf",
     "energie-verbraucher",
+    "energie-live",
     "einstellungen",
   ]);
   assert.equal(result.views.at(-1).path, "einstellungen");
@@ -199,7 +200,7 @@ test("ignoriert doppelte Einträge und Strategie-Ansichten", async () => {
     }),
   );
 
-  assert.equal(result.views.length, 6);
+  assert.equal(result.views.length, 7);
 });
 
 test("verhindert Selbstimport und lässt das Energiemanager-Dashboard benutzbar", async () => {
@@ -225,7 +226,7 @@ test("verhindert Selbstimport und lässt das Energiemanager-Dashboard benutzbar"
     }),
   );
 
-  assert.equal(result.views.length, 5);
+  assert.equal(result.views.length, 6);
   assert.equal(result.views[0].path, "speicher");
   assert.equal(result.views.at(-1).path, "einstellungen");
 });
@@ -396,7 +397,7 @@ test("ordnet die Schnellsteuerung eindeutig und zeigt Fehlerbehebung nur in Eins
   assert.equal(cycleStartIndex, cycleMonitorIndex + 1);
 });
 
-test("erzeugt drei synchronisierte Energieansichten vor der Einstellungsseite", async () => {
+test("erzeugt historische und aktuelle Energieansichten vor der Einstellungsseite", async () => {
   const result = await Strategy.generate({}, createLayoutHass());
   const energyViews = result.views.filter((view) =>
     view.path.startsWith("energie"),
@@ -406,26 +407,46 @@ test("erzeugt drei synchronisierte Energieansichten vor der Einstellungsseite", 
     "energie",
     "energie-verlauf",
     "energie-verbraucher",
+    "energie-live",
   ]);
   assert.equal(result.views.at(-1).path, "einstellungen");
 
-  const cards = energyViews.flatMap((view) =>
+  const historicalViews = energyViews.filter((view) =>
+    view.path !== "energie-live"
+  );
+  const historicalCards = historicalViews.flatMap((view) =>
     view.sections.flatMap((section) => section.cards),
   );
-  const linkedCards = cards.filter((card) =>
-    card.type.startsWith("energy-") || card.type === "power-sources-graph",
+  const linkedCards = historicalCards.filter((card) =>
+    card.type.startsWith("energy-"),
   );
   assert.ok(linkedCards.length > 10);
   assert.ok(linkedCards.every(
     (card) => card.collection_key === "energy_xt500_manager",
   ));
-  assert.ok(energyViews.every((view) =>
+  assert.ok(historicalViews.every((view) =>
     view.sections[0].cards.some((card) => card.type === "energy-date-selection"),
   ));
-  assert.ok(energyViews.every((view) =>
+  assert.ok(historicalViews.every((view) =>
     !view.sections.flatMap((section) => section.cards)
       .some((card) => card.type === "energy-compare-card"),
   ));
+
+  const liveView = energyViews.find((view) => view.path === "energie-live");
+  const liveCards = liveView.sections.flatMap((section) => section.cards);
+  assert.ok(liveCards.some((card) => card.type === "power-sources-graph"));
+  assert.ok(liveCards.some((card) => card.type === "power-sankey"));
+  assert.equal(energyViews
+    .flatMap((view) => view.sections.flatMap((section) => section.cards))
+    .filter((card) => card.type === "power-sources-graph").length, 1);
+  assert.ok(!liveCards.some((card) => card.type === "energy-date-selection"));
+  assert.ok(liveCards.filter((card) => card.type.startsWith("power-")).every(
+    (card) => card.collection_key === "energy_xt500_manager_live",
+  ));
+  assert.deepEqual(plain(liveView.badges), [{
+    type: "power-total",
+    collection_key: "energy_xt500_manager_live",
+  }]);
 });
 
 test("unterstützt kompakte und ausgeblendete Energieseiten", async () => {
@@ -438,6 +459,10 @@ test("unterstützt kompakte und ausgeblendete Energieseiten", async () => {
     "energie",
     "einstellungen",
   ]);
+  assert.ok(compact.views[1].sections
+    .flatMap((section) => section.cards)
+    .some((card) => card.type === "power-sankey"));
+  assert.equal(compact.views[1].badges[0].type, "power-total");
 
   const hidden = await Strategy.generate(
     { energy_views_mode: "hidden" },

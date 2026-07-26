@@ -196,22 +196,25 @@ Messwertes prüfen.
 
 ## 4. Dashboard-Strategie einrichten
 
-Die Strategie erzeugt in der ausführlichen Standarddarstellung fünf Ansichten:
+Die Strategie erzeugt in der ausführlichen Standarddarstellung sechs Ansichten:
 
 - **Speicher:** Status, Speicherstand, Leistungsflüsse und Schnellsteuerung
   für Regelung, manuelle Zielladung und Zyklusladung
 - **Energie:** Energiefluss, Netzbilanz, Eigenverbrauch, Autarkie sowie
   Quellen- und Kostentabelle
-- **Verlauf:** Hausverbrauch, PV-Erzeugung und Leistung nach Energiequelle
+- **Verlauf:** Hausverbrauch und PV-Erzeugung im gewählten Zeitraum
 - **Verbraucher:** Energie-Sankey, größte Verbraucher und detaillierter
   Geräteverbrauch
+- **Live:** aktueller Gesamtverbrauch, Leistung nach Quelle und momentaner
+  Leistungsfluss als Sankey-Diagramm
 - **Einstellungen:** Anleitung, manuelle Zielladung, Zyklusüberwachung,
   tägliche Prüfzeit, manueller Zyklusstart, Normalbetrieb und erweiterte
   Regelparameter
 
-Die drei Energieseiten verwenden ausschließlich die in Home Assistant unter
+Die vier Energieseiten verwenden ausschließlich die in Home Assistant unter
 **Energie** konfigurierten Quellen und Statistikdaten. Ihre Datumsauswahl und
-der Vergleichszeitraum sind über alle drei Reiter synchron. Im Strategy-Editor
+der Vergleichszeitraum sind über die drei historischen Reiter synchron. Die
+Live-Seite zeigt aktuelle Leistungsdaten unabhängig vom gewählten Zeitraum. Im Strategy-Editor
 lassen sie sich alternativ zu einer kompakten Seite zusammenfassen oder
 vollständig ausblenden.
 
@@ -272,7 +275,7 @@ Dieser Weg steht ab Home Assistant 2026.5 zur Verfügung.
 
 5. Dashboard erstellen.
 6. Das neue Dashboard öffnen. Die Ansichten **Speicher**, **Energie**,
-   **Verlauf**, **Verbraucher** und **Einstellungen** werden automatisch
+   **Verlauf**, **Verbraucher**, **Live** und **Einstellungen** werden automatisch
    erzeugt.
 
 ### Schritt 2B: Manuelle Erstellung über die Rohkonfiguration
@@ -332,17 +335,19 @@ Blöcke.
 2. Im Strategy-Editor unter **Energie-Dashboard** die gewünschte Darstellung
    wählen:
 
-   - **Ausführlich – drei Reiter:** Energie, Verlauf und Verbraucher
+   - **Ausführlich – vier Reiter:** Energie, Verlauf, Verbraucher und Live
    - **Kompakt – ein Reiter:** die wichtigsten Karten auf einer Seite
    - **Nicht anzeigen:** keine zusätzlichen Energieseiten
 
 3. Speichern und das Dashboard vollständig neu laden.
 
 Die Datumsauswahl, frei gewählte Zeiträume und der Vergleich mit dem vorherigen
-Zeitraum bleiben in der ausführlichen Darstellung über alle drei Reiter
-synchron. Voraussetzung sind unter **Energie** eingerichtete Netz-, PV-,
-Speicher- oder Verbraucherquellen. Fehlende Quellen erzeugt der Energiemanager
-nicht künstlich.
+Zeitraum bleiben in der ausführlichen Darstellung über die drei historischen
+Reiter synchron. **Live** zeigt den aktuellen Gesamtverbrauch, den
+Leistungsverlauf des Tages und den momentanen Leistungsfluss. Voraussetzung
+sind unter **Energie** eingerichtete Netz-, PV-, Speicher- oder
+Verbraucherquellen einschließlich der jeweiligen Leistungssensoren. Fehlende
+Quellen erzeugt der Energiemanager nicht künstlich.
 
 ### Ansichten anderer Dashboards ergänzen
 
