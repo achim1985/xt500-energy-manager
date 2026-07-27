@@ -11,6 +11,10 @@
 - mitgelieferter Automation-Blueprint für beliebige numerische Preissensoren
   mit getrennter Start-/Stoppschwelle, Hysterese und sicherem Verhalten bei
   ungültigen Preisen
+- der Blueprint wird bei Neuinstallation automatisch angelegt und nach einem
+  HACS-Update beim Home-Assistant-Start sicher synchronisiert
+- eine verwaltete Prüfsumme schützt manuell veränderte Blueprint-Kopien vor
+  unbeabsichtigtem Überschreiben
 - ausführliche Anleitung mit Tibber-Beispiel, Einheitenhinweis und Abgrenzung
   zu vorausschauender Preisoptimierung
 

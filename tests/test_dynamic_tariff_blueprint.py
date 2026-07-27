@@ -6,9 +6,9 @@ import unittest
 
 BLUEPRINT = (
     Path(__file__).parents[1]
-    / "blueprints"
-    / "automation"
+    / "custom_components"
     / "xt500_energy_manager"
+    / "blueprints"
     / "dynamic_tariff_charging.yaml"
 )
 
@@ -20,9 +20,12 @@ class DynamicTariffBlueprintTests(unittest.TestCase):
     def test_has_stable_source_url_and_typed_entity_inputs(self):
         self.assertIn("source_url:", self.source)
         self.assertIn(
-            "blueprints/automation/xt500_energy_manager/"
+            "custom_components/xt500_energy_manager/blueprints/"
             "dynamic_tariff_charging.yaml",
             self.source,
+        )
+        self.assertTrue(
+            self.source.startswith("# Managed by XT500 Energy Manager.")
         )
         self.assertIn("integration: xt500_energy_manager", self.source)
         self.assertIn("integration: sunenergyxt", self.source)

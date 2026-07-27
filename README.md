@@ -472,23 +472,25 @@ Integration automatisch in den Grundbetrieb zurück.
 > solange die Entladegrenze nicht erreicht ist. Die Tarifsteuerung fordert
 > keine Batterieeinspeisung in das öffentliche Netz an.
 
-#### Mitgelieferten Preis-Blueprint installieren
+#### Mitgelieferten Preis-Blueprint verwenden
 
 Der mitgelieferte Blueprint arbeitet anbieterunabhängig mit jedem numerischen
 Strompreissensor, beispielsweise dem aktuellen Gesamtpreis der offiziellen
 Tibber-Integration.
 
-1. **Einstellungen → Automationen & Szenen → Blueprints** öffnen.
-2. **Blueprint importieren** auswählen.
-3. Diese URL einfügen:
+Der Blueprint wird zusammen mit der Integration installiert und nach einem
+HACS-Update beim nächsten Home-Assistant-Start automatisch aktualisiert. Unter
+**Einstellungen → Automationen & Szenen → Blueprints** erscheint:
 
-   ```text
-   https://github.com/achim1985/xt500-energy-manager/blob/main/blueprints/automation/xt500_energy_manager/dynamic_tariff_charging.yaml
-   ```
+**XT500 – Laden bei günstigem Strompreis**
 
-4. Aus dem Blueprint **XT500 – Laden bei günstigem Strompreis** eine
+Eigene Änderungen an der installierten Blueprint-Datei werden erkannt und
+nicht überschrieben. In diesem Fall protokolliert die Integration eine Warnung
+und lässt die angepasste Fassung bestehen.
+
+1. Aus dem Blueprint **XT500 – Laden bei günstigem Strompreis** eine
    Automation erstellen.
-5. Folgende Entitäten auswählen:
+2. Folgende Entitäten auswählen:
 
    - aktuellen Strompreissensor
    - originalen SunEnergyXT-System-Speicherlevel
@@ -496,7 +498,7 @@ Tibber-Integration.
    - **Ladeziel der Tarifladung**
    - **Netzleistung der Tarifladung**
 
-6. Startpreis, Ausschaltpreis, Ladeziel und Ladeleistung einstellen.
+3. Startpreis, Ausschaltpreis, Ladeziel und Ladeleistung einstellen.
 
 Beispiel:
 

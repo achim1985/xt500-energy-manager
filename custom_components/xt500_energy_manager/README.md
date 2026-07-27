@@ -60,12 +60,16 @@ mode.
 The included provider-independent automation blueprint evaluates any numeric
 current-price sensor with separate start and stop thresholds:
 
-`blueprints/automation/xt500_energy_manager/dynamic_tariff_charging.yaml`
+`custom_components/xt500_energy_manager/blueprints/dynamic_tariff_charging.yaml`
 
 It refreshes a cheap-price request every 15 minutes and switches it off when
 the price is invalid, the target SOC is reached, or the stop threshold is
 reached. Normal operation already uses the battery for home consumption at
 high prices; this feature does not request battery export to the public grid.
+
+The integration installs its bundled copy automatically under Home Assistant's
+automation blueprints and safely synchronizes it after HACS updates. A
+management hash prevents locally modified copies from being overwritten.
 
 ## Installation
 

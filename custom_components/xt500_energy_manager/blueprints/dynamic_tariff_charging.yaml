@@ -1,3 +1,4 @@
+# Managed by XT500 Energy Manager.
 blueprint:
   name: XT500 – Laden bei günstigem Strompreis
   description: >-
@@ -10,7 +11,7 @@ blueprint:
   domain: automation
   author: Achim Schmitz
   source_url: >-
-    https://github.com/achim1985/xt500-energy-manager/blob/main/blueprints/automation/xt500_energy_manager/dynamic_tariff_charging.yaml
+    https://github.com/achim1985/xt500-energy-manager/blob/main/custom_components/xt500_energy_manager/blueprints/dynamic_tariff_charging.yaml
   homeassistant:
     min_version: "2024.10.0"
   input:
