@@ -2,6 +2,28 @@
 
 ## Unveröffentlicht
 
+## 1.6.0 – 2026-07-27
+
+- neue empfohlene Einrichtung über eine native SunEnergy-XT500-Geräteauswahl
+- originale XT500-Sensoren, Sollwerte und Leistungsgrenzen werden anhand ihrer
+  stabilen SunEnergyXT-Kennungen automatisch erkannt
+- nur der externe Gesamt-Stromzähler und seine Vorzeichenrichtung müssen
+  weiterhin manuell ausgewählt werden
+- vollständige manuelle Entitätsauswahl bleibt als Expertenmodus erhalten
+- automatische Erkennung kann später über **Konfigurieren** erneut ausgeführt
+  werden
+- Stromzählerauswahl zeigt nur Leistungssensoren und erklärt ausdrücklich,
+  dass die Gesamtleistung am öffentlichen Netzanschlusspunkt benötigt wird
+- ungültige Eingangsdaten nennen den betroffenen Eingang, die Entität, ihren
+  Zustand und die genaue Ursache
+- letzter Eingangsfehler sowie Fehler- und Erholungszeitpunkt bleiben nach
+  einer kurzen Störung in Entitätsattributen und Diagnosedaten sichtbar
+- Start- und Neuladephasen erzeugen keine Serie irreführender Warnmeldungen
+- Installationsanleitung und Fehlerbehebung an den neuen Einrichtungsablauf
+  angepasst
+
+## 1.5.0 – 2026-07-26
+
 - Inhalte der Seiten **Speicher** und **Einstellungen** sind in eigenständige,
   frei anordenbare Blöcke aufgeteilt
 - grafischer Strategy-Editor kann jeden Block mit Pfeiltasten verschieben oder

@@ -15,6 +15,7 @@ from .const import (
     CONF_MAX_CHARGE_SOC_ENTITY,
     CONF_PV_POWER_ENTITY,
     DOMAIN,
+    VERSION,
 )
 from .runtime import XT500Runtime
 
@@ -33,7 +34,7 @@ class XT500Entity(Entity):
             name=runtime.entry.title,
             manufacturer="Community",
             model="XT500 energy manager",
-            sw_version="1.4.0",
+            sw_version=VERSION,
         )
 
     @property
