@@ -1,6 +1,6 @@
 # Änderungsprotokoll
 
-## Unveröffentlicht
+## 1.7.0 – 2026-07-27
 
 - eigene, providerunabhängige Tarif-Ladeanforderung mit separatem Ladeziel und
   separater Netz-Ladeleistung

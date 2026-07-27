@@ -273,7 +273,7 @@ Neuladen auch im Energiemanager-Dashboard.
 5. Als URL exakt eintragen:
 
    ```text
-   /xt500_energy_manager/xt500-energy-dashboard-strategy.js?v=1.6.0
+   /xt500_energy_manager/xt500-energy-dashboard-strategy.js?v=1.7.0
    ```
 
 6. Als Ressourcentyp **JavaScript-Modul** auswählen.
@@ -652,7 +652,7 @@ Der separate **Zyklusstatus** unterscheidet:
 
 ## Projektstatus
 
-Version 1.6.0 ist der aktuelle veröffentlichte Stand. Gesucht werden
+Version 1.7.0 ist der aktuelle veröffentlichte Stand. Gesucht werden
 Testerinnen und Tester mit unterschiedlichen XT500- und XT500-Pro-Systemen,
 Firmwareständen und Stromzählern.
 
