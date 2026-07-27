@@ -32,12 +32,18 @@ from .const import (
     SETTING_SOC_HYSTERESIS,
     SETTING_TARGET_GRID_POWER,
     SETTING_TARGET_SOC,
+    SETTING_TARIFF_CHARGE_POWER,
+    SETTING_TARIFF_REQUEST_DURATION,
+    SETTING_TARIFF_TARGET_SOC,
 )
 from .entity import XT500Entity
 from .runtime import XT500Runtime
 
 NUMBERS = (
     NumberEntityDescription(key=SETTING_TARGET_SOC, translation_key="target_soc", icon="mdi:battery-charging-100", native_min_value=50, native_max_value=100, native_step=1, native_unit_of_measurement="%", mode=NumberMode.BOX),
+    NumberEntityDescription(key=SETTING_TARIFF_TARGET_SOC, translation_key="tariff_target_soc", icon="mdi:battery-charging-medium", native_min_value=20, native_max_value=100, native_step=1, native_unit_of_measurement="%", mode=NumberMode.BOX),
+    NumberEntityDescription(key=SETTING_TARIFF_CHARGE_POWER, translation_key="tariff_charge_power", icon="mdi:transmission-tower-import", native_min_value=0, native_max_value=2400, native_step=50, native_unit_of_measurement=UnitOfPower.WATT, mode=NumberMode.BOX),
+    NumberEntityDescription(key=SETTING_TARIFF_REQUEST_DURATION, translation_key="tariff_request_duration", icon="mdi:timer-sand", native_min_value=5, native_max_value=360, native_step=5, native_unit_of_measurement="min", mode=NumberMode.BOX),
     NumberEntityDescription(key=SETTING_AUTO_TARGET_SOC, translation_key="automatic_target_soc", icon="mdi:battery-check", native_min_value=50, native_max_value=100, native_step=1, native_unit_of_measurement="%", mode=NumberMode.BOX),
     NumberEntityDescription(key=SETTING_NORMAL_CHARGE_LIMIT, translation_key="normal_charge_limit", icon="mdi:battery-lock", native_min_value=0, native_max_value=100, native_step=1, native_unit_of_measurement="%", mode=NumberMode.BOX),
     NumberEntityDescription(key=SETTING_CHARGE_POWER, translation_key="charge_power", icon="mdi:flash", native_min_value=0, native_max_value=2400, native_step=50, native_unit_of_measurement=UnitOfPower.WATT, mode=NumberMode.BOX),

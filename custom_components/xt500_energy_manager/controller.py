@@ -329,6 +329,57 @@ class ControlResult:
     discharge_blocked: bool
 
 
+@dataclass(slots=True, frozen=True)
+class ChargeRequestDecision:
+    """Resolved charge request after applying source priorities."""
+
+    active: bool
+    source: str
+    mode: str
+    target_soc: float
+    charge_power: float
+
+
+def select_charge_request(
+    *,
+    manual_active: bool,
+    manual_cycle_active: bool,
+    automatic_cycle_active: bool,
+    tariff_active: bool,
+    manual_mode: str,
+    cycle_mode: str,
+    manual_target_soc: float,
+    cycle_target_soc: float,
+    tariff_target_soc: float,
+    charge_power: float,
+    tariff_charge_power: float,
+) -> ChargeRequestDecision:
+    """Select manual, cycle, tariff, or inactive request in priority order."""
+    if manual_active:
+        return ChargeRequestDecision(
+            True, "manual", manual_mode, manual_target_soc, charge_power
+        )
+    if manual_cycle_active:
+        return ChargeRequestDecision(
+            True, "cycle_manual", cycle_mode, cycle_target_soc, charge_power
+        )
+    if automatic_cycle_active:
+        return ChargeRequestDecision(
+            True, "cycle_automatic", cycle_mode, cycle_target_soc, charge_power
+        )
+    if tariff_active:
+        return ChargeRequestDecision(
+            True,
+            "tariff",
+            MODE_GRID,
+            tariff_target_soc,
+            tariff_charge_power,
+        )
+    return ChargeRequestDecision(
+        False, "none", MODE_GRID, tariff_target_soc, tariff_charge_power
+    )
+
+
 def calculate_control(data: ControlInput, cfg: ControlSettings) -> ControlResult:
     """Calculate GS/IS setpoints using the verified v1.3 topology model."""
     normalized_grid = data.grid_power if cfg.meter_export_positive else -data.grid_power

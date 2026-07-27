@@ -14,6 +14,7 @@ from homeassistant.const import EVENT_HOMEASSISTANT_STARTED
 from homeassistant.core import Event, HomeAssistant, State, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.event import (
+    async_call_later,
     async_track_state_change_event,
     async_track_time_change,
 )
@@ -71,6 +72,11 @@ from .const import (
     SETTING_SOC_HYSTERESIS,
     SETTING_TARGET_GRID_POWER,
     SETTING_TARGET_SOC,
+    SETTING_TARIFF_ACTIVE,
+    SETTING_TARIFF_CHARGE_POWER,
+    SETTING_TARIFF_EXPIRES_AT,
+    SETTING_TARIFF_REQUEST_DURATION,
+    SETTING_TARIFF_TARGET_SOC,
 )
 from .controller import (
     AdaptiveControlProfile,
@@ -88,6 +94,7 @@ from .controller import (
     recovery_delay_seconds,
     select_adaptive_control_profile,
     select_charge_limit,
+    select_charge_request,
     update_pv_release,
     WRITE_RETRY_DELAY_MULTIPLIERS,
     write_retry_delay_seconds,
@@ -150,6 +157,7 @@ class XT500Runtime:
         self._unsub_state: Callable[[], None] | None = None
         self._unsub_started: Callable[[], None] | None = None
         self._unsub_cycle_check: Callable[[], None] | None = None
+        self._unsub_tariff_expiry: Callable[[], None] | None = None
         self._control_apply_task: asyncio.Task | None = None
         self._startup_ready_task: asyncio.Task | None = None
         self._control_apply_requested = False
@@ -228,10 +236,19 @@ class XT500Runtime:
             self.settings[SETTING_CYCLE_AUTOMATIC_ACTIVE] = True
             migrated = True
 
+        if not self._tariff_request_is_valid():
+            if bool(self.settings[SETTING_TARIFF_ACTIVE]) or self.settings.get(
+                SETTING_TARIFF_EXPIRES_AT
+            ) is not None:
+                self.settings[SETTING_TARIFF_ACTIVE] = False
+                self.settings[SETTING_TARIFF_EXPIRES_AT] = None
+                migrated = True
+
         if migrated:
             await self._store.async_save(self.settings)
 
         self._schedule_cycle_check()
+        self._schedule_tariff_expiry()
         self._unsub_state = async_track_state_change_event(
             self.hass, self.source_entities, self._async_state_changed
         )
@@ -263,6 +280,9 @@ class XT500Runtime:
         if self._unsub_cycle_check:
             self._unsub_cycle_check()
             self._unsub_cycle_check = None
+        if self._unsub_tariff_expiry:
+            self._unsub_tariff_expiry()
+            self._unsub_tariff_expiry = None
 
     @callback
     def _async_home_assistant_started(self, _event: Event) -> None:
@@ -466,36 +486,40 @@ class XT500Runtime:
 
         manual_cycle_active = self.manual_cycle_requested
         automatic_cycle_active = self.automatic_cycle_requested
-        charge_active = manual_active or manual_cycle_active or automatic_cycle_active
-        source = (
-            "manual"
-            if manual_active
-            else "cycle_manual"
-            if manual_cycle_active
-            else "cycle_automatic"
-            if automatic_cycle_active
-            else "none"
+        tariff_active = self.tariff_request_active
+        tariff_target = float(self.settings[SETTING_TARIFF_TARGET_SOC])
+        if tariff_active and values[CONF_SOC_ENTITY] >= tariff_target:
+            self.settings[SETTING_TARIFF_ACTIVE] = False
+            self.settings[SETTING_TARIFF_EXPIRES_AT] = None
+            self._cancel_tariff_expiry()
+            self._store.async_delay_save(lambda: self.settings, 1)
+            tariff_active = False
+
+        charge_request = select_charge_request(
+            manual_active=manual_active,
+            manual_cycle_active=manual_cycle_active,
+            automatic_cycle_active=automatic_cycle_active,
+            tariff_active=tariff_active,
+            manual_mode=self.settings[SETTING_MANUAL_MODE],
+            cycle_mode=self.settings[SETTING_AUTO_MODE],
+            manual_target_soc=float(self.settings[SETTING_TARGET_SOC]),
+            cycle_target_soc=float(self.settings[SETTING_AUTO_TARGET_SOC]),
+            tariff_target_soc=float(self.settings[SETTING_TARIFF_TARGET_SOC]),
+            charge_power=float(self.settings[SETTING_CHARGE_POWER]),
+            tariff_charge_power=float(self.settings[SETTING_TARIFF_CHARGE_POWER]),
         )
-        mode = (
-            self.settings[SETTING_MANUAL_MODE]
-            if manual_active
-            else self.settings[SETTING_AUTO_MODE]
+        self.charge_request_active = charge_request.active
+        self.active_target_soc = (
+            charge_request.target_soc if charge_request.active else None
         )
-        target_soc = float(
-            self.settings[SETTING_TARGET_SOC]
-            if manual_active
-            else self.settings[SETTING_AUTO_TARGET_SOC]
-        )
-        self.charge_request_active = charge_active
-        self.active_target_soc = target_soc if charge_active else None
 
         charge_limit_state = self.hass.states.get(
             self.entry.data[CONF_MAX_CHARGE_SOC_ENTITY]
         )
         self.desired_charge_limit = select_charge_limit(
             normal_limit=float(self.settings[SETTING_NORMAL_CHARGE_LIMIT]),
-            target_soc=target_soc,
-            charge_active=charge_active,
+            target_soc=charge_request.target_soc,
+            charge_active=charge_request.active,
             low=float(charge_limit_state.attributes.get("min", 0)),
             high=float(charge_limit_state.attributes.get("max", 100)),
             step=float(charge_limit_state.attributes.get("step", 1) or 1),
@@ -519,15 +543,15 @@ class XT500Runtime:
                 current_inverter_setpoint=values[CONF_INVERTER_SETPOINT_ENTITY],
             ),
             ControlSettings(
-                charge_active=charge_active,
-                charge_source=source,
-                charge_mode=mode,
+                charge_active=charge_request.active,
+                charge_source=charge_request.source,
+                charge_mode=charge_request.mode,
                 base_mode=self.settings[SETTING_BASE_MODE],
-                target_soc=target_soc,
+                target_soc=charge_request.target_soc,
                 minimum_soc=minimum_soc,
                 soc_hysteresis=hysteresis,
                 discharge_hold=self._low_soc_hold,
-                charge_power=float(self.settings[SETTING_CHARGE_POWER]),
+                charge_power=charge_request.charge_power,
                 target_grid_power=float(self.settings[SETTING_TARGET_GRID_POWER]),
                 grid_limit=float(self.settings[SETTING_MAX_GRID_OUTPUT]),
                 inverter_limit=float(self.settings[SETTING_MAX_INVERTER_OUTPUT]),
@@ -584,6 +608,71 @@ class XT500Runtime:
         if not isinstance(value, str):
             return None
         return dt_util.parse_datetime(value)
+
+    def _tariff_request_is_valid(self) -> bool:
+        """Return whether the external tariff request is active and unexpired."""
+        expires_at = self._setting_datetime(SETTING_TARIFF_EXPIRES_AT)
+        return bool(self.settings[SETTING_TARIFF_ACTIVE]) and (
+            expires_at is not None and expires_at > dt_util.now()
+        )
+
+    @property
+    def tariff_request_active(self) -> bool:
+        """Return whether a valid tariff charge request currently exists."""
+        return self._tariff_request_is_valid()
+
+    @property
+    def tariff_expires_datetime(self) -> datetime | None:
+        """Return the current tariff-request expiry for dashboard display."""
+        if not self.tariff_request_active:
+            return None
+        return self._setting_datetime(SETTING_TARIFF_EXPIRES_AT)
+
+    @callback
+    def _cancel_tariff_expiry(self) -> None:
+        if self._unsub_tariff_expiry:
+            self._unsub_tariff_expiry()
+            self._unsub_tariff_expiry = None
+
+    @callback
+    def _schedule_tariff_expiry(self) -> None:
+        """Stop an external tariff request when its safety window ends."""
+        self._cancel_tariff_expiry()
+        expires_at = self._setting_datetime(SETTING_TARIFF_EXPIRES_AT)
+        if not self.tariff_request_active or expires_at is None:
+            return
+        delay = max((expires_at - dt_util.now()).total_seconds(), 0.0)
+        self._unsub_tariff_expiry = async_call_later(
+            self.hass, delay, self._async_tariff_expired
+        )
+
+    @callback
+    def _async_tariff_expired(self, _now: datetime) -> None:
+        self._unsub_tariff_expiry = None
+        self.settings[SETTING_TARIFF_ACTIVE] = False
+        self.settings[SETTING_TARIFF_EXPIRES_AT] = None
+        self._store.async_delay_save(lambda: self.settings, 1)
+        self.async_calculate()
+
+    @callback
+    def async_set_tariff_active(self, active: bool) -> None:
+        """Set or refresh the externally controlled tariff charge request."""
+        self.settings[SETTING_TARIFF_ACTIVE] = active
+        self.settings[SETTING_TARIFF_EXPIRES_AT] = (
+            (
+                dt_util.now()
+                + timedelta(
+                    minutes=max(
+                        float(self.settings[SETTING_TARIFF_REQUEST_DURATION]), 1.0
+                    )
+                )
+            ).isoformat()
+            if active
+            else None
+        )
+        self._schedule_tariff_expiry()
+        self._store.async_delay_save(lambda: self.settings, 1)
+        self.async_calculate()
 
     @property
     def next_cycle_at(self) -> str | None:
@@ -1557,6 +1646,9 @@ class XT500Runtime:
             self._schedule_cycle_check()
             if self._automatic_cycle_should_start_now():
                 self.settings[SETTING_CYCLE_AUTOMATIC_ACTIVE] = True
+        elif key == SETTING_TARIFF_REQUEST_DURATION and self.tariff_request_active:
+            self.async_set_tariff_active(True)
+            return
         self._store.async_delay_save(lambda: self.settings, 1)
         if key == SETTING_AUTOMATIC_RECOVERY_ENABLED:
             self._cancel_recovery_task()

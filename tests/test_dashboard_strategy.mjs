@@ -83,6 +83,11 @@ const createLayoutHass = () => {
     "regulation_enabled",
     "automatic_recovery_enabled",
     "manual_active",
+    "tariff_active",
+    "tariff_target_soc",
+    "tariff_charge_power",
+    "tariff_request_duration",
+    "tariff_expires_at",
     "automatic_enabled",
     "cycle_start",
     "base_mode",
@@ -315,6 +320,7 @@ test("teilt die Speicheransicht standardmäßig in einzeln anordenbare Blöcke",
     "Bedienung und Sicherheit",
     "Hauptsteuerung",
     "Manuelle Zielladung",
+    "Dynamischer Stromtarif",
     "Normalbetrieb und Grenzen",
     "Adaptive Regelung",
   ]);
@@ -335,6 +341,7 @@ test("wendet Reihenfolge und ausgeblendete Blöcke für beide Seiten an", async 
       settings_block_order: [
         "normal_limits",
         "target_charge",
+        "tariff_charge",
         "main_control",
         "advanced",
         "guide",
@@ -355,6 +362,7 @@ test("wendet Reihenfolge und ausgeblendete Blöcke für beide Seiten an", async 
   assert.deepEqual(plain(sectionHeadings(settings)), [
     "Normalbetrieb und Grenzen",
     "Manuelle Zielladung",
+    "Dynamischer Stromtarif",
     "Hauptsteuerung",
   ]);
 });
@@ -395,6 +403,22 @@ test("ordnet die Schnellsteuerung eindeutig und zeigt Fehlerbehebung nur in Eins
     (card) => card.name === "Jetzt manuell starten",
   );
   assert.equal(cycleStartIndex, cycleMonitorIndex + 1);
+});
+
+test("zeigt die Tarifladung nur einmal als eigenen Einstellungsblock", async () => {
+  const result = await Strategy.generate({}, createLayoutHass());
+  const settings = result.views.find((view) => view.path === "einstellungen");
+  const tariffSections = settings.sections.filter(
+    (section) => section.cards[0].heading === "Dynamischer Stromtarif",
+  );
+
+  assert.equal(tariffSections.length, 1);
+  assert.deepEqual(plain(tariffSections[0].cards.slice(1, 5).map((card) => card.name)), [
+    "Tarifladung anfordern",
+    "Ladeziel",
+    "Netz-Ladeleistung",
+    "Gültigkeit je Anforderung",
+  ]);
 });
 
 test("erzeugt historische und aktuelle Energieansichten vor der Einstellungsseite", async () => {

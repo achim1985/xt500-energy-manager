@@ -50,6 +50,23 @@ ceiling, and system charge limit.
 Manual charging overrides an automatic due state. Both return to the selected
 base mode after completion.
 
+## Dynamic tariff charging
+
+The integration exposes a separate tariff charge request with its own target
+SOC, grid charging power, and safety expiry. Manual and cycle charging take
+priority. An unrefreshed request expires automatically and returns to the base
+mode.
+
+The included provider-independent automation blueprint evaluates any numeric
+current-price sensor with separate start and stop thresholds:
+
+`blueprints/automation/xt500_energy_manager/dynamic_tariff_charging.yaml`
+
+It refreshes a cheap-price request every 15 minutes and switches it off when
+the price is invalid, the target SOC is reached, or the stop threshold is
+reached. Normal operation already uses the battery for home consumption at
+high prices; this feature does not request battery export to the public grid.
+
 ## Installation
 
 1. Install and configure the original

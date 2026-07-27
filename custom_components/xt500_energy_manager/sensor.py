@@ -32,6 +32,7 @@ STATUS_OPTIONS = (
     "cycle_manual_pv_priority", "cycle_manual_pv_and_grid",
     "cycle_automatic_grid_charge", "cycle_automatic_pv_surplus",
     "cycle_automatic_pv_priority", "cycle_automatic_pv_and_grid",
+    "tariff_grid_charge",
 )
 
 SENSORS = (
@@ -62,6 +63,7 @@ SENSORS = (
     XT500SensorDescription(key="control_interval", translation_key="control_interval", icon="mdi:timer-sync-outline", native_unit_of_measurement="s", value_fn=lambda r: r.effective_control_interval),
     XT500SensorDescription(key="control_max_step", translation_key="control_max_step", icon="mdi:delta", native_unit_of_measurement=UnitOfPower.WATT, value_fn=lambda r: r.control_profile.maximum_change),
     XT500SensorDescription(key="active_target_soc", translation_key="active_target_soc", icon="mdi:battery-charging", native_unit_of_measurement=PERCENTAGE, value_fn=lambda r: r.active_target_soc),
+    XT500SensorDescription(key="tariff_expires_at", translation_key="tariff_expires_at", icon="mdi:timer-sand", device_class=SensorDeviceClass.TIMESTAMP, value_fn=lambda r: r.tariff_expires_datetime),
     XT500SensorDescription(key="desired_charge_limit", translation_key="desired_charge_limit", icon="mdi:battery-lock", native_unit_of_measurement=PERCENTAGE, value_fn=lambda r: r.desired_charge_limit),
     XT500SensorDescription(key="battery_charge_power", translation_key="battery_charge_power", icon="mdi:battery-arrow-up", device_class=SensorDeviceClass.POWER, native_unit_of_measurement=UnitOfPower.WATT, value_fn=lambda r: r.battery_charge_power),
     XT500SensorDescription(key="battery_discharge_power", translation_key="battery_discharge_power", icon="mdi:battery-arrow-down", device_class=SensorDeviceClass.POWER, native_unit_of_measurement=UnitOfPower.WATT, value_fn=lambda r: r.battery_discharge_power),

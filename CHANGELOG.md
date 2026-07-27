@@ -2,6 +2,18 @@
 
 ## Unveröffentlicht
 
+- eigene, providerunabhängige Tarif-Ladeanforderung mit separatem Ladeziel und
+  separater Netz-Ladeleistung
+- zeitlich begrenzte Anforderung fällt ohne regelmäßige Erneuerung automatisch
+  und sicher in den Grundbetrieb zurück
+- klare Priorität: manuelle Zielladung, Zyklusladung, Tarifladung, Grundbetrieb
+- eigener Tarifstatus und Ablaufzeitpunkt in Dashboard und Diagnosedaten
+- mitgelieferter Automation-Blueprint für beliebige numerische Preissensoren
+  mit getrennter Start-/Stoppschwelle, Hysterese und sicherem Verhalten bei
+  ungültigen Preisen
+- ausführliche Anleitung mit Tibber-Beispiel, Einheitenhinweis und Abgrenzung
+  zu vorausschauender Preisoptimierung
+
 ## 1.6.0 – 2026-07-27
 
 - neue empfohlene Einrichtung über eine native SunEnergy-XT500-Geräteauswahl

@@ -33,6 +33,7 @@ Wechselrichterleistung.
 - [3. Integration einrichten](#3-integration-einrichten)
 - [4. Dashboard-Strategie einrichten](#4-dashboard-strategie-einrichten)
 - [Bedienung und Lademodi](#bedienung-und-lademodi)
+- [Dynamischer Stromtarif](#dynamischer-stromtarif)
 - [Sicherheitsverhalten](#sicherheitsverhalten)
 - [Aktualisieren](#aktualisieren)
 - [Fehlerbehebung](#fehlerbehebung)
@@ -439,6 +440,84 @@ Nur die noch fehlende Leistung wird aus dem Netz angefordert. Beispiel:
 `1200 W` Ladeziel und `700 W` tatsächlich für den Akku verfügbare PV ergeben
 `500 W` Netzladung. Deckt PV das Ladeziel vollständig, wird keine Netzladung
 angefordert.
+
+### Dynamischer Stromtarif
+
+Die Integration besitzt eine eigene, zeitlich begrenzte
+**Tarif-Ladeanforderung**. Sie ist von manueller Zielladung und Zyklusladung
+getrennt und kann von einer beliebigen Home-Assistant-Automation bedient werden.
+
+Die Tarifladung verwendet immer:
+
+- reine **Netzladung**
+- ein separates **Ladeziel der Tarifladung**
+- eine separate **Netzleistung der Tarifladung**
+- eine einstellbare **Gültigkeitsdauer je Tarifanforderung**
+
+Die Priorität lautet:
+
+1. manuelle Zielladung
+2. manuelle oder automatische Zyklusladung
+3. Tarifladung
+4. Grundbetrieb
+
+Eine höher priorisierte Ladung überschreibt die Tarifanforderung nicht
+dauerhaft. Ist sie danach noch nicht abgelaufen, darf die Tarifladung bis zu
+ihrem eigenen Ziel weiterlaufen. Bei Zielerreichung oder Ablauf kehrt die
+Integration automatisch in den Grundbetrieb zurück.
+
+> [!IMPORTANT]
+> Bei hohem Strompreis ist kein eigener Entlademodus erforderlich. Im
+> Normalbetrieb versorgt der Energiemanager das Haus bereits aus dem Akku,
+> solange die Entladegrenze nicht erreicht ist. Die Tarifsteuerung fordert
+> keine Batterieeinspeisung in das öffentliche Netz an.
+
+#### Mitgelieferten Preis-Blueprint installieren
+
+Der mitgelieferte Blueprint arbeitet anbieterunabhängig mit jedem numerischen
+Strompreissensor, beispielsweise dem aktuellen Gesamtpreis der offiziellen
+Tibber-Integration.
+
+1. **Einstellungen → Automationen & Szenen → Blueprints** öffnen.
+2. **Blueprint importieren** auswählen.
+3. Diese URL einfügen:
+
+   ```text
+   https://github.com/achim1985/xt500-energy-manager/blob/main/blueprints/automation/xt500_energy_manager/dynamic_tariff_charging.yaml
+   ```
+
+4. Aus dem Blueprint **XT500 – Laden bei günstigem Strompreis** eine
+   Automation erstellen.
+5. Folgende Entitäten auswählen:
+
+   - aktuellen Strompreissensor
+   - originalen SunEnergyXT-System-Speicherlevel
+   - **Tarifladung anfordern**
+   - **Ladeziel der Tarifladung**
+   - **Netzleistung der Tarifladung**
+
+6. Startpreis, Ausschaltpreis, Ladeziel und Ladeleistung einstellen.
+
+Beispiel:
+
+- unter `0,20 €/kWh`: Tarifladung starten
+- von `0,20` bis unter `0,22 €/kWh`: bisherigen Zustand beibehalten
+- ab `0,22 €/kWh`: Tarifladung beenden
+- bei `unknown`, `unavailable` oder erreichtem SOC: Tarifladung beenden
+
+Der Blueprint prüft den Preis bei jeder Änderung, nach einem
+Home-Assistant-Start und alle 15 Minuten. Während eines günstigen Zeitraums
+erneuert er die zeitlich begrenzte Anforderung. Die eingestellte Gültigkeitsdauer
+sollte deshalb länger als 15 Minuten sein; der Standardwert von 90 Minuten
+bietet ausreichend Reserve.
+
+Die Preisgrenzen müssen dieselbe Einheit wie der ausgewählte Sensor verwenden.
+Ein Sensor in `ct/kWh` benötigt beispielsweise `20` und `22` statt `0,20` und
+`0,22`.
+
+Diese erste Strategie reagiert auf den aktuellen Preis. Sie sucht noch nicht
+vorausschauend die günstigsten Zeitfenster von heute oder morgen und
+berücksichtigt keine PV-Prognose.
 
 ### Zyklusladung
 

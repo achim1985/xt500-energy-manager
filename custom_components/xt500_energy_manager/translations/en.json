@@ -141,7 +141,8 @@
           "cycle_automatic_grid_charge": "Automatic cycle - grid charging",
           "cycle_automatic_pv_surplus": "Automatic cycle - PV surplus",
           "cycle_automatic_pv_priority": "Automatic cycle - PV priority",
-          "cycle_automatic_pv_and_grid": "Automatic cycle - PV and grid"
+          "cycle_automatic_pv_and_grid": "Automatic cycle - PV and grid",
+          "tariff_grid_charge": "Tariff charging - grid charging"
         }
       },
       "recovery_status": {
@@ -178,6 +179,7 @@
       "control_interval": { "name": "Active control interval" },
       "control_max_step": { "name": "Active maximum setpoint change" },
       "active_target_soc": { "name": "Currently used charge target" },
+      "tariff_expires_at": { "name": "Tariff request valid until" },
       "desired_charge_limit": { "name": "Applied system charge limit" },
       "battery_charge_power": { "name": "Actual battery charging power" },
       "battery_discharge_power": { "name": "Actual battery discharging power" },
@@ -206,6 +208,7 @@
       "cycle_due": { "name": "Cycle due" },
       "cycle_charge_active": { "name": "Cycle charging active" },
       "charge_request": { "name": "Charge request active" },
+      "tariff_request": { "name": "Tariff charge request active" },
       "control_ready": { "name": "Production control ready" },
       "feedback_ready": { "name": "Fresh feedback received" },
       "pv_release_active": { "name": "PV output released" }
@@ -214,6 +217,7 @@
       "regulation_enabled": { "name": "Energy manager enabled" },
       "automatic_recovery_enabled": { "name": "Automatic error recovery" },
       "manual_active": { "name": "Start manual target charging" },
+      "tariff_active": { "name": "Request tariff charging" },
       "automatic_enabled": { "name": "Automatic cycle monitoring" },
       "show_advanced": { "name": "Show fine tuning" }
     },
@@ -233,6 +237,9 @@
     },
     "number": {
       "target_soc": { "name": "Manual target charge level" },
+      "tariff_target_soc": { "name": "Tariff charging target" },
+      "tariff_charge_power": { "name": "Tariff grid charging power" },
+      "tariff_request_duration": { "name": "Validity of each tariff request" },
       "automatic_target_soc": { "name": "Cycle full-charge target" },
       "normal_charge_limit": { "name": "Normal-operation charge limit" },
       "charge_power": { "name": "Requested charging power" },

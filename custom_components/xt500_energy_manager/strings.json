@@ -141,7 +141,8 @@
           "cycle_automatic_grid_charge": "Zyklus automatisch – Netzladung",
           "cycle_automatic_pv_surplus": "Zyklus automatisch – PV-Überschuss",
           "cycle_automatic_pv_priority": "Zyklus automatisch – PV-Vorrang",
-          "cycle_automatic_pv_and_grid": "Zyklus automatisch – PV + Netz"
+          "cycle_automatic_pv_and_grid": "Zyklus automatisch – PV + Netz",
+          "tariff_grid_charge": "Tarifladung – Netzladung"
         }
       },
       "recovery_status": {
@@ -178,6 +179,7 @@
       "control_interval": { "name": "Aktiver Regelabstand" },
       "control_max_step": { "name": "Aktive maximale Sollwertänderung" },
       "active_target_soc": { "name": "Aktuell verwendetes Ladeziel" },
+      "tariff_expires_at": { "name": "Tarifanforderung gültig bis" },
       "desired_charge_limit": { "name": "Verwendete System-Ladegrenze" },
       "battery_charge_power": { "name": "Batterie lädt tatsächlich" },
       "battery_discharge_power": { "name": "Batterie entlädt tatsächlich" },
@@ -206,6 +208,7 @@
       "cycle_due": { "name": "Zyklus fällig" },
       "cycle_charge_active": { "name": "Zyklusladung aktiv" },
       "charge_request": { "name": "Ladeanforderung aktiv" },
+      "tariff_request": { "name": "Tarif-Ladeanforderung aktiv" },
       "control_ready": { "name": "Produktivregelung bereit" },
       "feedback_ready": { "name": "Neue Rückmeldungen eingetroffen" },
       "pv_release_active": { "name": "PV-Ausgabe freigegeben" }
@@ -214,6 +217,7 @@
       "regulation_enabled": { "name": "Energiemanager aktiv" },
       "automatic_recovery_enabled": { "name": "Automatische Fehlerwiederherstellung" },
       "manual_active": { "name": "Manuelle Zielladung starten" },
+      "tariff_active": { "name": "Tarifladung anfordern" },
       "automatic_enabled": { "name": "Automatische Zyklusüberwachung" },
       "show_advanced": { "name": "Feinabstimmung anzeigen" }
     },
@@ -233,6 +237,9 @@
     },
     "number": {
       "target_soc": { "name": "Ladeziel der manuellen Zielladung" },
+      "tariff_target_soc": { "name": "Ladeziel der Tarifladung" },
+      "tariff_charge_power": { "name": "Netzleistung der Tarifladung" },
+      "tariff_request_duration": { "name": "Gültigkeitsdauer je Tarifanforderung" },
       "automatic_target_soc": { "name": "Vollladeziel der Zyklusladung" },
       "normal_charge_limit": { "name": "Ladelimit im Normalbetrieb" },
       "charge_power": { "name": "Gewünschte Ladeleistung" },

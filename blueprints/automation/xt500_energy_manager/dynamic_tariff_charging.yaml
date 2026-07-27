@@ -1,0 +1,158 @@
+blueprint:
+  name: XT500 – Laden bei günstigem Strompreis
+  description: >-
+    Fordert beim XT500 Energy Manager eine zeitlich begrenzte Netzladung an,
+    wenn ein beliebiger Strompreissensor unter die Startgrenze fällt. Eine
+    getrennte Ausschaltschwelle bildet die Hysterese. Bei ungültigem Preis,
+    erreichtem Ladeziel oder hohem Preis wird die Tarifanforderung beendet.
+    Der normale Energiemanager-Betrieb nutzt den Akku anschließend weiter für
+    das Haus, ohne eine Batterieeinspeisung ins öffentliche Netz anzufordern.
+  domain: automation
+  author: Achim Schmitz
+  source_url: >-
+    https://github.com/achim1985/xt500-energy-manager/blob/main/blueprints/automation/xt500_energy_manager/dynamic_tariff_charging.yaml
+  homeassistant:
+    min_version: "2024.10.0"
+  input:
+    sources:
+      name: Preis und Speicher
+      icon: mdi:cash-clock
+      input:
+        price_sensor:
+          name: Aktueller Strompreis
+          description: >-
+            Numerischer Preis einschließlich der gewünschten Abgaben. Die
+            beiden Preisgrenzen müssen dieselbe Einheit wie dieser Sensor
+            verwenden, zum Beispiel EUR/kWh.
+          selector:
+            entity:
+              domain: sensor
+        soc_sensor:
+          name: Speicherstand
+          description: Originaler System-Speicherlevel des SunEnergy XT500.
+          selector:
+            entity:
+              domain: sensor
+              integration: sunenergyxt
+    manager:
+      name: XT500 Energy Manager
+      icon: mdi:home-battery
+      input:
+        tariff_switch:
+          name: Tarifladung anfordern
+          selector:
+            entity:
+              domain: switch
+              integration: xt500_energy_manager
+        tariff_target_entity:
+          name: Ladeziel der Tarifladung
+          selector:
+            entity:
+              domain: number
+              integration: xt500_energy_manager
+        tariff_power_entity:
+          name: Netzleistung der Tarifladung
+          selector:
+            entity:
+              domain: number
+              integration: xt500_energy_manager
+    thresholds:
+      name: Preisgrenzen und Ladeziel
+      icon: mdi:tune-variant
+      input:
+        charge_start_price:
+          name: Laden starten unter
+          description: Unterhalb dieses Preises wird die Tarifladung angefordert.
+          default: 0.20
+          selector:
+            number:
+              min: -100
+              max: 500
+              step: 0.001
+              mode: box
+        charge_stop_price:
+          name: Laden beenden ab
+          description: >-
+            Muss oberhalb der Startgrenze liegen. Zwischen beiden Grenzen
+            bleibt der bisherige Zustand erhalten.
+          default: 0.22
+          selector:
+            number:
+              min: -100
+              max: 500
+              step: 0.001
+              mode: box
+        target_soc:
+          name: Ladeziel
+          default: 80
+          selector:
+            number:
+              min: 20
+              max: 100
+              step: 1
+              unit_of_measurement: "%"
+              mode: slider
+        charge_power:
+          name: Netz-Ladeleistung
+          description: Technischen Leistungsbereich des XT500 beachten.
+          default: 1000
+          selector:
+            number:
+              min: 0
+              max: 2400
+              step: 50
+              unit_of_measurement: W
+              mode: box
+
+mode: restart
+max_exceeded: silent
+
+triggers:
+  - trigger: state
+    entity_id: !input price_sensor
+  - trigger: homeassistant
+    event: start
+  - trigger: time_pattern
+    minutes: "/15"
+
+actions:
+  - choose:
+      - conditions:
+          - condition: numeric_state
+            entity_id: !input price_sensor
+            below: !input charge_start_price
+          - condition: numeric_state
+            entity_id: !input soc_sensor
+            below: !input target_soc
+        sequence:
+          - action: number.set_value
+            target:
+              entity_id: !input tariff_target_entity
+            data:
+              value: !input target_soc
+          - action: number.set_value
+            target:
+              entity_id: !input tariff_power_entity
+            data:
+              value: !input charge_power
+          - action: switch.turn_on
+            target:
+              entity_id: !input tariff_switch
+      - conditions:
+          - condition: state
+            entity_id: !input tariff_switch
+            state: "on"
+          - condition: numeric_state
+            entity_id: !input price_sensor
+            below: !input charge_stop_price
+          - condition: numeric_state
+            entity_id: !input soc_sensor
+            below: !input target_soc
+        sequence:
+          - action: switch.turn_on
+            target:
+              entity_id: !input tariff_switch
+    default:
+      - action: switch.turn_off
+        target:
+          entity_id: !input tariff_switch

@@ -299,6 +299,74 @@ class ControllerTest(unittest.TestCase):
         )
         self.assertEqual(result.recommended_grid_setpoint, -600)
 
+    def test_tariff_request_uses_separate_grid_charge_settings(self):
+        decision = controller.select_charge_request(
+            manual_active=False,
+            manual_cycle_active=False,
+            automatic_cycle_active=False,
+            tariff_active=True,
+            manual_mode="pv_priority",
+            cycle_mode="pv_surplus",
+            manual_target_soc=90,
+            cycle_target_soc=100,
+            tariff_target_soc=80,
+            charge_power=2400,
+            tariff_charge_power=1000,
+        )
+        self.assertTrue(decision.active)
+        self.assertEqual(decision.source, "tariff")
+        self.assertEqual(decision.mode, "grid_charge")
+        self.assertEqual(decision.target_soc, 80)
+        self.assertEqual(decision.charge_power, 1000)
+
+        result = controller.calculate_control(
+            self.input(soc=50),
+            controller.ControlSettings(
+                charge_active=decision.active,
+                charge_source=decision.source,
+                charge_mode=decision.mode,
+                target_soc=decision.target_soc,
+                charge_power=decision.charge_power,
+            ),
+        )
+        self.assertEqual(result.status, "tariff_grid_charge")
+        self.assertEqual(result.recommended_grid_setpoint, -1000)
+
+    def test_manual_and_cycle_requests_override_tariff_request(self):
+        manual = controller.select_charge_request(
+            manual_active=True,
+            manual_cycle_active=True,
+            automatic_cycle_active=True,
+            tariff_active=True,
+            manual_mode="pv_priority",
+            cycle_mode="pv_surplus",
+            manual_target_soc=85,
+            cycle_target_soc=100,
+            tariff_target_soc=80,
+            charge_power=1200,
+            tariff_charge_power=600,
+        )
+        self.assertEqual(manual.source, "manual")
+        self.assertEqual(manual.target_soc, 85)
+        self.assertEqual(manual.charge_power, 1200)
+
+        cycle = controller.select_charge_request(
+            manual_active=False,
+            manual_cycle_active=False,
+            automatic_cycle_active=True,
+            tariff_active=True,
+            manual_mode="pv_priority",
+            cycle_mode="pv_and_grid",
+            manual_target_soc=85,
+            cycle_target_soc=100,
+            tariff_target_soc=80,
+            charge_power=1200,
+            tariff_charge_power=600,
+        )
+        self.assertEqual(cycle.source, "cycle_automatic")
+        self.assertEqual(cycle.mode, "pv_and_grid")
+        self.assertEqual(cycle.charge_power, 1200)
+
     def test_charge_limit_returns_to_normal_after_target_charge(self):
         self.assertEqual(
             controller.select_charge_limit(

@@ -5,6 +5,8 @@ const XT500_DISPLAY_NAMES = {
   data_valid: "Eingangsdaten",
   control_ready: "Produktivregelung",
   charge_request: "Ladeanforderung",
+  tariff_request: "Tarif-Ladeanforderung",
+  tariff_expires_at: "Tarifanforderung gültig bis",
   recommended_grid_setpoint: "Netzanschluss-Sollwert",
   recommended_inverter_setpoint: "Wechselrichter-Obergrenze",
   desired_charge_limit: "System-Ladegrenze",
@@ -48,6 +50,7 @@ const XT500_DASHBOARD_BLOCKS = {
     { key: "guide", label: "Bedienung und Sicherheit" },
     { key: "main_control", label: "Hauptsteuerung" },
     { key: "target_charge", label: "Zielladung und Zyklusladung" },
+    { key: "tariff_charge", label: "Dynamischer Stromtarif" },
     { key: "normal_limits", label: "Normalbetrieb und Grenzen" },
     { key: "advanced", label: "Feinabstimmung" },
   ],
@@ -1027,7 +1030,7 @@ class XT500EnergyManagerDashboardStrategy extends HTMLElement {
 
       const regulationStatusEntities = namedExisting([
         "status", "control_ready", "recovery_status", "active_mode", "charge_request",
-        "active_target_soc", "pv_release_active", "data_valid",
+        "active_target_soc", "tariff_request", "pv_release_active", "data_valid",
       ]);
       const setpointEntities = namedExisting(["desired_charge_limit"]);
       if (actualGridSetpoint && hass.states[actualGridSetpoint]) {
@@ -1103,6 +1106,18 @@ class XT500EnergyManagerDashboardStrategy extends HTMLElement {
         tile("target_grid_power", "Netzziel", [{ type: "numeric-input", style: "buttons" }]),
         tile("maximum_grid_output", "Hausnetz-Limit", [{ type: "numeric-input", style: "buttons" }]),
       ]);
+      const tariffControlCards = compact([
+        heading("Dynamischer Stromtarif", "mdi:currency-eur"),
+        tile("tariff_active", "Tarifladung anfordern", [{ type: "toggle" }]),
+        tile("tariff_target_soc", "Ladeziel", [{ type: "numeric-input", style: "buttons" }]),
+        tile("tariff_charge_power", "Netz-Ladeleistung", [{ type: "numeric-input", style: "buttons" }]),
+        tile("tariff_request_duration", "Gültigkeit je Anforderung", [{ type: "numeric-input", style: "buttons" }]),
+        entities.tariff_expires_at ? {
+          type: "entities",
+          show_header_toggle: false,
+          entities: namedExisting(["tariff_expires_at"]),
+        } : null,
+      ]);
       const advancedControlCards = compact([
         heading("Adaptive Regelung", "mdi:speedometer"),
         existing(["control_band", "control_error", "control_interval", "control_max_step", "feedback_ready"]).length ? {
@@ -1160,6 +1175,11 @@ class XT500EnergyManagerDashboardStrategy extends HTMLElement {
           "- **PV-Überschuss:** Gibt aktuelle PV-Leistung nur passend zum Hausverbrauch weiter; der Rest kann den Akku laden. Es wird keine Netzladung angefordert. Das Ziel kann mehrere Tage aktiv bleiben.\n" +
           "- **PV-Vorrang:** Verfolgt das Ziel ausschließlich mit PV und hält die Batterieentladung zurück. Bei schlechtem Wetter läuft die Anforderung über mehrere Tage weiter.\n" +
           "- **PV + Netz:** Die eingestellte Ladeleistung ist das Ziel für die gesamte Batterieladung. Der nach Hausversorgung für den Akku verbleibende PV-Anteil wird davon abgezogen; nur die Differenz kommt aus dem Netz. Beispiel: 1.200 W Ziel und 700 W PV-Anteil ergeben 500 W Netzladung. Reicht PV allein aus, bleibt die Netzladung bei 0 W.\n\n" +
+          "**Dynamischer Stromtarif**\n\n" +
+          "- Eine externe Preisautomation oder der mitgelieferte Tarif-Blueprint darf eine eigene **Tarifladung** anfordern. Diese verwendet ausschließlich Netzladung mit dem separaten Tarif-Ladeziel und der separaten Netz-Ladeleistung.\n" +
+          "- Manuelle Zielladung und Zyklusladung haben Vorrang. Die Tarifanforderung bleibt währenddessen nur bis zu ihrem angezeigten Ablaufzeitpunkt vorgemerkt.\n" +
+          "- Jede erneute Anforderung verlängert die Gültigkeit. Bleibt die Preisautomation aus oder wird der Preissensor ungültig, endet die Tarifladung spätestens nach der eingestellten Dauer automatisch und der Grundmodus übernimmt wieder.\n" +
+          "- Bei hohem Preis ist kein eigener Entlademodus nötig: Nach Ende der Tarifladung versorgt der Normalbetrieb das Haus bereits aus dem Akku, solange die Entladegrenze nicht erreicht ist. Eine Einspeisung aus dem Akku ins öffentliche Netz wird dadurch nicht angefordert.\n\n" +
           "**Zyklusladung: Überwachung, Start und Rücksetzen**\n\n" +
           "- **Automatische Zyklusüberwachung** beobachtet nur den Zeitabstand. Sie bedeutet nicht, dass gerade geladen wird.\n" +
           "- Ist das Intervall abgelaufen, zeigt der Zyklusstatus **Fällig – wartet auf tägliche Prüfzeit**. Erst zur eingestellten **täglichen Prüfzeit** startet die Integration die Ladung im gewählten Zyklus-Lademodus.\n" +
@@ -1257,6 +1277,10 @@ class XT500EnergyManagerDashboardStrategy extends HTMLElement {
         target_charge: chargeControlCards.length > 2 ? {
           type: "grid",
           cards: chargeControlCards,
+        } : null,
+        tariff_charge: tariffControlCards.length > 1 ? {
+          type: "grid",
+          cards: tariffControlCards,
         } : null,
         normal_limits: normalControlCards.length > 1 ? {
           type: "grid",
