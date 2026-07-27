@@ -112,6 +112,10 @@ class XT500Sensor(XT500Entity, SensorEntity):
                     "communication_pause": self.runtime.communication_pause_active,
                     "communication_pause_since": self.runtime.communication_pause_since,
                     "communication_pause_message": self.runtime.communication_pause_message,
+                    "current_input_errors": self.runtime.invalid_inputs,
+                    "last_input_errors": self.runtime.last_invalid_inputs,
+                    "last_input_error_at": self.runtime.last_invalid_at,
+                    "last_inputs_recovered_at": self.runtime.last_inputs_recovered_at,
                 }
             )
         elif self.key == "recovery_status":

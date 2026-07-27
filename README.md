@@ -148,8 +148,28 @@ XT500 Energy Manager fortfahren.
 
 ## 3. Integration einrichten
 
-Im Einrichtungsdialog werden die vorhandenen Home-Assistant-Entitäten
-zugeordnet.
+Im ersten Dialog stehen zwei Wege zur Auswahl:
+
+1. **Automatisch über das XT500-Gerät einrichten (empfohlen)**
+2. **Entitäten manuell auswählen (Expertenmodus)**
+
+Bei der automatischen Einrichtung wird nur das Gerät der zuvor installierten
+**SunEnergyXT 500 Series** Integration ausgewählt. Der Energiemanager erkennt
+die originalen XT500-Entitäten anhand ihrer stabilen Gerätekennungen
+automatisch. Umbenannte Anzeigenamen sind daher kein Problem.
+
+Manuell bleiben nur:
+
+- die **Gesamtleistung am öffentlichen Netzanschlusspunkt**
+- die dazu passende **Vorzeichenrichtung**
+
+Die automatische Erkennung prüft, ob alle für die Regelung notwendigen
+Original-Entitäten am ausgewählten XT500 vorhanden sind. Falls die
+SunEnergyXT-Integration einzelne Werte nicht bereitstellt oder Werte mehrfach
+gefunden werden, zeigt der Dialog einen konkreten Fehler und verweist auf den
+Expertenmodus.
+
+Der Expertenmodus bietet weiterhin die vollständige manuelle Zuordnung:
 
 | Feld | Benötigte Entität |
 | --- | --- |
@@ -534,11 +554,20 @@ Der separate **Zyklusstatus** unterscheidet:
 
 ### Eingangsdaten sind ungültig
 
-- Alle Pflichtsensoren auf `unknown`, `unavailable` oder nichtnumerische Werte
-  prüfen.
-- Kontrollieren, ob die richtigen SunEnergyXT-Sollwertentitäten gewählt
-  wurden.
-- Vorzeichen des öffentlichen Zählers prüfen.
+- Die Entität **Eingangsdaten gültig** öffnen. In den Attributen stehen unter
+  `current_errors` der betroffene Eingang, die konkrete Entität, ihr gelesener
+  Zustand und die genaue Ursache.
+- Auch wenn sich die Verbindung bereits erholt hat, bleiben die letzten Fehler
+  unter `last_errors` mit `last_error_at` und `last_recovered_at` sichtbar.
+- Typische Ursachen werden getrennt ausgewiesen: Entität nicht eingerichtet,
+  Entität nicht gefunden, `unavailable`, noch kein gültiger Wert, leerer Wert
+  oder nichtnumerischer Messwert.
+- Unter **Einstellungen → Geräte & Dienste → XT500 Energy Manager →
+  Konfigurieren** kann die automatische Geräteerkennung erneut ausgeführt oder
+  die vollständige Zuordnung im Expertenmodus geprüft werden.
+- Bei einer Supportanfrage die Home-Assistant-Diagnosedaten der Integration
+  beifügen. Sie enthalten `input_errors` mit dem aktuellen und dem zuletzt
+  beobachteten Eingangsfehler.
 
 ## Projektstatus
 

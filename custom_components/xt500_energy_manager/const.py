@@ -27,6 +27,18 @@ CONF_LOAD_DISCHARGE_LIMIT_ENTITY: Final = "load_discharge_limit_entity"
 CONF_BATTERY_INPUT_POWER_ENTITY: Final = "battery_input_power_entity"
 CONF_BATTERY_OUTPUT_POWER_ENTITY: Final = "battery_output_power_entity"
 CONF_METER_SIGN: Final = "meter_sign"
+CONF_XT500_DEVICE: Final = "xt500_device"
+
+INPUT_LABELS: Final = {
+    CONF_SOC_ENTITY: "Speicherstand (SOC)",
+    CONF_PV_POWER_ENTITY: "PV-Gesamteingangsleistung",
+    CONF_GRID_POWER_ENTITY: "Öffentlicher Netzanschlusspunkt",
+    CONF_GRID_PORT_POWER_ENTITY: "XT500-Netzanschluss",
+    CONF_LOAD_PORT_POWER_ENTITY: "XT500-Lastanschluss",
+    CONF_GRID_SETPOINT_ENTITY: "Sollwert Netzanschluss",
+    CONF_INVERTER_SETPOINT_ENTITY: "Sollwert Wechselrichter-Obergrenze",
+    CONF_MAX_CHARGE_SOC_ENTITY: "System-Ladegrenze",
+}
 
 METER_IMPORT_POSITIVE: Final = "import_positive"
 METER_EXPORT_POSITIVE: Final = "export_positive"

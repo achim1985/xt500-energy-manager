@@ -4,7 +4,29 @@
     "step": {
       "user": {
         "title": "Set up XT500 Energy Manager",
-        "description": "The integration automatically takes control after startup. Existing setpoint automations must be disabled first.",
+        "description": "Choose automatic setup or assign every entity yourself in expert mode.",
+        "menu_options": {
+          "automatic": "Set up automatically from the XT500 device (recommended)",
+          "manual": "Select entities manually (expert mode)"
+        }
+      },
+      "automatic": {
+        "title": "Set up XT500 automatically",
+        "description": "Select your SunEnergy XT500 device. Its original battery, power and setpoint entities are detected automatically. Only the external grid meter remains manual.",
+        "data": {
+          "xt500_device": "SunEnergy XT500 device",
+          "grid_power_entity": "Total power at the public grid connection",
+          "meter_sign": "Public meter sign convention"
+        },
+        "data_description": {
+          "xt500_device": "The device must come from the previously installed SunEnergyXT 500 Series integration.",
+          "grid_power_entity": "Total active power of the home, for example from a Shelly Pro 3EM. Do not select one phase or an XT500 port value.",
+          "meter_sign": "Use a current reading to verify which sign your meter reports during grid import."
+        }
+      },
+      "manual": {
+        "title": "Select entities manually",
+        "description": "Expert mode: Production control writes all setpoints directly to the selected device entities.",
         "data": {
           "soc_entity": "Battery state of charge",
           "pv_power_entity": "Total PV input power",
@@ -20,6 +42,14 @@
           "meter_sign": "Public meter sign convention"
         }
       }
+    },
+    "error": {
+      "device_not_found": "The selected device could not be found.",
+      "missing_xt500_entities": "Required original SunEnergy XT500 entities are missing from this device. Check the SunEnergy XT500 integration first.",
+      "ambiguous_xt500_entities": "Some XT500 entities were found more than once. Use expert mode instead.",
+      "grid_meter_not_found": "The selected grid meter entity could not be found.",
+      "grid_meter_not_numeric": "The selected grid meter entity does not provide a numeric value.",
+      "unknown": "The setup could not be validated."
     }
   },
   "selector": {
@@ -34,7 +64,29 @@
     "step": {
       "init": {
         "title": "Change device entities",
-        "description": "Production control writes all setpoints directly to the selected device entities.",
+        "description": "Detect the XT500 entities again automatically or change them in expert mode.",
+        "menu_options": {
+          "automatic": "Detect XT500 entities automatically",
+          "manual": "Change entities manually (expert mode)"
+        }
+      },
+      "automatic": {
+        "title": "Detect XT500 entities automatically",
+        "description": "The original entities of the selected SunEnergy XT500 device are used. Select the external total grid meter separately.",
+        "data": {
+          "xt500_device": "SunEnergy XT500 device",
+          "grid_power_entity": "Total power at the public grid connection",
+          "meter_sign": "Public meter sign convention"
+        },
+        "data_description": {
+          "xt500_device": "The device must come from the previously installed SunEnergyXT 500 Series integration.",
+          "grid_power_entity": "Total active power of the home, for example from a Shelly Pro 3EM. Do not select one phase or an XT500 port value.",
+          "meter_sign": "Use a current reading to verify which sign your meter reports during grid import."
+        }
+      },
+      "manual": {
+        "title": "Change entities manually",
+        "description": "Expert mode: Production control writes all setpoints directly to the selected device entities.",
         "data": {
           "soc_entity": "Battery state of charge",
           "pv_power_entity": "Total PV input power",
@@ -50,6 +102,14 @@
           "meter_sign": "Public meter sign convention"
         }
       }
+    },
+    "error": {
+      "device_not_found": "The selected device could not be found.",
+      "missing_xt500_entities": "Required original SunEnergy XT500 entities are missing from this device.",
+      "ambiguous_xt500_entities": "Some XT500 entities were found more than once. Use expert mode instead.",
+      "grid_meter_not_found": "The selected grid meter entity could not be found.",
+      "grid_meter_not_numeric": "The selected grid meter entity does not provide a numeric value.",
+      "unknown": "The change could not be validated."
     }
   },
   "entity": {

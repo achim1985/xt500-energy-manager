@@ -44,6 +44,10 @@ class XT500BinarySensor(XT500Entity, BinarySensorEntity):
         attrs: dict[str, object] = dict(super().extra_state_attributes)
         if self.key == "data_valid":
             attrs["invalid_entities"] = self.runtime.invalid_entities
+            attrs["current_errors"] = self.runtime.invalid_inputs
+            attrs["last_errors"] = self.runtime.last_invalid_inputs
+            attrs["last_error_at"] = self.runtime.last_invalid_at
+            attrs["last_recovered_at"] = self.runtime.last_inputs_recovered_at
         return attrs
 
 

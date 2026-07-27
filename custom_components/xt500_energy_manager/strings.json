@@ -4,7 +4,29 @@
     "step": {
       "user": {
         "title": "XT500 Energiemanager einrichten",
-        "description": "Die Integration übernimmt die Regelung nach dem Start automatisch. Bestehende Sollwert-Automationen müssen vorher ausgeschaltet sein.",
+        "description": "Wähle die automatische Einrichtung oder ordne alle Entitäten im Expertenmodus selbst zu.",
+        "menu_options": {
+          "automatic": "Automatisch über das XT500-Gerät einrichten (empfohlen)",
+          "manual": "Entitäten manuell auswählen (Expertenmodus)"
+        }
+      },
+      "automatic": {
+        "title": "XT500 automatisch einrichten",
+        "description": "Wähle dein SunEnergy-XT500-Gerät. Die originalen Speicher-, Leistungs- und Sollwert-Entitäten werden automatisch erkannt. Nur der externe Stromzähler bleibt manuell.",
+        "data": {
+          "xt500_device": "SunEnergy-XT500-Gerät",
+          "grid_power_entity": "Gesamtleistung am öffentlichen Netzanschlusspunkt",
+          "meter_sign": "Vorzeichen des öffentlichen Zählers"
+        },
+        "data_description": {
+          "xt500_device": "Das Gerät muss aus der zuvor installierten SunEnergyXT 500 Series Integration stammen.",
+          "grid_power_entity": "Gesamt-Wirkleistung des Hauses, zum Beispiel vom Shelly Pro 3EM. Keine einzelne Phase und keine XT500-Anschlussleistung.",
+          "meter_sign": "Prüfe an einem aktuellen Messwert, welches Vorzeichen dein Zähler bei Netzbezug verwendet."
+        }
+      },
+      "manual": {
+        "title": "Entitäten manuell auswählen",
+        "description": "Expertenmodus: Alle Sollwerte werden im Produktivbetrieb direkt auf die ausgewählten Geräteentitäten geschrieben.",
         "data": {
           "soc_entity": "Speicherstand (SOC)",
           "pv_power_entity": "PV-Gesamteingangsleistung",
@@ -20,6 +42,14 @@
           "meter_sign": "Vorzeichen des öffentlichen Zählers"
         }
       }
+    },
+    "error": {
+      "device_not_found": "Das ausgewählte Gerät wurde nicht gefunden.",
+      "missing_xt500_entities": "Am Gerät fehlen benötigte originale SunEnergy-XT500-Entitäten. Prüfe zuerst die SunEnergy-XT500-Integration.",
+      "ambiguous_xt500_entities": "Einige XT500-Entitäten wurden mehrfach gefunden. Verwende bitte den Expertenmodus.",
+      "grid_meter_not_found": "Die ausgewählte Stromzähler-Entität wurde nicht gefunden.",
+      "grid_meter_not_numeric": "Die ausgewählte Stromzähler-Entität liefert keinen Zahlenwert.",
+      "unknown": "Die Einrichtung konnte nicht geprüft werden."
     }
   },
   "selector": {
@@ -34,7 +64,29 @@
     "step": {
       "init": {
         "title": "Verwendete Geräteentitäten ändern",
-        "description": "Alle Sollwerte werden im Produktivbetrieb direkt auf die ausgewählten Geräteentitäten geschrieben.",
+        "description": "Lasse die XT500-Entitäten erneut automatisch erkennen oder ändere sie im Expertenmodus.",
+        "menu_options": {
+          "automatic": "XT500-Entitäten automatisch neu erkennen",
+          "manual": "Entitäten manuell ändern (Expertenmodus)"
+        }
+      },
+      "automatic": {
+        "title": "XT500-Entitäten automatisch erkennen",
+        "description": "Die originalen Entitäten des ausgewählten SunEnergy-XT500-Geräts werden übernommen. Der externe Gesamt-Stromzähler wird separat ausgewählt.",
+        "data": {
+          "xt500_device": "SunEnergy-XT500-Gerät",
+          "grid_power_entity": "Gesamtleistung am öffentlichen Netzanschlusspunkt",
+          "meter_sign": "Vorzeichen des öffentlichen Zählers"
+        },
+        "data_description": {
+          "xt500_device": "Das Gerät muss aus der zuvor installierten SunEnergyXT 500 Series Integration stammen.",
+          "grid_power_entity": "Gesamt-Wirkleistung des Hauses, zum Beispiel vom Shelly Pro 3EM. Keine einzelne Phase und keine XT500-Anschlussleistung.",
+          "meter_sign": "Prüfe an einem aktuellen Messwert, welches Vorzeichen dein Zähler bei Netzbezug verwendet."
+        }
+      },
+      "manual": {
+        "title": "Entitäten manuell ändern",
+        "description": "Expertenmodus: Alle Sollwerte werden im Produktivbetrieb direkt auf die ausgewählten Geräteentitäten geschrieben.",
         "data": {
           "soc_entity": "Speicherstand (SOC)",
           "pv_power_entity": "PV-Gesamteingangsleistung",
@@ -50,6 +102,14 @@
           "meter_sign": "Vorzeichen des öffentlichen Zählers"
         }
       }
+    },
+    "error": {
+      "device_not_found": "Das ausgewählte Gerät wurde nicht gefunden.",
+      "missing_xt500_entities": "Am Gerät fehlen benötigte originale SunEnergy-XT500-Entitäten.",
+      "ambiguous_xt500_entities": "Einige XT500-Entitäten wurden mehrfach gefunden. Verwende bitte den Expertenmodus.",
+      "grid_meter_not_found": "Die ausgewählte Stromzähler-Entität wurde nicht gefunden.",
+      "grid_meter_not_numeric": "Die ausgewählte Stromzähler-Entität liefert keinen Zahlenwert.",
+      "unknown": "Die Änderung konnte nicht geprüft werden."
     }
   },
   "entity": {

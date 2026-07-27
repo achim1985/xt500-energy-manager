@@ -34,6 +34,7 @@ from .const import (
     CONF_SOC_ENTITY,
     DEFAULT_SETTINGS,
     DOMAIN,
+    INPUT_LABELS,
     METER_EXPORT_POSITIVE,
     SETTING_AUTO_ENABLED,
     SETTING_AUTO_MODE,
@@ -117,6 +118,10 @@ class XT500Runtime:
         self.active_target_soc: float | None = None
         self.desired_charge_limit: float | None = None
         self.invalid_entities: list[str] = []
+        self.invalid_inputs: list[dict[str, str]] = []
+        self.last_invalid_inputs: list[dict[str, str]] = []
+        self.last_invalid_at: str | None = None
+        self.last_inputs_recovered_at: str | None = None
         self.control_error_message: str | None = None
         self.last_control_write: str | None = None
         self.last_recovery_success: str | None = None
@@ -313,11 +318,54 @@ class XT500Runtime:
         except ValueError:
             return None
 
+    def _input_issue(self, key: str, entity_id: str | None) -> dict[str, str] | None:
+        """Describe why a required input cannot currently be used."""
+        label = INPUT_LABELS.get(key, key)
+        if not entity_id:
+            return {
+                "input": label,
+                "entity_id": "",
+                "state": "",
+                "reason": "Nicht eingerichtet",
+            }
+        state: State | None = self.hass.states.get(entity_id)
+        if state is None:
+            return {
+                "input": label,
+                "entity_id": entity_id,
+                "state": "",
+                "reason": "Entität nicht gefunden",
+            }
+        if state.state == "unavailable":
+            reason = "Entität nicht verfügbar"
+        elif state.state == "unknown":
+            reason = "Noch kein gültiger Messwert"
+        elif state.state in ("none", ""):
+            reason = "Messwert ist leer"
+        else:
+            try:
+                float(state.state)
+                return None
+            except ValueError:
+                reason = "Messwert ist keine Zahl"
+        return {
+            "input": label,
+            "entity_id": entity_id,
+            "state": state.state,
+            "reason": reason,
+        }
+
     @callback
     def async_calculate(self) -> None:
         """Calculate and, when ready, schedule production setpoint writes."""
         values: dict[str, float] = {}
+        was_data_valid = self.data_valid
+        previous_signature = tuple(
+            (issue["input"], issue["entity_id"], issue["state"], issue["reason"])
+            for issue in self.invalid_inputs
+        )
         self.invalid_entities = []
+        self.invalid_inputs = []
         for key in (
             CONF_SOC_ENTITY,
             CONF_PV_POWER_ENTITY,
@@ -329,17 +377,38 @@ class XT500Runtime:
             CONF_MAX_CHARGE_SOC_ENTITY,
         ):
             entity_id = self.entry.data.get(key)
-            if not entity_id:
-                self.invalid_entities.append(f"missing:{key}")
+            issue = self._input_issue(key, entity_id)
+            if issue is not None:
+                self.invalid_entities.append(entity_id or f"missing:{key}")
+                self.invalid_inputs.append(issue)
                 continue
-            value = self._float_state(entity_id)
-            if value is None:
-                self.invalid_entities.append(entity_id)
-            else:
-                values[key] = value
+            values[key] = self._float_state(entity_id)
 
         self.data_valid = not self.invalid_entities
         if not self.data_valid:
+            signature = tuple(
+                (issue["input"], issue["entity_id"], issue["state"], issue["reason"])
+                for issue in self.invalid_inputs
+            )
+            if signature != previous_signature:
+                self.last_invalid_inputs = [dict(issue) for issue in self.invalid_inputs]
+                self.last_invalid_at = datetime.now(UTC).isoformat()
+                if (
+                    self._ha_started
+                    and (
+                        was_data_valid
+                        or self.result is not None
+                        or self._communication_pause_active
+                    )
+                ):
+                    _LOGGER.warning(
+                        "XT500 input data invalid: %s",
+                        "; ".join(
+                            f"{issue['input']} ({issue['entity_id'] or 'nicht eingerichtet'}): "
+                            f"{issue['reason']} [{issue['state'] or '-'}]"
+                            for issue in self.invalid_inputs
+                        ),
+                    )
             if (
                 self.regulation_enabled
                 and self._ha_started
@@ -365,6 +434,9 @@ class XT500Runtime:
             self._notify()
             return
 
+        if not was_data_valid and self.last_invalid_at is not None:
+            self.last_inputs_recovered_at = datetime.now(UTC).isoformat()
+            _LOGGER.info("XT500 input data is valid again")
         if self._data_valid_since_monotonic is None:
             self._data_valid_since_monotonic = monotonic()
         self._update_full_charge(values[CONF_SOC_ENTITY])

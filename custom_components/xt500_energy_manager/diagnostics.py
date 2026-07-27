@@ -66,5 +66,11 @@ async def async_get_config_entry_diagnostics(_hass: HomeAssistant, entry: XT500C
             "last_control_write": runtime.last_control_write,
         },
         "invalid_entities": runtime.invalid_entities,
+        "input_errors": {
+            "current": runtime.invalid_inputs,
+            "last": runtime.last_invalid_inputs,
+            "last_error_at": runtime.last_invalid_at,
+            "last_recovered_at": runtime.last_inputs_recovered_at,
+        },
         "result": asdict(runtime.result) if runtime.result else None,
     }
