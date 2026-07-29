@@ -72,10 +72,20 @@ const createLayoutHass = () => {
       ...managerState.attributes,
       source_soc_entity: "sensor.xt500_soc",
       source_pv_power_entity: "sensor.xt500_pv",
+      source_pv_daily_energy_entity: "sensor.xt500_pd",
+      source_grid_charge_daily_energy_entity: "sensor.xt500_gd1",
+      source_grid_export_daily_energy_entity: "sensor.xt500_gd2",
+      source_offgrid_daily_energy_entity: "sensor.xt500_ld",
     },
   };
   hass.states["sensor.xt500_soc"] = { state: "72", attributes: {} };
   hass.states["sensor.xt500_pv"] = { state: "500", attributes: {} };
+  for (const key of ["pd", "gd1", "gd2", "ld"]) {
+    hass.states[`sensor.xt500_${key}`] = {
+      state: "1.234",
+      attributes: { unit_of_measurement: "kWh" },
+    };
+  }
   for (const key of [
     "recommended_grid_setpoint",
     "cycle_state",
@@ -277,10 +287,11 @@ test("Editor verschiebt, versteckt und setzt Blöcke zurück", () => {
   assert.deepEqual(plain(editor._config.overview_block_order), [
     "storage",
     "regulation_status",
-    "setpoints",
-    "cycle",
-    "flows",
     "quick_controls",
+    "flows",
+    "energy_today",
+    "cycle",
+    "setpoints",
   ]);
   assert.equal(changes, 3);
 });
@@ -310,10 +321,11 @@ test("teilt die Speicheransicht standardmäßig in einzeln anordenbare Blöcke",
   assert.deepEqual(plain(sectionHeadings(result.views[0])), [
     "Speicherstand",
     "Regelungsstatus",
-    "Sollwerte und Berechnung",
-    "Zyklusladung",
-    "Aktuelle Leistungsflüsse",
     "Schnellsteuerung",
+    "Aktuelle Leistungsflüsse",
+    "Energie heute",
+    "Zyklusladung",
+    "Sollwerte und Berechnung",
   ]);
   const settings = result.views.find((view) => view.path === "einstellungen");
   assert.deepEqual(plain(sectionHeadings(settings)), [
@@ -332,6 +344,7 @@ test("wendet Reihenfolge und ausgeblendete Blöcke für beide Seiten an", async 
       overview_block_order: [
         "quick_controls",
         "flows",
+        "energy_today",
         "storage",
         "regulation_status",
         "setpoints",
@@ -353,6 +366,7 @@ test("wendet Reihenfolge und ausgeblendete Blöcke für beide Seiten an", async 
 
   assert.deepEqual(plain(sectionHeadings(result.views[0])), [
     "Schnellsteuerung",
+    "Energie heute",
     "Speicherstand",
     "Regelungsstatus",
     "Sollwerte und Berechnung",
@@ -382,10 +396,10 @@ test("ordnet die Schnellsteuerung eindeutig und zeigt Fehlerbehebung nur in Eins
   );
 
   assert.deepEqual(plain(quickControls.cards.slice(1).map((card) => card.name)), [
-    "Regelung aktiv",
-    "Manuelle Zielladung",
-    "Automatische Zyklusüberwachung",
-    "Zyklusladung jetzt starten",
+    "Regelung",
+    "Zielladung",
+    "Automatik",
+    "Zyklusstart",
   ]);
   assert.equal(
     quickControls.cards.some((card) => card.entity?.includes("automatic_recovery")),

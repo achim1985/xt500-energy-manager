@@ -41,10 +41,11 @@ const XT500_DASHBOARD_BLOCKS = {
   overview: [
     { key: "storage", label: "Speicherstand" },
     { key: "regulation_status", label: "Regelungsstatus" },
-    { key: "setpoints", label: "Sollwerte und Berechnung" },
-    { key: "cycle", label: "Zyklusladung" },
-    { key: "flows", label: "Aktuelle Leistungsflüsse" },
     { key: "quick_controls", label: "Schnellsteuerung" },
+    { key: "flows", label: "Aktuelle Leistungsflüsse" },
+    { key: "energy_today", label: "Energie heute" },
+    { key: "cycle", label: "Zyklusladung" },
+    { key: "setpoints", label: "Sollwerte und Berechnung" },
   ],
   settings: [
     { key: "guide", label: "Bedienung und Sicherheit" },
@@ -1027,6 +1028,14 @@ class XT500EnergyManagerDashboardStrategy extends HTMLElement {
         grid_options: { columns: "full", rows: "auto" },
       } : null;
       const compact = (cards) => cards.filter(Boolean);
+      const compactOverviewTile = (entityId, name, icon) =>
+        entityId && hass.states[entityId] ? {
+          type: "tile",
+          entity: entityId,
+          name,
+          ...(icon ? { icon } : {}),
+          grid_options: { columns: 6, rows: "auto" },
+        } : null;
 
       const regulationStatusEntities = namedExisting([
         "status", "control_ready", "recovery_status", "active_mode", "charge_request",
@@ -1051,15 +1060,40 @@ class XT500EnergyManagerDashboardStrategy extends HTMLElement {
       ]);
 
       const flowEntities = [
-        [entities.battery_charge_power, "Batterie lädt"],
-        [entities.battery_discharge_power, "Batterie entlädt"],
+        [entities.battery_charge_power, "Akku lädt"],
+        [entities.battery_discharge_power, "Akku entlädt"],
         [sourceAttributes.source_pv_power_entity, "PV-Eingang"],
-        [sourceAttributes.source_public_grid_power_entity, "Öffentliches Netz (+ Bezug)"],
-        [sourceAttributes.source_grid_port_power_entity, "XT500 Netzanschluss"],
-        [sourceAttributes.source_load_port_power_entity, "XT500 Lastanschluss"],
+        [sourceAttributes.source_public_grid_power_entity, "Netzleistung"],
+        [sourceAttributes.source_grid_port_power_entity, "XT500 Netz"],
+        [sourceAttributes.source_load_port_power_entity, "XT500 Last"],
       ]
         .filter(([entityId]) => entityId && hass.states[entityId])
         .map(([entityId, name]) => ({ entity: entityId, name }));
+      const flowTiles = flowEntities.map(({ entity, name }) =>
+        compactOverviewTile(entity, name)
+      );
+      const dailyEnergyTiles = compact([
+        compactOverviewTile(
+          sourceAttributes.source_pv_daily_energy_entity,
+          "PV heute",
+          "mdi:solar-power",
+        ),
+        compactOverviewTile(
+          sourceAttributes.source_grid_charge_daily_energy_entity,
+          "Netzladung",
+          "mdi:battery-charging",
+        ),
+        compactOverviewTile(
+          sourceAttributes.source_grid_export_daily_energy_entity,
+          "Einspeisung",
+          "mdi:transmission-tower-export",
+        ),
+        compactOverviewTile(
+          sourceAttributes.source_offgrid_daily_energy_entity,
+          "Off-Grid",
+          "mdi:power-plug-battery-outline",
+        ),
+      ]);
 
       const mainControlCards = compact([
         heading("Hauptsteuerung", "mdi:power"),
@@ -1154,6 +1188,7 @@ class XT500EnergyManagerDashboardStrategy extends HTMLElement {
           min: 0,
           max: 100,
           severity: { red: 0, yellow: 20, green: 60 },
+          grid_options: { columns: "full", rows: 3 },
         };
       }
 
@@ -1202,10 +1237,22 @@ class XT500EnergyManagerDashboardStrategy extends HTMLElement {
 
       const quickControlCards = compact([
         heading("Schnellsteuerung", "mdi:shield-home"),
-        tile("regulation_enabled", "Regelung aktiv", [{ type: "toggle" }]),
-        tile("manual_active", "Manuelle Zielladung", [{ type: "toggle" }]),
-        tile("automatic_enabled", "Automatische Zyklusüberwachung", [{ type: "toggle" }]),
-        tile("cycle_start", "Zyklusladung jetzt starten", [{ type: "button" }]),
+        entities.regulation_enabled ? {
+          ...tile("regulation_enabled", "Regelung", [{ type: "toggle" }]),
+          grid_options: { columns: 6, rows: "auto" },
+        } : null,
+        entities.manual_active ? {
+          ...tile("manual_active", "Zielladung", [{ type: "toggle" }]),
+          grid_options: { columns: 6, rows: "auto" },
+        } : null,
+        entities.automatic_enabled ? {
+          ...tile("automatic_enabled", "Automatik", [{ type: "toggle" }]),
+          grid_options: { columns: 6, rows: "auto" },
+        } : null,
+        entities.cycle_start ? {
+          ...tile("cycle_start", "Zyklusstart", [{ type: "button" }]),
+          grid_options: { columns: 6, rows: "auto" },
+        } : null,
       ]);
       const overviewBlocks = {
         storage: storageGauge ? {
@@ -1252,11 +1299,14 @@ class XT500EnergyManagerDashboardStrategy extends HTMLElement {
           type: "grid",
           cards: [
             heading("Aktuelle Leistungsflüsse", "mdi:transmission-tower"),
-            {
-              type: "entities",
-              show_header_toggle: false,
-              entities: flowEntities,
-            },
+            ...flowTiles,
+          ],
+        } : null,
+        energy_today: dailyEnergyTiles.length ? {
+          type: "grid",
+          cards: [
+            heading("Energie heute", "mdi:chart-donut"),
+            ...dailyEnergyTiles,
           ],
         } : null,
         quick_controls: quickControlCards.length > 1 ? {
@@ -1302,7 +1352,7 @@ class XT500EnergyManagerDashboardStrategy extends HTMLElement {
         path: managers.size > 1 ? `speicher-${index}` : "speicher",
         icon: "mdi:home-battery",
         type: "sections",
-        max_columns: 2,
+        max_columns: 3,
         sections: orderedVisibleBlocks(config, "overview", overviewBlocks),
       });
 

@@ -8,13 +8,16 @@ import logging
 from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EVENT_HOMEASSISTANT_STARTED
-from homeassistant.core import Event, HomeAssistant, callback
+from homeassistant.core import Event, HassJob, HomeAssistant, callback
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.event import async_call_later
 
 from .blueprint_sync import BlueprintSyncResult, sync_bundled_blueprint
 from .const import (
     CONF_BATTERY_INPUT_POWER_ENTITY,
     CONF_BATTERY_OUTPUT_POWER_ENTITY,
+    CONF_GRID_CHARGE_DAILY_ENERGY_ENTITY,
+    CONF_GRID_EXPORT_DAILY_ENERGY_ENTITY,
     CONF_GRID_PORT_POWER_ENTITY,
     CONF_GRID_POWER_ENTITY,
     CONF_GRID_SETPOINT_ENTITY,
@@ -23,17 +26,62 @@ from .const import (
     CONF_LOAD_PORT_POWER_ENTITY,
     CONF_MAX_CHARGE_SOC_ENTITY,
     CONF_METER_SIGN,
+    CONF_OFFGRID_DAILY_ENERGY_ENTITY,
+    CONF_PV_DAILY_ENERGY_ENTITY,
     CONF_PV_POWER_ENTITY,
     CONF_SOC_ENTITY,
     DOMAIN,
     FRONTEND_URL,
     PLATFORMS,
 )
+from .entity_mapping import detect_xt500_entities
 from .runtime import XT500Runtime
 
 type XT500ConfigEntry = ConfigEntry[XT500Runtime]
 
 _LOGGER = logging.getLogger(__name__)
+
+_OPTIONAL_DAILY_ENERGY_KEYS = (
+    CONF_PV_DAILY_ENERGY_ENTITY,
+    CONF_GRID_CHARGE_DAILY_ENERGY_ENTITY,
+    CONF_GRID_EXPORT_DAILY_ENERGY_ENTITY,
+    CONF_OFFGRID_DAILY_ENERGY_ENTITY,
+)
+
+
+def _discover_daily_energy_entities(
+    hass: HomeAssistant, entry: XT500ConfigEntry
+) -> None:
+    """Attach original daily-energy sensors from the configured XT500 device."""
+    registry = er.async_get(hass)
+    device_id = None
+    for key in (CONF_SOC_ENTITY, CONF_PV_POWER_ENTITY, CONF_GRID_PORT_POWER_ENTITY):
+        source_entity = entry.data.get(key)
+        registry_entry = registry.async_get(source_entity) if source_entity else None
+        if (
+            registry_entry is not None
+            and registry_entry.platform == "sunenergyxt"
+            and registry_entry.device_id
+        ):
+            device_id = registry_entry.device_id
+            break
+    if device_id is None:
+        return
+
+    detected, _missing, ambiguous = detect_xt500_entities(
+        er.async_entries_for_device(
+            registry, device_id, include_disabled_entities=True
+        )
+    )
+    additions = {
+        key: detected[key]
+        for key in _OPTIONAL_DAILY_ENERGY_KEYS
+        if key in detected and key not in ambiguous and entry.data.get(key) != detected[key]
+    }
+    if additions:
+        hass.config_entries.async_update_entry(
+            entry, data={**entry.data, **additions}
+        )
 
 
 async def _async_reload_automations(hass: HomeAssistant) -> None:
@@ -99,9 +147,15 @@ async def async_setup(hass: HomeAssistant, _config: dict) -> bool:
 
 async def async_setup_entry(hass: HomeAssistant, entry: XT500ConfigEntry) -> bool:
     """Set up one XT500 energy controller."""
+    _discover_daily_energy_entities(hass, entry)
     runtime = XT500Runtime(hass, entry)
     entry.runtime_data = runtime
     await runtime.async_start()
+    entry.async_on_unload(
+        hass.async_add_shutdown_job(
+            HassJob(runtime.async_stop, name="Stop XT500 Energy Manager")
+        )
+    )
     entry.async_on_unload(entry.add_update_listener(_async_reload_entry))
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
@@ -124,6 +178,10 @@ async def async_migrate_entry(
             CONF_LOAD_DISCHARGE_LIMIT_ENTITY,
             CONF_BATTERY_INPUT_POWER_ENTITY,
             CONF_BATTERY_OUTPUT_POWER_ENTITY,
+            CONF_PV_DAILY_ENERGY_ENTITY,
+            CONF_GRID_CHARGE_DAILY_ENERGY_ENTITY,
+            CONF_GRID_EXPORT_DAILY_ENERGY_ENTITY,
+            CONF_OFFGRID_DAILY_ENERGY_ENTITY,
             CONF_METER_SIGN,
         }
         hass.config_entries.async_update_entry(

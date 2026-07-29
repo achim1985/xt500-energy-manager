@@ -262,15 +262,26 @@ class XT500Runtime:
     async def async_stop(self) -> None:
         """Stop all observation and writes without controlling external automations."""
         self._control_apply_requested = False
-        for task in (
-            self._control_apply_task,
-            self._startup_ready_task,
-            self._pv_release_task,
-            self._recovery_task,
-            self._communication_pause_task,
-        ):
-            if task is not None and not task.done():
-                task.cancel()
+        pending_tasks = [
+            task
+            for task in (
+                self._control_apply_task,
+                self._startup_ready_task,
+                self._pv_release_task,
+                self._recovery_task,
+                self._communication_pause_task,
+            )
+            if task is not None and not task.done()
+        ]
+        for task in pending_tasks:
+            task.cancel()
+        if pending_tasks:
+            await asyncio.gather(*pending_tasks, return_exceptions=True)
+        self._control_apply_task = None
+        self._startup_ready_task = None
+        self._pv_release_task = None
+        self._recovery_task = None
+        self._communication_pause_task = None
         if self._unsub_started:
             self._unsub_started()
             self._unsub_started = None

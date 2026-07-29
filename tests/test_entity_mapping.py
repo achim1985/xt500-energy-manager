@@ -38,12 +38,16 @@ mapping_module = _load_module(
 from custom_components.xt500_energy_manager.const import (  # noqa: E402
     CONF_BATTERY_INPUT_POWER_ENTITY,
     CONF_BATTERY_OUTPUT_POWER_ENTITY,
+    CONF_GRID_CHARGE_DAILY_ENERGY_ENTITY,
+    CONF_GRID_EXPORT_DAILY_ENERGY_ENTITY,
     CONF_GRID_PORT_POWER_ENTITY,
     CONF_GRID_SETPOINT_ENTITY,
     CONF_INVERTER_SETPOINT_ENTITY,
     CONF_LOAD_DISCHARGE_LIMIT_ENTITY,
     CONF_LOAD_PORT_POWER_ENTITY,
     CONF_MAX_CHARGE_SOC_ENTITY,
+    CONF_OFFGRID_DAILY_ENERGY_ENTITY,
+    CONF_PV_DAILY_ENERGY_ENTITY,
     CONF_PV_POWER_ENTITY,
     CONF_SOC_ENTITY,
 )
@@ -71,6 +75,10 @@ class EntityMappingTests(unittest.TestCase):
             CONF_LOAD_DISCHARGE_LIMIT_ENTITY: "number.xt_so",
             CONF_BATTERY_INPUT_POWER_ENTITY: "sensor.xt_iw",
             CONF_BATTERY_OUTPUT_POWER_ENTITY: "sensor.xt_op",
+            CONF_PV_DAILY_ENERGY_ENTITY: "sensor.xt_pd",
+            CONF_GRID_CHARGE_DAILY_ENERGY_ENTITY: "sensor.xt_gd1",
+            CONF_GRID_EXPORT_DAILY_ENERGY_ENTITY: "sensor.xt_gd2",
+            CONF_OFFGRID_DAILY_ENERGY_ENTITY: "sensor.xt_ld",
         }
         entries = [
             RegistryEntry(entity_id, f"serial_123_{suffix}")
@@ -85,6 +93,10 @@ class EntityMappingTests(unittest.TestCase):
                 ("number.xt_so", "SO"),
                 ("sensor.xt_iw", "IW"),
                 ("sensor.xt_op", "OP"),
+                ("sensor.xt_pd", "PD"),
+                ("sensor.xt_gd1", "GD1"),
+                ("sensor.xt_gd2", "GD2"),
+                ("sensor.xt_ld", "LD"),
             )
         ]
 

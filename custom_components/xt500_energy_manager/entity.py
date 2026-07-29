@@ -8,11 +8,15 @@ from homeassistant.helpers.entity import Entity
 from .const import (
     CONF_BATTERY_INPUT_POWER_ENTITY,
     CONF_BATTERY_OUTPUT_POWER_ENTITY,
+    CONF_GRID_CHARGE_DAILY_ENERGY_ENTITY,
+    CONF_GRID_EXPORT_DAILY_ENERGY_ENTITY,
     CONF_GRID_PORT_POWER_ENTITY,
     CONF_GRID_POWER_ENTITY,
     CONF_LOAD_DISCHARGE_LIMIT_ENTITY,
     CONF_LOAD_PORT_POWER_ENTITY,
     CONF_MAX_CHARGE_SOC_ENTITY,
+    CONF_OFFGRID_DAILY_ENERGY_ENTITY,
+    CONF_PV_DAILY_ENERGY_ENTITY,
     CONF_PV_POWER_ENTITY,
     DOMAIN,
     VERSION,
@@ -61,6 +65,18 @@ class XT500Entity(Entity):
             "source_public_grid_power_entity": self.runtime.entry.data.get(CONF_GRID_POWER_ENTITY),
             "source_grid_port_power_entity": self.runtime.entry.data.get(CONF_GRID_PORT_POWER_ENTITY),
             "source_load_port_power_entity": self.runtime.entry.data.get(CONF_LOAD_PORT_POWER_ENTITY),
+            "source_pv_daily_energy_entity": self.runtime.entry.data.get(
+                CONF_PV_DAILY_ENERGY_ENTITY
+            ),
+            "source_grid_charge_daily_energy_entity": self.runtime.entry.data.get(
+                CONF_GRID_CHARGE_DAILY_ENERGY_ENTITY
+            ),
+            "source_grid_export_daily_energy_entity": self.runtime.entry.data.get(
+                CONF_GRID_EXPORT_DAILY_ENERGY_ENTITY
+            ),
+            "source_offgrid_daily_energy_entity": self.runtime.entry.data.get(
+                CONF_OFFGRID_DAILY_ENERGY_ENTITY
+            ),
         }
 
     async def async_added_to_hass(self) -> None:

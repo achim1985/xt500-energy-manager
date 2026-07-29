@@ -1,5 +1,23 @@
 # Änderungsprotokoll
 
+## 1.8.0 – 2026-07-29
+
+- optionale Tagesenergie-Sensoren der originalen SunEnergyXT-Integration
+  1.1.2 werden automatisch am ausgewählten XT500 erkannt
+- neue Übersicht **Energie heute** mit PV-Erzeugung, Netzladung,
+  Netzeinspeisung und Off-Grid-Ausgabe in kWh
+- die zusätzlichen Werte stammen direkt aus der Originalintegration; es werden
+  dafür keine Hilfssensoren angelegt
+- kompaktere, responsive Speicherübersicht mit drei Spalten auf breiten
+  Bildschirmen und platzsparenden Standard-Kacheln
+- Leistungsflüsse, Schnellsteuerung und Tagesenergien verwenden kurze,
+  eindeutig lesbare Bezeichnungen
+- der neue Block **Energie heute** kann im Strategy-Editor verschoben oder
+  ausgeblendet werden
+- laufende Regel-, Start-, PV- und Wiederherstellungsaufgaben werden beim
+  Entladen der Integration abgebrochen und vollständig abgewartet; dadurch
+  verzögert der Energiemanager das Herunterfahren nicht mehr
+
 ## 1.7.0 – 2026-07-27
 
 - eigene, providerunabhängige Tarif-Ladeanforderung mit separatem Ladeziel und

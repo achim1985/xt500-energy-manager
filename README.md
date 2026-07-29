@@ -49,7 +49,7 @@ Wechselrichterleistung.
   Home Assistant 2026.5 oder neuer
 
 Die Integration wurde mit Home Assistant 2026.7 und der SunEnergyXT-Integration
-1.1.1 getestet.
+1.1.2 getestet.
 
 ## 1. SunEnergyXT 500 Series installieren
 
@@ -88,8 +88,16 @@ Die Integration wurde mit Home Assistant 2026.7 und der SunEnergyXT-Integration
    - Systemlastanschluss-Entladegrenze
    - Gesamteingangs- und Gesamtausgangsleistung des Systems
 
-Erst wenn diese Entitäten verfügbar und nicht `unavailable` sind, mit dem
-XT500 Energy Manager fortfahren.
+   Ab SunEnergyXT 1.1.2 stehen zusätzlich folgende Tagesenergien zur Verfügung:
+
+   - heutige PV-Erzeugung (`PD`)
+   - heutige Netzladung (`GD1`)
+   - heutige Netzeinspeisung (`GD2`)
+   - heutige Off-Grid-Ausgabe (`LD`)
+
+Erst wenn die für die Regelung zuerst genannten Entitäten verfügbar und nicht
+`unavailable` sind, mit dem XT500 Energy Manager fortfahren. Die vier
+Tagesenergien sind reine optionale Dashboard-Werte.
 
 ## 2. XT500 Energy Manager installieren
 
@@ -159,6 +167,12 @@ Bei der automatischen Einrichtung wird nur das Gerät der zuvor installierten
 die originalen XT500-Entitäten anhand ihrer stabilen Gerätekennungen
 automatisch. Umbenannte Anzeigenamen sind daher kein Problem.
 
+Die vier Tagesenergie-Sensoren aus SunEnergyXT 1.1.2 werden ebenfalls
+automatisch erkannt, sofern sie am ausgewählten Gerät vorhanden sind. Sie sind
+für die Regelung nicht erforderlich und werden deshalb im Expertenmodus nicht
+zusätzlich abgefragt. Fehlt einer dieser optionalen Sensoren, bleibt nur die
+entsprechende Kachel unter **Energie heute** ausgeblendet.
+
 Manuell bleiben nur:
 
 - die **Gesamtleistung am öffentlichen Netzanschlusspunkt**
@@ -221,8 +235,8 @@ Messwertes prüfen.
 
 Die Strategie erzeugt in der ausführlichen Standarddarstellung sechs Ansichten:
 
-- **Speicher:** Status, Speicherstand, Leistungsflüsse und Schnellsteuerung
-  für Regelung, manuelle Zielladung und Zyklusladung
+- **Speicher:** Status, Speicherstand, Leistungsflüsse, heutige Energiewerte
+  und Schnellsteuerung für Regelung, manuelle Zielladung und Zyklusladung
 - **Energie:** Energiefluss, Netzbilanz, Eigenverbrauch, Autarkie sowie
   Quellen- und Kostentabelle
 - **Verlauf:** Hausverbrauch und PV-Erzeugung im gewählten Zeitraum
@@ -237,9 +251,9 @@ Die Strategie erzeugt in der ausführlichen Standarddarstellung sechs Ansichten:
 Die vier Energieseiten verwenden ausschließlich die in Home Assistant unter
 **Energie** konfigurierten Quellen und Statistikdaten. Ihre Datumsauswahl und
 der Vergleichszeitraum sind über die drei historischen Reiter synchron. Die
-Live-Seite zeigt aktuelle Leistungsdaten unabhängig vom gewählten Zeitraum. Im Strategy-Editor
-lassen sie sich alternativ zu einer kompakten Seite zusammenfassen oder
-vollständig ausblenden.
+Live-Seite zeigt aktuelle Leistungsdaten unabhängig vom gewählten Zeitraum.
+Im Strategy-Editor lassen sie sich alternativ zu einer kompakten Seite
+zusammenfassen oder vollständig ausblenden.
 
 ### Einstellungsansicht nicht übersehen
 
@@ -273,7 +287,7 @@ Neuladen auch im Energiemanager-Dashboard.
 5. Als URL exakt eintragen:
 
    ```text
-   /xt500_energy_manager/xt500-energy-dashboard-strategy.js?v=1.7.0
+   /xt500_energy_manager/xt500-energy-dashboard-strategy.js?v=1.8.0
    ```
 
 6. Als Ressourcentyp **JavaScript-Modul** auswählen.
@@ -347,9 +361,9 @@ den vorhandenen XT500-Energy-Manager-Entitäten erzeugt.
 
 Die Reihenfolge wird auf Smartphones von oben nach unten verwendet. Auf
 breiten Bildschirmen verteilt Home Assistant dieselbe Reihenfolge automatisch
-auf sein mehrspaltiges Raster. Speicherstand, Regelungsstatus, Sollwerte,
-Zyklusladung, Leistungsflüsse und Schnellsteuerung bleiben dabei eigenständige
-Blöcke.
+auf bis zu drei Spalten. Speicherstand, Regelungsstatus, Sollwerte,
+Zyklusladung, Leistungsflüsse, **Energie heute** und Schnellsteuerung bleiben
+dabei eigenständige Blöcke.
 
 ### Energieseiten auswählen
 
@@ -633,6 +647,18 @@ Der separate **Zyklusstatus** unterscheidet:
 - Die Rohkonfiguration muss exakt den Eintrag
   `custom:xt500-energy-manager` enthalten.
 
+### Der Block „Energie heute“ fehlt oder ist unvollständig
+
+- SunEnergyXT 500 Series auf Version 1.1.2 oder neuer aktualisieren.
+- Prüfen, ob am ausgewählten XT500 die Sensoren `PD`, `GD1`, `GD2` und `LD`
+  vorhanden und verfügbar sind.
+- Unter **Einstellungen → Geräte & Dienste → XT500 Energy Manager** den
+  Eintrag neu laden oder Home Assistant neu starten. Die optionalen Sensoren
+  werden bei jedem Laden der Integration erneut automatisch erkannt.
+- Im Strategy-Editor prüfen, ob der Block **Energie heute** ausgeblendet wurde.
+- Die Dashboard-Ressource auf `?v=1.8.0` setzen und Ressourcen beziehungsweise
+  Browser vollständig neu laden.
+
 ### Eingangsdaten sind ungültig
 
 - Die Entität **Eingangsdaten gültig** öffnen. In den Attributen stehen unter
@@ -652,7 +678,7 @@ Der separate **Zyklusstatus** unterscheidet:
 
 ## Projektstatus
 
-Version 1.7.0 ist der aktuelle veröffentlichte Stand. Gesucht werden
+Version 1.8.0 ist der aktuelle veröffentlichte Stand. Gesucht werden
 Testerinnen und Tester mit unterschiedlichen XT500- und XT500-Pro-Systemen,
 Firmwareständen und Stromzählern.
 
