@@ -1,6 +1,6 @@
 # Änderungsprotokoll
 
-## Unveröffentlicht
+## 1.8.1 – 2026-07-30
 
 - die Entladegrenze des Energiemanagers verwendet jetzt direkt die originale
   SunEnergyXT-System-Entladegrenze (`SI`); Änderungen an beiden Stellen wirken

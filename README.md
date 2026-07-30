@@ -289,7 +289,7 @@ Neuladen auch im Energiemanager-Dashboard.
 5. Als URL exakt eintragen:
 
    ```text
-   /xt500_energy_manager/xt500-energy-dashboard-strategy.js?v=1.8.0
+   /xt500_energy_manager/xt500-energy-dashboard-strategy.js?v=1.8.1
    ```
 
 6. Als Ressourcentyp **JavaScript-Modul** auswählen.
@@ -664,7 +664,7 @@ Der separate **Zyklusstatus** unterscheidet:
   Eintrag neu laden oder Home Assistant neu starten. Die optionalen Sensoren
   werden bei jedem Laden der Integration erneut automatisch erkannt.
 - Im Strategy-Editor prüfen, ob der Block **Energie heute** ausgeblendet wurde.
-- Die Dashboard-Ressource auf `?v=1.8.0` setzen und Ressourcen beziehungsweise
+- Die Dashboard-Ressource auf `?v=1.8.1` setzen und Ressourcen beziehungsweise
   Browser vollständig neu laden.
 
 ### Eingangsdaten sind ungültig
@@ -686,7 +686,7 @@ Der separate **Zyklusstatus** unterscheidet:
 
 ## Projektstatus
 
-Version 1.8.0 ist der aktuelle veröffentlichte Stand. Gesucht werden
+Version 1.8.1 ist der aktuelle veröffentlichte Stand. Gesucht werden
 Testerinnen und Tester mit unterschiedlichen XT500- und XT500-Pro-Systemen,
 Firmwareständen und Stromzählern.
 
