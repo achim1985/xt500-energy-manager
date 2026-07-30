@@ -46,6 +46,7 @@ from custom_components.xt500_energy_manager.const import (  # noqa: E402
     CONF_LOAD_DISCHARGE_LIMIT_ENTITY,
     CONF_LOAD_PORT_POWER_ENTITY,
     CONF_MAX_CHARGE_SOC_ENTITY,
+    CONF_MIN_DISCHARGE_SOC_ENTITY,
     CONF_OFFGRID_DAILY_ENERGY_ENTITY,
     CONF_PV_DAILY_ENERGY_ENTITY,
     CONF_PV_POWER_ENTITY,
@@ -72,6 +73,7 @@ class EntityMappingTests(unittest.TestCase):
             CONF_GRID_SETPOINT_ENTITY: "number.xt_gs",
             CONF_INVERTER_SETPOINT_ENTITY: "number.xt_is",
             CONF_MAX_CHARGE_SOC_ENTITY: "number.xt_sa",
+            CONF_MIN_DISCHARGE_SOC_ENTITY: "number.xt_si",
             CONF_LOAD_DISCHARGE_LIMIT_ENTITY: "number.xt_so",
             CONF_BATTERY_INPUT_POWER_ENTITY: "sensor.xt_iw",
             CONF_BATTERY_OUTPUT_POWER_ENTITY: "sensor.xt_op",
@@ -90,6 +92,7 @@ class EntityMappingTests(unittest.TestCase):
                 ("number.xt_gs", "GS"),
                 ("number.xt_is", "IS"),
                 ("number.xt_sa", "SA"),
+                ("number.xt_si", "SI"),
                 ("number.xt_so", "SO"),
                 ("sensor.xt_iw", "IW"),
                 ("sensor.xt_op", "OP"),
@@ -112,7 +115,7 @@ class EntityMappingTests(unittest.TestCase):
             for suffix in ("SC", "PV", "GP", "LP")
         ] + [
             RegistryEntry(f"number.entity_{suffix.lower()}", f"serial_{suffix}")
-            for suffix in ("GS", "IS", "SA")
+            for suffix in ("GS", "IS", "SA", "SI")
         ]
 
         _detected, missing, ambiguous = detect_xt500_entities(entries)

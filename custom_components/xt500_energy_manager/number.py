@@ -9,6 +9,8 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from . import XT500ConfigEntry
 from .const import (
+    CONF_MAX_CHARGE_SOC_ENTITY,
+    CONF_MIN_DISCHARGE_SOC_ENTITY,
     SETTING_AUTO_TARGET_SOC,
     SETTING_CHARGE_POWER,
     SETTING_CONTROL_FAST_INTERVAL,
@@ -76,39 +78,56 @@ class XT500Number(XT500Entity, NumberEntity):
 
     @property
     def native_value(self) -> float:
+        if self.key == SETTING_MIN_SOC:
+            state = self.runtime.hass.states.get(
+                self.runtime.entry.data.get(CONF_MIN_DISCHARGE_SOC_ENTITY)
+            )
+            if state is not None:
+                try:
+                    return float(state.state)
+                except ValueError:
+                    pass
         return float(self.runtime.settings[self.key])
+
+    def _source_number_state(self):
+        source_key = {
+            SETTING_NORMAL_CHARGE_LIMIT: CONF_MAX_CHARGE_SOC_ENTITY,
+            SETTING_MIN_SOC: CONF_MIN_DISCHARGE_SOC_ENTITY,
+        }.get(self.key)
+        if source_key is None:
+            return None
+        return self.runtime.hass.states.get(
+            self.runtime.entry.data.get(source_key)
+        )
 
     @property
     def native_min_value(self) -> float:
-        if self.key == SETTING_NORMAL_CHARGE_LIMIT:
-            state = self.runtime.hass.states.get(
-                self.runtime.entry.data.get("max_charge_soc_entity")
+        if (state := self._source_number_state()) is not None:
+            return float(
+                state.attributes.get("min", self.entity_description.native_min_value)
             )
-            if state is not None:
-                return float(state.attributes.get("min", 0))
         return float(self.entity_description.native_min_value)
 
     @property
     def native_max_value(self) -> float:
-        if self.key == SETTING_NORMAL_CHARGE_LIMIT:
-            state = self.runtime.hass.states.get(
-                self.runtime.entry.data.get("max_charge_soc_entity")
+        if (state := self._source_number_state()) is not None:
+            return float(
+                state.attributes.get("max", self.entity_description.native_max_value)
             )
-            if state is not None:
-                return float(state.attributes.get("max", 100))
         return float(self.entity_description.native_max_value)
 
     @property
     def native_step(self) -> float:
-        if self.key == SETTING_NORMAL_CHARGE_LIMIT:
-            state = self.runtime.hass.states.get(
-                self.runtime.entry.data.get("max_charge_soc_entity")
+        if (state := self._source_number_state()) is not None:
+            return float(
+                state.attributes.get("step", self.entity_description.native_step) or 1
             )
-            if state is not None:
-                return float(state.attributes.get("step", 1) or 1)
         return float(self.entity_description.native_step)
 
     async def async_set_native_value(self, value: float) -> None:
+        if self.key == SETTING_MIN_SOC:
+            await self.runtime.async_set_system_discharge_limit(value)
+            return
         self.runtime.async_set_setting(self.key, value)
 
 

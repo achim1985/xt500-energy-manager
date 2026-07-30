@@ -1,5 +1,14 @@
 # Änderungsprotokoll
 
+## Unveröffentlicht
+
+- die Entladegrenze des Energiemanagers verwendet jetzt direkt die originale
+  SunEnergyXT-System-Entladegrenze (`SI`); Änderungen an beiden Stellen wirken
+  damit auf denselben Gerätewert
+- bestehende Konfigurationen erkennen `SI` beim Upgrade automatisch
+- Systemlastanschluss-Entladegrenze (`SO`) bleibt als unabhängige,
+  bereits direkt verbundene Geräte-Einstellung erhalten
+
 ## 1.8.0 – 2026-07-29
 
 - optionale Tagesenergie-Sensoren der originalen SunEnergyXT-Integration

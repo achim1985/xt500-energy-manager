@@ -15,6 +15,7 @@ from .const import (
     CONF_LOAD_DISCHARGE_LIMIT_ENTITY,
     CONF_LOAD_PORT_POWER_ENTITY,
     CONF_MAX_CHARGE_SOC_ENTITY,
+    CONF_MIN_DISCHARGE_SOC_ENTITY,
     CONF_OFFGRID_DAILY_ENERGY_ENTITY,
     CONF_PV_DAILY_ENERGY_ENTITY,
     CONF_PV_POWER_ENTITY,
@@ -55,6 +56,9 @@ class XT500Entity(Entity):
             "source_inverter_setpoint_entity": self.runtime.entry.data["inverter_setpoint_entity"],
             "source_max_charge_soc_entity": self.runtime.entry.data.get(
                 CONF_MAX_CHARGE_SOC_ENTITY
+            ),
+            "source_min_discharge_soc_entity": self.runtime.entry.data.get(
+                CONF_MIN_DISCHARGE_SOC_ENTITY
             ),
             "source_load_discharge_limit_entity": self.runtime.entry.data.get(
                 CONF_LOAD_DISCHARGE_LIMIT_ENTITY

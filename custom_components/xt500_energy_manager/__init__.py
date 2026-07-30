@@ -25,6 +25,7 @@ from .const import (
     CONF_LOAD_DISCHARGE_LIMIT_ENTITY,
     CONF_LOAD_PORT_POWER_ENTITY,
     CONF_MAX_CHARGE_SOC_ENTITY,
+    CONF_MIN_DISCHARGE_SOC_ENTITY,
     CONF_METER_SIGN,
     CONF_OFFGRID_DAILY_ENERGY_ENTITY,
     CONF_PV_DAILY_ENERGY_ENTITY,
@@ -49,14 +50,14 @@ _OPTIONAL_DAILY_ENERGY_KEYS = (
 )
 
 
-def _discover_daily_energy_entities(
-    hass: HomeAssistant, entry: XT500ConfigEntry
-) -> None:
-    """Attach original daily-energy sensors from the configured XT500 device."""
+def _detect_configured_xt500_entities(
+    hass: HomeAssistant, data: dict
+) -> tuple[dict[str, str], list[str], list[str]] | None:
+    """Detect original entities belonging to the already configured XT500."""
     registry = er.async_get(hass)
     device_id = None
     for key in (CONF_SOC_ENTITY, CONF_PV_POWER_ENTITY, CONF_GRID_PORT_POWER_ENTITY):
-        source_entity = entry.data.get(key)
+        source_entity = data.get(key)
         registry_entry = registry.async_get(source_entity) if source_entity else None
         if (
             registry_entry is not None
@@ -66,13 +67,23 @@ def _discover_daily_energy_entities(
             device_id = registry_entry.device_id
             break
     if device_id is None:
-        return
+        return None
 
-    detected, _missing, ambiguous = detect_xt500_entities(
+    return detect_xt500_entities(
         er.async_entries_for_device(
             registry, device_id, include_disabled_entities=True
         )
     )
+
+
+def _discover_daily_energy_entities(
+    hass: HomeAssistant, entry: XT500ConfigEntry
+) -> None:
+    """Attach original daily-energy sensors from the configured XT500 device."""
+    result = _detect_configured_xt500_entities(hass, dict(entry.data))
+    if result is None:
+        return
+    detected, _missing, ambiguous = result
     additions = {
         key: detected[key]
         for key in _OPTIONAL_DAILY_ENERGY_KEYS
@@ -165,6 +176,7 @@ async def async_migrate_entry(
     hass: HomeAssistant, entry: XT500ConfigEntry
 ) -> bool:
     """Migrate development entries to the production source schema."""
+    data = dict(entry.data)
     if entry.version < 2:
         retained_keys = {
             CONF_SOC_ENTITY,
@@ -175,6 +187,7 @@ async def async_migrate_entry(
             CONF_GRID_SETPOINT_ENTITY,
             CONF_INVERTER_SETPOINT_ENTITY,
             CONF_MAX_CHARGE_SOC_ENTITY,
+            CONF_MIN_DISCHARGE_SOC_ENTITY,
             CONF_LOAD_DISCHARGE_LIMIT_ENTITY,
             CONF_BATTERY_INPUT_POWER_ENTITY,
             CONF_BATTERY_OUTPUT_POWER_ENTITY,
@@ -184,15 +197,32 @@ async def async_migrate_entry(
             CONF_OFFGRID_DAILY_ENERGY_ENTITY,
             CONF_METER_SIGN,
         }
-        hass.config_entries.async_update_entry(
-            entry,
-            data={
-                key: value
-                for key, value in entry.data.items()
-                if key in retained_keys
-            },
-            version=2,
-        )
+        data = {key: value for key, value in data.items() if key in retained_keys}
+
+    if entry.version < 3 and not data.get(CONF_MIN_DISCHARGE_SOC_ENTITY):
+        result = _detect_configured_xt500_entities(hass, data)
+        if result is None:
+            _LOGGER.error(
+                "Unable to locate the configured SunEnergyXT device while "
+                "migrating the system discharge limit"
+            )
+            return False
+        detected, _missing, ambiguous = result
+        if (
+            CONF_MIN_DISCHARGE_SOC_ENTITY in ambiguous
+            or CONF_MIN_DISCHARGE_SOC_ENTITY not in detected
+        ):
+            _LOGGER.error(
+                "Unable to uniquely detect the SunEnergyXT system discharge "
+                "limit (SI) during migration"
+            )
+            return False
+        data[CONF_MIN_DISCHARGE_SOC_ENTITY] = detected[
+            CONF_MIN_DISCHARGE_SOC_ENTITY
+        ]
+
+    if entry.version < 3:
+        hass.config_entries.async_update_entry(entry, data=data, version=3)
     return True
 
 

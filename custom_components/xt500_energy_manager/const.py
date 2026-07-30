@@ -24,6 +24,7 @@ CONF_LOAD_PORT_POWER_ENTITY: Final = "load_port_power_entity"
 CONF_GRID_SETPOINT_ENTITY: Final = "grid_setpoint_entity"
 CONF_INVERTER_SETPOINT_ENTITY: Final = "inverter_setpoint_entity"
 CONF_MAX_CHARGE_SOC_ENTITY: Final = "max_charge_soc_entity"
+CONF_MIN_DISCHARGE_SOC_ENTITY: Final = "min_discharge_soc_entity"
 CONF_LOAD_DISCHARGE_LIMIT_ENTITY: Final = "load_discharge_limit_entity"
 CONF_BATTERY_INPUT_POWER_ENTITY: Final = "battery_input_power_entity"
 CONF_BATTERY_OUTPUT_POWER_ENTITY: Final = "battery_output_power_entity"
@@ -43,6 +44,7 @@ INPUT_LABELS: Final = {
     CONF_GRID_SETPOINT_ENTITY: "Sollwert Netzanschluss",
     CONF_INVERTER_SETPOINT_ENTITY: "Sollwert Wechselrichter-Obergrenze",
     CONF_MAX_CHARGE_SOC_ENTITY: "System-Ladegrenze",
+    CONF_MIN_DISCHARGE_SOC_ENTITY: "System-Entladegrenze",
 }
 
 METER_IMPORT_POSITIVE: Final = "import_positive"

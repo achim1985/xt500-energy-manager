@@ -85,6 +85,7 @@ Die Integration wurde mit Home Assistant 2026.7 und der SunEnergyXT-Integration
    - Sollwert Leistung Netzanschluss (`GS`)
    - Sollwert maximale Wechselrichterleistung (`IS`)
    - System-Ladegrenze (`SA`)
+   - System-Entladegrenze (`SI`)
    - Systemlastanschluss-Entladegrenze
    - Gesamteingangs- und Gesamtausgangsleistung des Systems
 
@@ -196,6 +197,7 @@ Der Expertenmodus bietet weiterhin die vollständige manuelle Zuordnung:
 | Sollwert Leistung Netzanschluss | SunEnergyXT **Sollwert Leistung Netzanschluss** (`GS`) |
 | Sollwert max. Wechselrichterleistung | SunEnergyXT **Sollwert max. Wechselrichterleistung** (`IS`) |
 | System-Ladegrenze | SunEnergyXT **System-Ladegrenze** (`SA`) |
+| Entladegrenze | SunEnergyXT **System-Entladegrenze** (`SI`); der Energiemanager zeigt und ändert direkt denselben Gerätewert |
 | Systemlastanschluss-Entladegrenze | SunEnergyXT **Systemlastanschluss-Entladegrenze**; wird im Dashboard direkt am Gerät eingestellt |
 | Batterie-Ladeleistung | SunEnergyXT **Gesamteingangsleistung des Systems** |
 | Batterie-Entladeleistung | SunEnergyXT **Gesamtausgangsleistung des Systems** |
@@ -425,6 +427,12 @@ der ursprünglichen Ansicht wirksam.
 Der Speicher gleicht den Hausverbrauch aus und hält das eingestellte Netzziel
 ein. Das **Ladelimit im Normalbetrieb** wird als reale System-Ladegrenze auf
 den XT500 geschrieben.
+
+Die **Entladegrenze** ist kein getrennt gespeicherter Energiemanager-Wert:
+Sie zeigt und verändert direkt die originale System-Entladegrenze (`SI`) des
+XT500. Änderungen über SunEnergyXT und über das Energiemanager-Dashboard
+bleiben dadurch identisch. Die Wiederfreigabe-Hysterese gehört weiterhin nur
+zur Regelung des Energiemanagers.
 
 ### PV-Überschuss
 

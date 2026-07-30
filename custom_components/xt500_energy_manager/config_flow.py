@@ -21,6 +21,7 @@ from .const import (
     CONF_LOAD_DISCHARGE_LIMIT_ENTITY,
     CONF_LOAD_PORT_POWER_ENTITY,
     CONF_MAX_CHARGE_SOC_ENTITY,
+    CONF_MIN_DISCHARGE_SOC_ENTITY,
     CONF_METER_SIGN,
     CONF_PV_POWER_ENTITY,
     CONF_SOC_ENTITY,
@@ -63,6 +64,7 @@ def _manual_schema(defaults: dict[str, Any] | None = None) -> vol.Schema:
             required(CONF_GRID_SETPOINT_ENTITY): _entity_selector("number"),
             required(CONF_INVERTER_SETPOINT_ENTITY): _entity_selector("number"),
             required(CONF_MAX_CHARGE_SOC_ENTITY): _entity_selector("number"),
+            required(CONF_MIN_DISCHARGE_SOC_ENTITY): _entity_selector("number"),
             optional(CONF_LOAD_DISCHARGE_LIMIT_ENTITY): _entity_selector("number"),
             optional(CONF_BATTERY_INPUT_POWER_ENTITY): _entity_selector("sensor"),
             optional(CONF_BATTERY_OUTPUT_POWER_ENTITY): _entity_selector("sensor"),
@@ -146,7 +148,7 @@ def _detect_device_data(
 class XT500EnergyManagerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle XT500 Energy Manager setup."""
 
-    VERSION = 2
+    VERSION = 3
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         return self.async_show_menu(

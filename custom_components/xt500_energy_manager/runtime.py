@@ -30,6 +30,7 @@ from .const import (
     CONF_INVERTER_SETPOINT_ENTITY,
     CONF_LOAD_PORT_POWER_ENTITY,
     CONF_MAX_CHARGE_SOC_ENTITY,
+    CONF_MIN_DISCHARGE_SOC_ENTITY,
     CONF_METER_SIGN,
     CONF_PV_POWER_ENTITY,
     CONF_SOC_ENTITY,
@@ -183,6 +184,7 @@ class XT500Runtime:
                 CONF_GRID_SETPOINT_ENTITY,
                 CONF_INVERTER_SETPOINT_ENTITY,
                 CONF_MAX_CHARGE_SOC_ENTITY,
+                CONF_MIN_DISCHARGE_SOC_ENTITY,
                 CONF_BATTERY_INPUT_POWER_ENTITY,
                 CONF_BATTERY_OUTPUT_POWER_ENTITY,
             )
@@ -406,6 +408,7 @@ class XT500Runtime:
             CONF_GRID_SETPOINT_ENTITY,
             CONF_INVERTER_SETPOINT_ENTITY,
             CONF_MAX_CHARGE_SOC_ENTITY,
+            CONF_MIN_DISCHARGE_SOC_ENTITY,
         ):
             entity_id = self.entry.data.get(key)
             issue = self._input_issue(key, entity_id)
@@ -536,7 +539,10 @@ class XT500Runtime:
             step=float(charge_limit_state.attributes.get("step", 1) or 1),
         )
 
-        minimum_soc = float(self.settings[SETTING_MIN_SOC])
+        minimum_soc = values[CONF_MIN_DISCHARGE_SOC_ENTITY]
+        if float(self.settings[SETTING_MIN_SOC]) != minimum_soc:
+            self.settings[SETTING_MIN_SOC] = minimum_soc
+            self._store.async_delay_save(lambda: self.settings, 1)
         hysteresis = float(self.settings[SETTING_SOC_HYSTERESIS])
         if values[CONF_SOC_ENTITY] <= minimum_soc:
             self._low_soc_hold = True
@@ -1634,6 +1640,12 @@ class XT500Runtime:
         self.settings[SETTING_CYCLE_AUTOMATIC_ACTIVE] = False
         self._full_soc_latched = False
         await self._store.async_save(self.settings)
+        self.async_calculate()
+
+    async def async_set_system_discharge_limit(self, value: float) -> None:
+        """Write the shared discharge limit through the original XT500 entity."""
+        entity_id = self.entry.data[CONF_MIN_DISCHARGE_SOC_ENTITY]
+        await self._async_set_number_resilient(entity_id, value)
         self.async_calculate()
 
     @callback
