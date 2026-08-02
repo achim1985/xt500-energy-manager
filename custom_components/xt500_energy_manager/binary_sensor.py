@@ -26,8 +26,9 @@ BINARY_SENSORS = (
     XT500BinaryDescription(key="charge_request", translation_key="charge_request", icon="mdi:battery-arrow-up", value_fn=lambda r: r.charge_request_active),
     XT500BinaryDescription(key="tariff_request", translation_key="tariff_request", icon="mdi:currency-eur", value_fn=lambda r: r.tariff_request_active),
     XT500BinaryDescription(key="control_ready", translation_key="control_ready", icon="mdi:shield-check", value_fn=lambda r: r.control_ready),
-    XT500BinaryDescription(key="feedback_ready", translation_key="feedback_ready", icon="mdi:database-sync", value_fn=lambda r: r.feedback_ready),
     XT500BinaryDescription(key="pv_release_active", translation_key="pv_release_active", icon="mdi:solar-power", value_fn=lambda r: r.pv_release_active),
+    XT500BinaryDescription(key="ac_pv_release_active", translation_key="ac_pv_release_active", icon="mdi:transmission-tower-export", value_fn=lambda r: r.ac_pv_release_active),
+    XT500BinaryDescription(key="ac_pv_input_valid", translation_key="ac_pv_input_valid", icon="mdi:solar-power-variant", value_fn=lambda r: r.ac_pv_input_valid),
 )
 
 
@@ -49,6 +50,11 @@ class XT500BinarySensor(XT500Entity, BinarySensorEntity):
             attrs["last_errors"] = self.runtime.last_invalid_inputs
             attrs["last_error_at"] = self.runtime.last_invalid_at
             attrs["last_recovered_at"] = self.runtime.last_inputs_recovered_at
+        elif self.key == "ac_pv_input_valid":
+            attrs["configured"] = bool(
+                self.runtime.entry.data.get("ac_pv_power_entity")
+            )
+            attrs["issue"] = self.runtime.ac_pv_input_issue
         return attrs
 
 

@@ -70,6 +70,7 @@ async def async_get_config_entry_diagnostics(_hass: HomeAssistant, entry: XT500C
             "maximum_change_w": runtime.control_profile.maximum_change,
             "feedback_ready": runtime.feedback_ready,
             "pv_release_active": runtime.pv_release_active,
+            "ac_pv_release_active": runtime.ac_pv_release_active,
             "last_control_write": runtime.last_control_write,
         },
         "invalid_entities": runtime.invalid_entities,
@@ -78,6 +79,10 @@ async def async_get_config_entry_diagnostics(_hass: HomeAssistant, entry: XT500C
             "last": runtime.last_invalid_inputs,
             "last_error_at": runtime.last_invalid_at,
             "last_recovered_at": runtime.last_inputs_recovered_at,
+        },
+        "optional_ac_pv_input": {
+            "valid": runtime.ac_pv_input_valid,
+            "issue": runtime.ac_pv_input_issue,
         },
         "result": asdict(runtime.result) if runtime.result else None,
     }

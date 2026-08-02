@@ -1,4 +1,4 @@
-# XT500 Energy Manager 1.8.1
+# XT500 Energy Manager 1.9.0
 
 Production-ready Home Assistant controller for SunEnergyXT XT500 and XT500 Pro
 systems. The integration directly controls the grid-port setpoint, inverter
@@ -40,12 +40,17 @@ ceiling, and system charge limit.
 ## Charging modes
 
 - **Grid charging:** requests the configured charging power from the grid.
-- **PV surplus:** passes current PV through only up to home demand and leaves the
-  remainder for battery charging, without intentional grid charging.
-- **PV priority:** uses PV only and prevents intentional battery discharge while
-  the target remains active.
-- **PV and grid:** treats the configured power as the total battery charging
-  target and requests only the shortfall after available PV from the grid.
+- **PV surplus:** uses available DC and AC PV surplus without intentional grid
+  import.
+- **PV priority:** prioritizes battery charging from DC and AC PV and prevents
+  intentional battery discharge while the target remains active.
+- **PV and grid:** treats the configured power as total battery charging power;
+  PV reduces only the required grid remainder.
+
+The coupling selector offers hybrid (recommended), XT500-PV-only, and external
+AC-PV-only control. The public grid meter remains authoritative. An optional
+signed AC PV production sensor improves display and diagnostics but never
+authorizes charging by itself.
 
 Manual charging overrides an automatic due state. Both return to the selected
 base mode after completion.
@@ -83,14 +88,15 @@ management hash prevents locally modified copies from being overwritten.
 5. Select the SunEnergy XT500 device. Its original measurement, setpoint, and
    limit entities are detected automatically.
 6. Select the external total grid-power sensor and confirm its sign convention.
-   A full manual expert setup remains available.
+   Optionally select AC PV power and its sign. A full manual expert setup remains
+   available.
 7. Ensure no other automation writes those same number entities, then enable
    the energy manager.
 
 ## Generated dashboard
 
 Register
-`/xt500_energy_manager/xt500-energy-dashboard-strategy.js?v=1.8.1` once as a
+`/xt500_energy_manager/xt500-energy-dashboard-strategy.js?v=1.9.0` once as a
 JavaScript module under Settings → Dashboards → Resources. Then add the
 **XT500 Energiemanager** community dashboard.
 

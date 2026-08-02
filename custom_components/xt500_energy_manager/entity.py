@@ -6,6 +6,8 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import Entity
 
 from .const import (
+    CONF_AC_PV_POWER_ENTITY,
+    CONF_AC_PV_SIGN,
     CONF_BATTERY_INPUT_POWER_ENTITY,
     CONF_BATTERY_OUTPUT_POWER_ENTITY,
     CONF_GRID_CHARGE_DAILY_ENERGY_ENTITY,
@@ -66,6 +68,10 @@ class XT500Entity(Entity):
             "source_battery_input_power_entity": self.runtime.entry.data.get(CONF_BATTERY_INPUT_POWER_ENTITY),
             "source_battery_output_power_entity": self.runtime.entry.data.get(CONF_BATTERY_OUTPUT_POWER_ENTITY),
             "source_pv_power_entity": self.runtime.entry.data.get(CONF_PV_POWER_ENTITY),
+            "source_ac_pv_power_entity": self.runtime.entry.data.get(
+                CONF_AC_PV_POWER_ENTITY
+            ),
+            "source_ac_pv_sign": self.runtime.entry.data.get(CONF_AC_PV_SIGN),
             "source_public_grid_power_entity": self.runtime.entry.data.get(CONF_GRID_POWER_ENTITY),
             "source_grid_port_power_entity": self.runtime.entry.data.get(CONF_GRID_PORT_POWER_ENTITY),
             "source_load_port_power_entity": self.runtime.entry.data.get(CONF_LOAD_PORT_POWER_ENTITY),

@@ -12,16 +12,20 @@
       },
       "automatic": {
         "title": "XT500 automatisch einrichten",
-        "description": "Wähle dein SunEnergy-XT500-Gerät. Die originalen Speicher-, Leistungs- und Sollwert-Entitäten werden automatisch erkannt. Nur der externe Stromzähler bleibt manuell.",
+        "description": "Wähle dein SunEnergy-XT500-Gerät. Die originalen Speicher-, Leistungs- und Sollwert-Entitäten werden automatisch erkannt. Öffentlicher Stromzähler und die optionale Erzeugungsleistung einer externen AC-PV-Anlage bleiben manuell.",
         "data": {
           "xt500_device": "SunEnergy-XT500-Gerät",
           "grid_power_entity": "Gesamtleistung am öffentlichen Netzanschlusspunkt",
-          "meter_sign": "Vorzeichen des öffentlichen Zählers"
+          "meter_sign": "Vorzeichen des öffentlichen Zählers",
+          "ac_pv_power_entity": "Externe AC-PV-Erzeugung (optional)",
+          "ac_pv_sign": "Vorzeichen der externen AC-PV-Erzeugung"
         },
         "data_description": {
           "xt500_device": "Das Gerät muss aus der zuvor installierten SunEnergyXT 500 Series Integration stammen.",
           "grid_power_entity": "Gesamt-Wirkleistung des Hauses, zum Beispiel vom Shelly Pro 3EM. Keine einzelne Phase und keine XT500-Anschlussleistung.",
-          "meter_sign": "Prüfe an einem aktuellen Messwert, welches Vorzeichen dein Zähler bei Netzbezug verwendet."
+          "meter_sign": "Prüfe an einem aktuellen Messwert, welches Vorzeichen dein Zähler bei Netzbezug verwendet.",
+          "ac_pv_power_entity": "Gesamte Erzeugungsleistung eines externen AC-PV-Wechselrichters. Dieser Wert bedeutet noch keine Akkuladung. Der tatsächlich nutzbare Überschuss wird separat am öffentlichen Netzanschluss ermittelt.",
+          "ac_pv_sign": "Wähle, ob der AC-PV-Sensor Erzeugung positiv oder negativ ausgibt."
         }
       },
       "manual": {
@@ -29,7 +33,8 @@
         "description": "Expertenmodus: Alle Sollwerte werden im Produktivbetrieb direkt auf die ausgewählten Geräteentitäten geschrieben.",
         "data": {
           "soc_entity": "Speicherstand (SOC)",
-          "pv_power_entity": "PV-Gesamteingangsleistung",
+          "pv_power_entity": "PV direkt am XT500",
+          "ac_pv_power_entity": "Externe AC-PV-Erzeugung (optional)",
           "grid_power_entity": "Leistung am öffentlichen Netzanschlusspunkt",
           "grid_port_power_entity": "XT500-Systemleistung am Netzanschluss",
           "load_port_power_entity": "XT500-Systemleistung am Lastanschluss",
@@ -40,7 +45,8 @@
           "load_discharge_limit_entity": "Systemlastanschluss-Entladegrenze",
           "battery_input_power_entity": "Batterie-Ladeleistung (Gesamteingang)",
           "battery_output_power_entity": "Batterie-Entladeleistung (Gesamtausgang)",
-          "meter_sign": "Vorzeichen des öffentlichen Zählers"
+          "meter_sign": "Vorzeichen des öffentlichen Zählers",
+          "ac_pv_sign": "Vorzeichen der externen AC-PV-Erzeugung"
         }
       }
     },
@@ -59,6 +65,12 @@
         "import_positive": "Netzbezug ist positiv",
         "export_positive": "Netzeinspeisung ist positiv"
       }
+    },
+    "ac_pv_sign": {
+      "options": {
+        "production_positive": "Erzeugung positiv, z. B. +350 W",
+        "production_negative": "Erzeugung negativ, z. B. -350 W"
+      }
     }
   },
   "options": {
@@ -73,16 +85,20 @@
       },
       "automatic": {
         "title": "XT500-Entitäten automatisch erkennen",
-        "description": "Die originalen Entitäten des ausgewählten SunEnergy-XT500-Geräts werden übernommen. Der externe Gesamt-Stromzähler wird separat ausgewählt.",
+        "description": "Die originalen Entitäten des ausgewählten SunEnergy-XT500-Geräts werden übernommen. Öffentlicher Stromzähler und die optionale Erzeugungsleistung einer externen AC-PV-Anlage werden separat ausgewählt.",
         "data": {
           "xt500_device": "SunEnergy-XT500-Gerät",
           "grid_power_entity": "Gesamtleistung am öffentlichen Netzanschlusspunkt",
-          "meter_sign": "Vorzeichen des öffentlichen Zählers"
+          "meter_sign": "Vorzeichen des öffentlichen Zählers",
+          "ac_pv_power_entity": "Externe AC-PV-Erzeugung (optional)",
+          "ac_pv_sign": "Vorzeichen der externen AC-PV-Erzeugung"
         },
         "data_description": {
           "xt500_device": "Das Gerät muss aus der zuvor installierten SunEnergyXT 500 Series Integration stammen.",
           "grid_power_entity": "Gesamt-Wirkleistung des Hauses, zum Beispiel vom Shelly Pro 3EM. Keine einzelne Phase und keine XT500-Anschlussleistung.",
-          "meter_sign": "Prüfe an einem aktuellen Messwert, welches Vorzeichen dein Zähler bei Netzbezug verwendet."
+          "meter_sign": "Prüfe an einem aktuellen Messwert, welches Vorzeichen dein Zähler bei Netzbezug verwendet.",
+          "ac_pv_power_entity": "Gesamte Erzeugungsleistung eines externen AC-PV-Wechselrichters. Dieser Wert bedeutet noch keine Akkuladung. Ein Ausfall stoppt die Regelung nicht.",
+          "ac_pv_sign": "Wähle, ob der AC-PV-Sensor Erzeugung positiv oder negativ ausgibt."
         }
       },
       "manual": {
@@ -90,7 +106,8 @@
         "description": "Expertenmodus: Alle Sollwerte werden im Produktivbetrieb direkt auf die ausgewählten Geräteentitäten geschrieben.",
         "data": {
           "soc_entity": "Speicherstand (SOC)",
-          "pv_power_entity": "PV-Gesamteingangsleistung",
+          "pv_power_entity": "PV direkt am XT500",
+          "ac_pv_power_entity": "Externe AC-PV-Erzeugung (optional)",
           "grid_power_entity": "Leistung am öffentlichen Netzanschlusspunkt",
           "grid_port_power_entity": "XT500-Systemleistung am Netzanschluss",
           "load_port_power_entity": "XT500-Systemleistung am Lastanschluss",
@@ -101,7 +118,8 @@
           "load_discharge_limit_entity": "Systemlastanschluss-Entladegrenze",
           "battery_input_power_entity": "Batterie-Ladeleistung (Gesamteingang)",
           "battery_output_power_entity": "Batterie-Entladeleistung (Gesamtausgang)",
-          "meter_sign": "Vorzeichen des öffentlichen Zählers"
+          "meter_sign": "Vorzeichen des öffentlichen Zählers",
+          "ac_pv_sign": "Vorzeichen der externen AC-PV-Erzeugung"
         }
       }
     },
@@ -170,6 +188,32 @@
           "pv_and_grid": "PV + Netz"
         }
       },
+      "selected_mode": {
+        "name": "Ausgewählter Lademodus",
+        "state": { "normal": "Normalbetrieb", "grid_charge": "Netzladung", "pv_surplus": "PV-Überschuss", "pv_priority": "PV-Vorrang", "pv_and_grid": "PV + Netz" }
+      },
+      "active_operation": {
+        "name": "Aktiver Vorgang",
+        "state": { "normal": "Normalbetrieb", "manual": "Manuelle Zielladung", "cycle_manual": "Zyklusladung manuell", "cycle_automatic": "Zyklusladung automatisch", "tariff": "Tarifladung" }
+      },
+      "mode_state": {
+        "name": "Zustand des Lademodus",
+        "state": { "normal": "Normalbetrieb", "charging": "Lädt", "waiting_for_pv": "Wartet auf ausreichend PV", "target_reached": "Ladeziel erreicht", "minimum_soc_hold": "Entladung gesperrt" }
+      },
+      "selected_coupling_mode": {
+        "name": "Gewählte PV-Berücksichtigung",
+        "state": { "automatic": "Hybrid", "dc": "Nur XT500-PV", "ac": "Nur externe AC-PV" }
+      },
+      "active_coupling_mode": {
+        "name": "Aktuell nutzbare PV-Quelle",
+        "state": { "none": "Keine", "dc": "XT500-PV", "ac": "Externe AC-PV", "hybrid": "XT500-PV + externe AC-PV" }
+      },
+      "active_energy_source": {
+        "name": "Tatsächliche Ladequelle",
+        "state": { "none": "Keine Ladung", "pv": "PV", "grid": "Netz", "pv_and_grid": "PV + Netz" }
+      },
+      "ac_pv_power": { "name": "Externe AC-PV-Erzeugung" },
+      "available_ac_surplus": { "name": "AC-PV-Überschuss am Netzanschluss" },
       "recommended_grid_setpoint": { "name": "Netzanschluss-Sollwert" },
       "recommended_inverter_setpoint": { "name": "Wechselrichter-Obergrenze" },
       "estimated_home_load": { "name": "Geschätzter Hausverbrauch" },
@@ -212,8 +256,9 @@
       "charge_request": { "name": "Ladeanforderung aktiv" },
       "tariff_request": { "name": "Tarif-Ladeanforderung aktiv" },
       "control_ready": { "name": "Produktivregelung bereit" },
-      "feedback_ready": { "name": "Neue Rückmeldungen eingetroffen" },
-      "pv_release_active": { "name": "PV-Ausgabe freigegeben" }
+      "pv_release_active": { "name": "DC-PV-Ausgabe freigegeben" },
+      "ac_pv_release_active": { "name": "AC-PV-Überschuss freigegeben" },
+      "ac_pv_input_valid": { "name": "Optionaler AC-PV-Sensor gültig" }
     },
     "switch": {
       "regulation_enabled": { "name": "Energiemanager aktiv" },
@@ -235,6 +280,10 @@
       "base_mode": {
         "name": "Betrieb ohne Zielladung",
         "state": { "normal": "Normalbetrieb", "pv_surplus": "PV-Überschuss" }
+      },
+      "coupling_mode": {
+        "name": "PV für Regelung berücksichtigen",
+        "state": { "automatic": "Hybrid (empfohlen)", "dc": "Nur XT500-PV", "ac": "Nur externe AC-PV" }
       }
     },
     "number": {

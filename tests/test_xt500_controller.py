@@ -43,6 +43,20 @@ class ControllerTest(unittest.TestCase):
         values.update(changes)
         return controller.ControlInput(**values)
 
+    def test_ac_pv_sign_is_normalized_without_turning_consumption_into_pv(self):
+        self.assertEqual(
+            controller.normalize_pv_production(-600, production_negative=True),
+            600,
+        )
+        self.assertEqual(
+            controller.normalize_pv_production(600, production_negative=False),
+            600,
+        )
+        self.assertEqual(
+            controller.normalize_pv_production(40, production_negative=True),
+            0,
+        )
+
     def test_pv_priority_never_requests_grid_charge(self):
         result = controller.calculate_control(
             self.input(),
@@ -179,6 +193,275 @@ class ControllerTest(unittest.TestCase):
             result.recommended_grid_setpoint,
             result.recommended_inverter_setpoint,
         )
+
+    def test_ac_only_pv_surplus_absorbs_export_without_grid_import(self):
+        result = controller.calculate_control(
+            self.input(
+                pv_power=0,
+                ac_pv_power=600,
+                grid_power=600,
+                grid_port_power=0,
+                load_port_power=0,
+                current_grid_setpoint=0,
+                current_inverter_setpoint=0,
+            ),
+            controller.ControlSettings(
+                charge_active=True,
+                charge_source="manual",
+                charge_mode="pv_surplus",
+                charge_power=1200,
+                meter_export_positive=True,
+            ),
+        )
+        self.assertEqual(result.recommended_grid_setpoint, -600)
+        self.assertEqual(result.recommended_inverter_setpoint, 0)
+        self.assertEqual(result.available_ac_surplus, 600)
+        self.assertEqual(result.active_coupling_mode, "ac")
+        self.assertEqual(result.active_energy_source, "pv")
+
+    def test_automatic_cycle_pv_surplus_uses_reconstructed_ac_export(self):
+        result = controller.calculate_control(
+            self.input(
+                pv_power=0,
+                ac_pv_power=0,
+                grid_power=600,
+                grid_port_power=0,
+                load_port_power=0,
+                current_grid_setpoint=0,
+                current_inverter_setpoint=0,
+            ),
+            controller.ControlSettings(
+                charge_active=True,
+                charge_source="cycle_automatic",
+                charge_mode="pv_surplus",
+                coupling_mode="ac",
+                charge_power=1200,
+                meter_export_positive=True,
+            ),
+        )
+        self.assertEqual(result.recommended_grid_setpoint, -600)
+        self.assertEqual(result.available_ac_surplus, 600)
+        self.assertEqual(result.active_coupling_mode, "ac")
+        self.assertEqual(result.status, "cycle_automatic_pv_surplus")
+        self.assertEqual(result.active_energy_source, "pv")
+
+    def test_ac_only_pv_priority_absorbs_only_available_surplus(self):
+        result = controller.calculate_control(
+            self.input(
+                pv_power=0,
+                ac_pv_power=600,
+                grid_power=600,
+                grid_port_power=0,
+                load_port_power=0,
+                current_grid_setpoint=0,
+                current_inverter_setpoint=0,
+            ),
+            controller.ControlSettings(
+                charge_active=True,
+                charge_source="cycle_automatic",
+                charge_mode="pv_priority",
+                charge_power=1200,
+                meter_export_positive=True,
+            ),
+        )
+        self.assertEqual(result.recommended_grid_setpoint, -600)
+        self.assertEqual(result.mode_state, "charging")
+
+    def test_ac_only_pv_and_grid_uses_pv_towards_total_charge_target(self):
+        result = controller.calculate_control(
+            self.input(
+                pv_power=0,
+                ac_pv_power=600,
+                grid_power=600,
+                grid_port_power=0,
+                load_port_power=0,
+            ),
+            controller.ControlSettings(
+                charge_active=True,
+                charge_source="manual",
+                charge_mode="pv_and_grid",
+                charge_power=1200,
+                meter_export_positive=True,
+            ),
+        )
+        self.assertEqual(result.recommended_grid_setpoint, -1200)
+        self.assertEqual(result.effective_public_grid_target, -600)
+        self.assertEqual(result.active_energy_source, "pv_and_grid")
+
+    def test_ac_only_grid_charge_preserves_configured_public_grid_share(self):
+        result = controller.calculate_control(
+            self.input(
+                pv_power=0,
+                ac_pv_power=600,
+                grid_power=600,
+                grid_port_power=0,
+                load_port_power=0,
+            ),
+            controller.ControlSettings(
+                charge_active=True,
+                charge_source="manual",
+                charge_mode="grid_charge",
+                charge_power=1200,
+                meter_export_positive=True,
+            ),
+        )
+        self.assertEqual(result.recommended_grid_setpoint, -1800)
+        self.assertEqual(result.effective_public_grid_target, -1200)
+
+    def test_grid_charge_respects_real_negative_device_range(self):
+        result = controller.calculate_control(
+            self.input(
+                pv_power=0,
+                ac_pv_power=1000,
+                grid_power=1000,
+                grid_port_power=0,
+                load_port_power=0,
+            ),
+            controller.ControlSettings(
+                charge_active=True,
+                charge_mode="grid_charge",
+                charge_power=2400,
+                grid_charge_limit=2400,
+                meter_export_positive=True,
+            ),
+        )
+        self.assertEqual(result.recommended_grid_setpoint, -2400)
+        self.assertEqual(result.effective_public_grid_target, -1400)
+
+    def test_mixed_pv_and_grid_counts_dc_and_ac_without_double_subtraction(self):
+        result = controller.calculate_control(
+            self.input(
+                pv_power=1000,
+                ac_pv_power=500,
+                grid_power=300,
+                grid_port_power=0,
+                load_port_power=0,
+                current_inverter_setpoint=0,
+            ),
+            controller.ControlSettings(
+                charge_active=True,
+                charge_mode="pv_and_grid",
+                charge_power=1200,
+                meter_export_positive=True,
+            ),
+        )
+        self.assertEqual(result.recommended_grid_setpoint, -200)
+        self.assertEqual(result.active_coupling_mode, "hybrid")
+        self.assertEqual(result.active_energy_source, "pv_and_grid")
+
+    def test_waiting_pv_mode_stays_selected_and_active(self):
+        result = controller.calculate_control(
+            self.input(
+                pv_power=0,
+                ac_pv_power=0,
+                grid_power=0,
+                grid_port_power=0,
+                current_inverter_setpoint=0,
+            ),
+            controller.ControlSettings(
+                charge_active=True,
+                charge_source="cycle_automatic",
+                charge_mode="pv_priority",
+                coupling_mode="automatic",
+            ),
+        )
+        self.assertEqual(result.selected_mode, "pv_priority")
+        self.assertEqual(result.active_mode, "pv_priority")
+        self.assertEqual(result.mode_state, "waiting_for_pv")
+        self.assertEqual(result.selected_coupling_mode, "automatic")
+        self.assertEqual(result.active_coupling_mode, "none")
+
+    def test_ac_and_dc_release_gates_do_not_unlock_each_other(self):
+        result = controller.calculate_control(
+            self.input(
+                pv_power=500,
+                ac_pv_power=600,
+                grid_power=600,
+                grid_port_power=0,
+                load_port_power=0,
+                current_inverter_setpoint=0,
+            ),
+            controller.ControlSettings(
+                charge_active=True,
+                charge_mode="pv_surplus",
+                pv_release_allowed=False,
+                ac_pv_release_allowed=True,
+                meter_export_positive=True,
+            ),
+        )
+        self.assertEqual(result.recommended_grid_setpoint, -600)
+        self.assertEqual(result.recommended_inverter_setpoint, 0)
+        self.assertEqual(result.active_coupling_mode, "ac")
+
+    def test_normal_mode_waits_for_ac_release_before_absorbing_small_surplus(self):
+        blocked = controller.calculate_control(
+            self.input(
+                pv_power=0,
+                grid_power=40,
+                grid_port_power=0,
+                load_port_power=0,
+                current_inverter_setpoint=0,
+            ),
+            controller.ControlSettings(
+                charge_active=False,
+                ac_pv_release_allowed=False,
+                meter_export_positive=True,
+            ),
+        )
+        released = controller.calculate_control(
+            self.input(
+                pv_power=0,
+                grid_power=100,
+                grid_port_power=0,
+                load_port_power=0,
+                current_inverter_setpoint=0,
+            ),
+            controller.ControlSettings(
+                charge_active=False,
+                ac_pv_release_allowed=True,
+                meter_export_positive=True,
+            ),
+        )
+        self.assertEqual(blocked.recommended_grid_setpoint, 0)
+        self.assertEqual(released.recommended_grid_setpoint, -100)
+
+    def test_dc_only_coupling_does_not_use_reconstructed_ac_surplus(self):
+        result = controller.calculate_control(
+            self.input(
+                pv_power=0,
+                ac_pv_power=600,
+                grid_power=600,
+                grid_port_power=0,
+                load_port_power=0,
+            ),
+            controller.ControlSettings(
+                charge_active=True,
+                charge_mode="pv_surplus",
+                coupling_mode="dc",
+                meter_export_positive=True,
+            ),
+        )
+        self.assertEqual(result.recommended_grid_setpoint, 0)
+        self.assertEqual(result.available_ac_surplus, 0)
+        self.assertEqual(result.mode_state, "waiting_for_pv")
+
+    def test_legacy_hybrid_selection_is_normalized_to_both_pv_sources(self):
+        result = controller.calculate_control(
+            self.input(
+                pv_power=300,
+                ac_pv_power=600,
+                grid_power=200,
+                grid_port_power=0,
+                load_port_power=0,
+            ),
+            controller.ControlSettings(
+                coupling_mode="hybrid",
+                meter_export_positive=True,
+            ),
+        )
+        self.assertEqual(result.selected_coupling_mode, "automatic")
+        self.assertEqual(result.dc_pv_power, 300)
+        self.assertEqual(result.available_ac_surplus, 200)
 
     def test_target_soc_ends_charge_recommendation(self):
         result = controller.calculate_control(

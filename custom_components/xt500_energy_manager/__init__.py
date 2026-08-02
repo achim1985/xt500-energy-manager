@@ -14,6 +14,8 @@ from homeassistant.helpers.event import async_call_later
 
 from .blueprint_sync import BlueprintSyncResult, sync_bundled_blueprint
 from .const import (
+    CONF_AC_PV_POWER_ENTITY,
+    CONF_AC_PV_SIGN,
     CONF_BATTERY_INPUT_POWER_ENTITY,
     CONF_BATTERY_OUTPUT_POWER_ENTITY,
     CONF_GRID_CHARGE_DAILY_ENERGY_ENTITY,
@@ -34,6 +36,7 @@ from .const import (
     DOMAIN,
     FRONTEND_URL,
     PLATFORMS,
+    PV_PRODUCTION_POSITIVE,
 )
 from .entity_mapping import detect_xt500_entities
 from .runtime import XT500Runtime
@@ -196,6 +199,8 @@ async def async_migrate_entry(
             CONF_GRID_EXPORT_DAILY_ENERGY_ENTITY,
             CONF_OFFGRID_DAILY_ENERGY_ENTITY,
             CONF_METER_SIGN,
+            CONF_AC_PV_POWER_ENTITY,
+            CONF_AC_PV_SIGN,
         }
         data = {key: value for key, value in data.items() if key in retained_keys}
 
@@ -221,8 +226,9 @@ async def async_migrate_entry(
             CONF_MIN_DISCHARGE_SOC_ENTITY
         ]
 
-    if entry.version < 3:
-        hass.config_entries.async_update_entry(entry, data=data, version=3)
+    if entry.version < 4:
+        data.setdefault(CONF_AC_PV_SIGN, PV_PRODUCTION_POSITIVE)
+        hass.config_entries.async_update_entry(entry, data=data, version=4)
     return True
 
 

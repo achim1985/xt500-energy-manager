@@ -13,6 +13,10 @@ from datetime import datetime, time, timedelta
 from .const import (
     BASE_NORMAL,
     BASE_PV_SURPLUS,
+    COUPLING_AC,
+    COUPLING_AUTO,
+    COUPLING_DC,
+    COUPLING_HYBRID,
     MODE_GRID,
     MODE_PV_GRID,
     MODE_PV_PRIORITY,
@@ -272,6 +276,12 @@ def decode_signed_16(value: float) -> float:
     return value - 65536 if value > 32767 else value
 
 
+def normalize_pv_production(value: float, *, production_negative: bool) -> float:
+    """Return non-negative PV production for either source sign convention."""
+    normalized = -float(value) if production_negative else float(value)
+    return max(normalized, 0.0)
+
+
 def net_battery_flows(
     input_power: float,
     output_power: float,
@@ -292,6 +302,7 @@ class ControlInput:
     load_port_power: float
     current_grid_setpoint: float
     current_inverter_setpoint: float
+    ac_pv_power: float = 0.0
 
 
 @dataclass(slots=True, frozen=True)
@@ -309,9 +320,12 @@ class ControlSettings:
     charge_power: float = 2400.0
     target_grid_power: float = 0.0
     grid_limit: float = 2400.0
+    grid_charge_limit: float = 2400.0
     inverter_limit: float = 2400.0
     meter_export_positive: bool = True
     pv_release_allowed: bool = True
+    ac_pv_release_allowed: bool = True
+    coupling_mode: str = COUPLING_AUTO
 
 
 @dataclass(slots=True, frozen=True)
@@ -327,6 +341,15 @@ class ControlResult:
     target_reached: bool
     charge_blocked: bool
     discharge_blocked: bool
+    selected_mode: str
+    selected_coupling_mode: str
+    active_coupling_mode: str
+    active_energy_source: str
+    mode_state: str
+    dc_pv_power: float
+    ac_pv_power: float
+    available_ac_surplus: float
+    effective_public_grid_target: float
 
 
 @dataclass(slots=True, frozen=True)
@@ -381,18 +404,33 @@ def select_charge_request(
 
 
 def calculate_control(data: ControlInput, cfg: ControlSettings) -> ControlResult:
-    """Calculate GS/IS setpoints using the verified v1.3 topology model."""
+    """Calculate one conflict-free GS/IS result for DC, AC, or hybrid PV."""
     normalized_grid = data.grid_power if cfg.meter_export_positive else -data.grid_power
     grid_port = decode_signed_16(data.grid_port_power)
     load_port = decode_signed_16(data.load_port_power)
     positive_load = max(load_port, 0.0)
     load_backfeed = max(-load_port, 0.0)
     estimated_home_load = grid_port - normalized_grid
+    coupling = (
+        cfg.coupling_mode
+        if cfg.coupling_mode in (COUPLING_AUTO, COUPLING_DC, COUPLING_AC)
+        else COUPLING_AUTO
+    )
+    dc_enabled = coupling in (COUPLING_AUTO, COUPLING_DC)
+    ac_enabled = coupling in (COUPLING_AUTO, COUPLING_AC)
+    dc_pv_power = max(float(data.pv_power), 0.0) if dc_enabled else 0.0
+    ac_pv_power = max(float(data.ac_pv_power), 0.0) if ac_enabled else 0.0
+    # This reconstructed surplus remains stable while the XT500 starts
+    # charging: public grid = XT500 grid port - rest-of-site net load.
+    available_ac_surplus = (
+        max(-estimated_home_load, 0.0) if ac_enabled else 0.0
+    )
     target_reached = cfg.charge_active and data.soc >= cfg.target_soc
     charge_active = cfg.charge_active and not target_reached
     discharge_blocked = cfg.discharge_hold or data.soc <= cfg.minimum_soc
     charge_blocked = target_reached
 
+    selected_mode = cfg.charge_mode if cfg.charge_active else cfg.base_mode
     active_mode = cfg.charge_mode if charge_active else cfg.base_mode
     pv_direct = active_mode == MODE_PV_SURPLUS or (
         not charge_active and cfg.base_mode == BASE_PV_SURPLUS
@@ -420,7 +458,7 @@ def calculate_control(data: ControlInput, cfg: ControlSettings) -> ControlResult
     )
     pv_direct_target = min(
         max(estimated_home_load + cfg.target_grid_power, 0.0),
-        max(data.pv_power, 0.0),
+        dc_pv_power,
         cfg.grid_limit,
         cfg.inverter_limit,
     )
@@ -435,31 +473,60 @@ def calculate_control(data: ControlInput, cfg: ControlSettings) -> ControlResult
         # power. PV first supplies the planned inverter output; only the PV
         # remainder can charge the battery. The grid supplies that shortfall.
         pv_battery_contribution = max(
-            max(data.pv_power, 0.0) - raw_is_target,
+            dc_pv_power - raw_is_target,
             0.0,
         )
         grid_charge_request = max(
             charge_request - pv_battery_contribution,
             0.0,
         )
-    if charge_active and active_mode in (MODE_GRID, MODE_PV_GRID):
-        # The positive house-grid output limit must not restrict charging.
-        # The runtime still clamps the negative request to the source entity's
-        # real device range.
-        grid_target = -grid_charge_request
+    ac_charge_cap = (
+        min(
+            available_ac_surplus,
+            charge_request if charge_active else cfg.grid_charge_limit,
+            cfg.grid_charge_limit,
+        )
+        if cfg.ac_pv_release_allowed
+        else 0.0
+    )
+    effective_public_grid_target = cfg.target_grid_power
+    if charge_active and active_mode == MODE_GRID:
+        # Grid mode defines the requested public-grid contribution. Existing
+        # AC PV is added to the battery charge instead of replacing that share.
+        grid_target = -min(
+            charge_request + ac_charge_cap, cfg.grid_charge_limit
+        )
+        effective_public_grid_target = grid_target - estimated_home_load
+    elif charge_active and active_mode == MODE_PV_GRID:
+        # Hybrid mode defines total battery charging power. AC PV naturally
+        # supplies part of this fixed AC draw and must not be subtracted twice.
+        grid_target = -min(grid_charge_request, cfg.grid_charge_limit)
+        effective_public_grid_target = grid_target - estimated_home_load
     elif charge_active and active_mode == MODE_PV_PRIORITY:
-        grid_target = 0.0
+        grid_target = feedback_grid_target
     elif pv_direct:
-        grid_target = pv_direct_target
+        grid_target = (
+            pv_direct_target if raw_grid_target >= 0 else feedback_grid_target
+        )
     else:
         grid_target = feedback_grid_target
 
     min_grid = -cfg.grid_limit
     max_grid = cfg.grid_limit
-    if charge_active and active_mode in (MODE_GRID, MODE_PV_GRID):
-        min_grid = -grid_charge_request
-    if pv_direct or charge_blocked or (load_backfeed > 0 and raw_grid_target >= 0):
+    if charge_active and active_mode == MODE_GRID:
+        min_grid = -cfg.grid_charge_limit
+    elif charge_active and active_mode == MODE_PV_GRID:
+        min_grid = -min(grid_charge_request, cfg.grid_charge_limit)
+    elif charge_active and active_mode == MODE_PV_PRIORITY:
+        min_grid = -ac_charge_cap
+        max_grid = 0.0
+    elif pv_direct:
+        min_grid = -ac_charge_cap
+        max_grid = pv_direct_target
+    if charge_blocked or (load_backfeed > 0 and raw_grid_target >= 0):
         min_grid = 0.0
+    if not charge_active and (not ac_enabled or not cfg.ac_pv_release_allowed):
+        min_grid = max(min_grid, 0.0)
     if discharge_blocked:
         max_grid = 0.0
     grid_target = clamp(grid_target, min_grid, max_grid)
@@ -471,9 +538,13 @@ def calculate_control(data: ControlInput, cfg: ControlSettings) -> ControlResult
     else:
         inverter_target = raw_is_target
     if discharge_blocked:
-        inverter_target = min(inverter_target, max(data.pv_power, 0.0))
+        inverter_target = min(inverter_target, dc_pv_power)
     inverter_target = clamp(inverter_target, 0.0, cfg.inverter_limit)
 
+    pv_available_for_charge = (
+        (cfg.pv_release_allowed and dc_pv_power > 0)
+        or (cfg.ac_pv_release_allowed and available_ac_surplus > 0)
+    )
     if target_reached:
         status = "target_reached"
     elif charge_active:
@@ -482,6 +553,52 @@ def calculate_control(data: ControlInput, cfg: ControlSettings) -> ControlResult
         status = "minimum_soc_hold"
     else:
         status = cfg.base_mode
+
+    if target_reached:
+        mode_state = "target_reached"
+    elif discharge_blocked and not charge_active:
+        mode_state = "minimum_soc_hold"
+    elif charge_active and active_mode in (MODE_PV_SURPLUS, MODE_PV_PRIORITY):
+        mode_state = "charging" if pv_available_for_charge else "waiting_for_pv"
+    elif charge_active:
+        mode_state = "charging"
+    else:
+        mode_state = "normal"
+
+    dc_active = dc_enabled and dc_pv_power > 0 and (
+        cfg.pv_release_allowed or active_mode not in (MODE_PV_SURPLUS, BASE_PV_SURPLUS)
+    )
+    ac_active = (
+        ac_enabled
+        and cfg.ac_pv_release_allowed
+        and available_ac_surplus > 0
+    )
+    if dc_active and ac_active:
+        active_coupling = COUPLING_HYBRID
+    elif dc_active:
+        active_coupling = COUPLING_DC
+    elif ac_active:
+        active_coupling = COUPLING_AC
+    else:
+        active_coupling = "none"
+
+    grid_source = charge_active and (
+        active_mode == MODE_GRID
+        or (active_mode == MODE_PV_GRID and grid_charge_request > 0)
+    )
+    dc_battery_contribution = max(dc_pv_power - inverter_target, 0.0)
+    pv_source = (
+        (charge_active and (dc_battery_contribution > 0 or ac_active))
+        or (not charge_active and grid_target < 0 and ac_active)
+    )
+    if grid_source and pv_source:
+        energy_source = "pv_and_grid"
+    elif grid_source:
+        energy_source = "grid"
+    elif pv_source:
+        energy_source = "pv"
+    else:
+        energy_source = "none"
 
     return ControlResult(
         recommended_grid_setpoint=round(grid_target),
@@ -493,4 +610,13 @@ def calculate_control(data: ControlInput, cfg: ControlSettings) -> ControlResult
         target_reached=target_reached,
         charge_blocked=charge_blocked,
         discharge_blocked=discharge_blocked,
+        selected_mode=selected_mode,
+        selected_coupling_mode=coupling,
+        active_coupling_mode=active_coupling,
+        active_energy_source=energy_source,
+        mode_state=mode_state,
+        dc_pv_power=round(dc_pv_power, 1),
+        ac_pv_power=round(ac_pv_power, 1),
+        available_ac_surplus=round(available_ac_surplus, 1),
+        effective_public_grid_target=round(effective_public_grid_target, 1),
     )

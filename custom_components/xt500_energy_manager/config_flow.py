@@ -12,6 +12,8 @@ from homeassistant.core import callback
 from homeassistant.helpers import device_registry as dr, entity_registry as er, selector
 
 from .const import (
+    CONF_AC_PV_POWER_ENTITY,
+    CONF_AC_PV_SIGN,
     CONF_BATTERY_INPUT_POWER_ENTITY,
     CONF_BATTERY_OUTPUT_POWER_ENTITY,
     CONF_GRID_PORT_POWER_ENTITY,
@@ -29,6 +31,8 @@ from .const import (
     DOMAIN,
     METER_IMPORT_POSITIVE,
     METER_SIGNS,
+    PV_PRODUCTION_POSITIVE,
+    PV_SIGNS,
 )
 from .entity_mapping import detect_xt500_entities
 
@@ -50,14 +54,13 @@ def _manual_schema(defaults: dict[str, Any] | None = None) -> vol.Schema:
         return vol.Required(key)
 
     def optional(key: str) -> vol.Optional:
-        if key in values and values[key]:
-            return vol.Optional(key, default=values[key])
         return vol.Optional(key)
 
     return vol.Schema(
         {
             required(CONF_SOC_ENTITY): _entity_selector("sensor"),
             required(CONF_PV_POWER_ENTITY): _entity_selector("sensor"),
+            optional(CONF_AC_PV_POWER_ENTITY): _entity_selector("sensor"),
             required(CONF_GRID_POWER_ENTITY): _entity_selector("sensor"),
             required(CONF_GRID_PORT_POWER_ENTITY): _entity_selector("sensor"),
             required(CONF_LOAD_PORT_POWER_ENTITY): _entity_selector("sensor"),
@@ -75,17 +78,30 @@ def _manual_schema(defaults: dict[str, Any] | None = None) -> vol.Schema:
                     mode=selector.SelectSelectorMode.DROPDOWN,
                 )
             ),
+            required(
+                CONF_AC_PV_SIGN, PV_PRODUCTION_POSITIVE
+            ): selector.SelectSelector(
+                selector.SelectSelectorConfig(
+                    options=list(PV_SIGNS),
+                    translation_key="ac_pv_sign",
+                    mode=selector.SelectSelectorMode.DROPDOWN,
+                )
+            ),
         }
     )
 
 
 def _automatic_schema(defaults: dict[str, Any] | None = None) -> vol.Schema:
     values = defaults or {}
+    ac_pv_marker = vol.Optional(CONF_AC_PV_POWER_ENTITY)
     schema: dict[vol.Marker, Any] = {
         vol.Required(CONF_XT500_DEVICE): selector.DeviceSelector(
             selector.DeviceSelectorConfig(integration="sunenergyxt")
         ),
         vol.Required(CONF_GRID_POWER_ENTITY): selector.EntitySelector(
+            selector.EntitySelectorConfig(domain="sensor", device_class="power")
+        ),
+        ac_pv_marker: selector.EntitySelector(
             selector.EntitySelectorConfig(domain="sensor", device_class="power")
         ),
         vol.Required(
@@ -95,6 +111,16 @@ def _automatic_schema(defaults: dict[str, Any] | None = None) -> vol.Schema:
             selector.SelectSelectorConfig(
                 options=list(METER_SIGNS),
                 translation_key="meter_sign",
+                mode=selector.SelectSelectorMode.DROPDOWN,
+            )
+        ),
+        vol.Required(
+            CONF_AC_PV_SIGN,
+            default=values.get(CONF_AC_PV_SIGN, PV_PRODUCTION_POSITIVE),
+        ): selector.SelectSelector(
+            selector.SelectSelectorConfig(
+                options=list(PV_SIGNS),
+                translation_key="ac_pv_sign",
                 mode=selector.SelectSelectorMode.DROPDOWN,
             )
         ),
@@ -138,17 +164,21 @@ def _detect_device_data(
         except ValueError:
             return None, "grid_meter_not_numeric"
 
-    return {
+    data = {
         **detected,
         CONF_GRID_POWER_ENTITY: grid_entity,
         CONF_METER_SIGN: user_input[CONF_METER_SIGN],
-    }, None
+        CONF_AC_PV_SIGN: user_input[CONF_AC_PV_SIGN],
+    }
+    if ac_pv_entity := user_input.get(CONF_AC_PV_POWER_ENTITY):
+        data[CONF_AC_PV_POWER_ENTITY] = ac_pv_entity
+    return data, None
 
 
 class XT500EnergyManagerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle XT500 Energy Manager setup."""
 
-    VERSION = 3
+    VERSION = 4
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         return self.async_show_menu(
@@ -214,7 +244,9 @@ class XT500OptionsFlow(config_entries.OptionsFlow):
             errors["base"] = error or "unknown"
         return self.async_show_form(
             step_id="automatic",
-            data_schema=_automatic_schema(dict(self.config_entry.data)),
+            data_schema=self.add_suggested_values_to_schema(
+                _automatic_schema(), dict(self.config_entry.data)
+            ),
             errors=errors,
         )
 
@@ -228,5 +260,7 @@ class XT500OptionsFlow(config_entries.OptionsFlow):
             return self.async_create_entry(title="", data={})
         return self.async_show_form(
             step_id="manual",
-            data_schema=_manual_schema(dict(self.config_entry.data)),
+            data_schema=self.add_suggested_values_to_schema(
+                _manual_schema(), dict(self.config_entry.data)
+            ),
         )

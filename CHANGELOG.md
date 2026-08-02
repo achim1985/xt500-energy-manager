@@ -1,5 +1,37 @@
 # Änderungsprotokoll
 
+## 1.9.0 – 2026-08-02
+
+- AC-gekoppelte PV wird in Normalbetrieb, manueller Zielladung,
+  Zyklusladung und Tarifladung durchgängig berücksichtigt
+- der öffentliche Stromzähler bleibt alleinige Sicherheits- und
+  Regelungsgrundlage; ein externer AC-PV-Leistungssensor ist optional
+- klare Auswahl der PV-Berücksichtigung: Hybrid, nur XT500-PV oder nur
+  externe AC-PV; die zuvor gleichwirkenden Auswahlwerte Automatisch und Hybrid
+  sind ohne Funktionsverlust zusammengeführt
+- getrennte DC- und AC-Hysteresen verhindern gegenseitige Freigaben und
+  Flattern bei geringer Leistung
+- Netzladung bezeichnet den gewünschten öffentlichen Netzanteil; bei
+  **PV + Netz** bleibt die Ladeleistung dagegen das gesamte Ladeziel
+- eindeutige Statuswerte für aktiven Vorgang, ausgewählten und aktiven
+  Lademodus, Moduszustand, ausgewählte und aktive Kopplung sowie Ladequelle
+- adaptive Regelabweichung verwendet den zum aktiven Modus gehörenden
+  öffentlichen Netz-Sollwert und behandelt beabsichtigte Ladung nicht als Fehler
+- Dashboard und Diagnose zeigen DC-PV, optionale AC-PV und verfügbaren
+  AC-Überschuss getrennt
+- eindeutige Begriffe trennen externe AC-PV-Erzeugung, den am Netzanschluss
+  tatsächlich verfügbaren AC-PV-Überschuss und die wirkliche Akkuladequelle
+- bei der optionalen externen AC-PV-Quelle kann getrennt ausgewählt werden, ob
+  Erzeugung als positiver oder negativer Wert gemeldet wird
+- eine nicht mehr verwendete optionale AC-PV-Quelle kann in den Optionen wieder
+  vollständig entfernt werden; der Optionsdialog ist mit Home Assistant 2026.7
+  kompatibel
+- im reinen XT500-PV-Betrieb blendet das Dashboard die nicht verwendeten
+  AC-PV-Leistungsflüsse aus
+- der nur intern benötigte Rückmeldungs-Handshake bleibt in den Diagnosedaten,
+  wird aber nicht mehr als Binärsensor angelegt; dadurch entfallen tausende
+  unnötige Recorder-Zustandswechsel pro Tag
+
 ## 1.8.1 – 2026-07-30
 
 - die Entladegrenze des Energiemanagers verwendet jetzt direkt die originale

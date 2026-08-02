@@ -10,8 +10,10 @@ from . import XT500ConfigEntry
 from .const import (
     BASE_MODES,
     CHARGE_MODES,
+    COUPLING_MODES,
     SETTING_AUTO_MODE,
     SETTING_BASE_MODE,
+    SETTING_COUPLING_MODE,
     SETTING_MANUAL_MODE,
 )
 from .entity import XT500Entity
@@ -21,6 +23,7 @@ SELECTS = (
     SelectEntityDescription(key=SETTING_MANUAL_MODE, translation_key="manual_mode", icon="mdi:tune", options=CHARGE_MODES),
     SelectEntityDescription(key=SETTING_AUTO_MODE, translation_key="automatic_mode", icon="mdi:tune-variant", options=CHARGE_MODES),
     SelectEntityDescription(key=SETTING_BASE_MODE, translation_key="base_mode", icon="mdi:transmission-tower-export", options=BASE_MODES),
+    SelectEntityDescription(key=SETTING_COUPLING_MODE, translation_key="coupling_mode", icon="mdi:connection", options=COUPLING_MODES),
 )
 
 

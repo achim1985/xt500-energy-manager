@@ -22,6 +22,8 @@ from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
 from .const import (
+    CONF_AC_PV_POWER_ENTITY,
+    CONF_AC_PV_SIGN,
     CONF_BATTERY_INPUT_POWER_ENTITY,
     CONF_BATTERY_OUTPUT_POWER_ENTITY,
     CONF_GRID_PORT_POWER_ENTITY,
@@ -38,12 +40,14 @@ from .const import (
     DOMAIN,
     INPUT_LABELS,
     METER_EXPORT_POSITIVE,
+    PV_PRODUCTION_NEGATIVE,
     SETTING_AUTO_ENABLED,
     SETTING_AUTO_MODE,
     SETTING_AUTO_TARGET_SOC,
     SETTING_AUTOMATIC_RECOVERY_ENABLED,
     SETTING_BASE_MODE,
     SETTING_CHARGE_POWER,
+    SETTING_COUPLING_MODE,
     SETTING_CONTROL_FAST_INTERVAL,
     SETTING_CONTROL_LARGE_ERROR,
     SETTING_CONTROL_LARGE_MAX_STEP,
@@ -86,10 +90,12 @@ from .controller import (
     ControlSettings,
     calculate_control,
     cycle_is_due,
+    decode_signed_16,
     feedback_samples_are_fresh,
     limit_setpoint_change,
     net_battery_flows,
     next_cycle_check_at,
+    normalize_pv_production,
     overall_control_error,
     RECOVERY_DELAY_MULTIPLIERS,
     recovery_delay_seconds,
@@ -123,6 +129,7 @@ class XT500Runtime:
         self.result: ControlResult | None = None
         self.data_valid = False
         self.charge_request_active = False
+        self.active_charge_source = "none"
         self.active_target_soc: float | None = None
         self.desired_charge_limit: float | None = None
         self.invalid_entities: list[str] = []
@@ -137,6 +144,8 @@ class XT500Runtime:
         self.last_transient_write_recovery: str | None = None
         self.transient_write_timeouts = 0
         self.communication_pause_message: str | None = None
+        self.ac_pv_input_valid = True
+        self.ac_pv_input_issue: dict[str, str] | None = None
 
         self._data_valid_since_monotonic: float | None = None
         self._ha_started = hass.is_running
@@ -168,6 +177,10 @@ class XT500Runtime:
         self._pv_above_start_since: float | None = None
         self._pv_release_due_monotonic: float | None = None
         self._pv_release_task: asyncio.Task | None = None
+        self._ac_pv_release_active = False
+        self._ac_pv_above_start_since: float | None = None
+        self._ac_pv_release_due_monotonic: float | None = None
+        self._ac_pv_release_task: asyncio.Task | None = None
         self._store = Store(hass, 1, f"{DOMAIN}.{entry.entry_id}")
 
     @property
@@ -178,6 +191,7 @@ class XT500Runtime:
             for key in (
                 CONF_SOC_ENTITY,
                 CONF_PV_POWER_ENTITY,
+                CONF_AC_PV_POWER_ENTITY,
                 CONF_GRID_POWER_ENTITY,
                 CONF_GRID_PORT_POWER_ENTITY,
                 CONF_LOAD_PORT_POWER_ENTITY,
@@ -200,6 +214,9 @@ class XT500Runtime:
             self.settings.update(
                 {key: stored[key] for key in DEFAULT_SETTINGS if key in stored}
             )
+            if self.settings[SETTING_COUPLING_MODE] == "hybrid":
+                self.settings[SETTING_COUPLING_MODE] = "automatic"
+                migrated = True
             if (
                 SETTING_FEEDBACK_SETTLE_TIME not in stored
                 and "live_write_interval" in stored
@@ -270,6 +287,7 @@ class XT500Runtime:
                 self._control_apply_task,
                 self._startup_ready_task,
                 self._pv_release_task,
+                self._ac_pv_release_task,
                 self._recovery_task,
                 self._communication_pause_task,
             )
@@ -282,6 +300,7 @@ class XT500Runtime:
         self._control_apply_task = None
         self._startup_ready_task = None
         self._pv_release_task = None
+        self._ac_pv_release_task = None
         self._recovery_task = None
         self._communication_pause_task = None
         if self._unsub_started:
@@ -418,6 +437,29 @@ class XT500Runtime:
                 continue
             values[key] = self._float_state(entity_id)
 
+        ac_pv_power = 0.0
+        ac_pv_entity = self.entry.data.get(CONF_AC_PV_POWER_ENTITY)
+        self.ac_pv_input_issue = None
+        self.ac_pv_input_valid = True
+        if ac_pv_entity:
+            self.ac_pv_input_issue = self._input_issue(
+                CONF_AC_PV_POWER_ENTITY, ac_pv_entity
+            )
+            if self.ac_pv_input_issue is None:
+                raw_ac_pv = self._float_state(ac_pv_entity) or 0.0
+                ac_pv_power = normalize_pv_production(
+                    raw_ac_pv,
+                    production_negative=(
+                        self.entry.data.get(CONF_AC_PV_SIGN)
+                        == PV_PRODUCTION_NEGATIVE
+                    ),
+                )
+            else:
+                # The optional source improves display and plausibility only.
+                # Public-grid feedback remains authoritative and keeps control
+                # operational when this sensor is temporarily unavailable.
+                self.ac_pv_input_valid = False
+
         self.data_valid = not self.invalid_entities
         if not self.data_valid:
             signature = tuple(
@@ -456,11 +498,10 @@ class XT500Runtime:
             self._data_valid_since_monotonic = None
             self._recovery_stable_since_monotonic = None
             self._next_recovery_attempt = None
-            self._cancel_pv_release_timer()
-            self._pv_release_active = False
-            self._pv_above_start_since = None
+            self._reset_pv_release_gates()
             self.result = None
             self.charge_request_active = False
+            self.active_charge_source = "none"
             self.active_target_soc = None
             self.desired_charge_limit = None
             self._control_apply_requested = False
@@ -478,18 +519,26 @@ class XT500Runtime:
         if not self.regulation_enabled:
             self._cancel_recovery_task()
             self._recovery_status = "disabled"
-            self._cancel_pv_release_timer()
-            self._pv_release_active = False
-            self._pv_above_start_since = None
+            self._reset_pv_release_gates()
             self.result = None
             self.charge_request_active = False
+            self.active_charge_source = "none"
             self.active_target_soc = None
             self.desired_charge_limit = None
             self._control_apply_requested = False
             self._notify()
             return
 
-        self._update_pv_release(values[CONF_PV_POWER_ENTITY])
+        normalized_grid = (
+            values[CONF_GRID_POWER_ENTITY]
+            if self.entry.data[CONF_METER_SIGN] == METER_EXPORT_POSITIVE
+            else -values[CONF_GRID_POWER_ENTITY]
+        )
+        grid_port = decode_signed_16(values[CONF_GRID_PORT_POWER_ENTITY])
+        available_ac_surplus = max(-(grid_port - normalized_grid), 0.0)
+        self._update_pv_release_gates(
+            values[CONF_PV_POWER_ENTITY], available_ac_surplus
+        )
 
         manual_active = bool(self.settings[SETTING_MANUAL_ACTIVE])
         manual_target = float(self.settings[SETTING_TARGET_SOC])
@@ -523,6 +572,7 @@ class XT500Runtime:
             tariff_charge_power=float(self.settings[SETTING_TARIFF_CHARGE_POWER]),
         )
         self.charge_request_active = charge_request.active
+        self.active_charge_source = charge_request.source
         self.active_target_soc = (
             charge_request.target_soc if charge_request.active else None
         )
@@ -549,6 +599,16 @@ class XT500Runtime:
         elif values[CONF_SOC_ENTITY] >= minimum_soc + hysteresis:
             self._low_soc_hold = False
 
+        grid_setpoint_state = self.hass.states.get(
+            self.entry.data[CONF_GRID_SETPOINT_ENTITY]
+        )
+        grid_charge_limit = abs(
+            min(
+                float(grid_setpoint_state.attributes.get("min", -2400)),
+                0.0,
+            )
+        )
+
         self.result = calculate_control(
             ControlInput(
                 soc=values[CONF_SOC_ENTITY],
@@ -558,6 +618,7 @@ class XT500Runtime:
                 load_port_power=values[CONF_LOAD_PORT_POWER_ENTITY],
                 current_grid_setpoint=values[CONF_GRID_SETPOINT_ENTITY],
                 current_inverter_setpoint=values[CONF_INVERTER_SETPOINT_ENTITY],
+                ac_pv_power=ac_pv_power,
             ),
             ControlSettings(
                 charge_active=charge_request.active,
@@ -571,11 +632,14 @@ class XT500Runtime:
                 charge_power=charge_request.charge_power,
                 target_grid_power=float(self.settings[SETTING_TARGET_GRID_POWER]),
                 grid_limit=float(self.settings[SETTING_MAX_GRID_OUTPUT]),
+                grid_charge_limit=grid_charge_limit,
                 inverter_limit=float(self.settings[SETTING_MAX_INVERTER_OUTPUT]),
                 meter_export_positive=(
                     self.entry.data[CONF_METER_SIGN] == METER_EXPORT_POSITIVE
                 ),
                 pv_release_allowed=self._pv_release_active,
+                ac_pv_release_allowed=self._ac_pv_release_active,
+                coupling_mode=self.settings[SETTING_COUPLING_MODE],
             ),
         )
         if self.control_ready:
@@ -912,58 +976,113 @@ class XT500Runtime:
 
     @property
     def pv_release_active(self) -> bool:
-        """Return whether PV-surplus output is released above the hysteresis."""
+        """Return whether direct XT500 PV is released above the hysteresis."""
         return self._pv_release_active
 
+    @property
+    def ac_pv_release_active(self) -> bool:
+        """Return whether reconstructed AC surplus passed the hysteresis."""
+        return self._ac_pv_release_active
+
     @callback
-    def _update_pv_release(self, pv_power: float) -> None:
-        """Update low-PV lockout and maintain its continuous-start timer."""
+    def _update_pv_release_gates(
+        self, dc_pv_power: float, ac_surplus_power: float
+    ) -> None:
+        """Update independent DC and AC gates so neither unlocks the other."""
+        self._update_pv_release_gate("dc", dc_pv_power)
+        self._update_pv_release_gate("ac", ac_surplus_power)
+
+    @callback
+    def _update_pv_release_gate(self, source: str, pv_power: float) -> None:
+        """Update one low-PV lockout and its continuous-start timer."""
         now = monotonic()
+        is_ac = source == "ac"
+        active = self._ac_pv_release_active if is_ac else self._pv_release_active
+        above_since = (
+            self._ac_pv_above_start_since
+            if is_ac
+            else self._pv_above_start_since
+        )
         decision = update_pv_release(
-            active=self._pv_release_active,
+            active=active,
             pv_power=pv_power,
             stop_power=float(self.settings[SETTING_PV_STOP_POWER]),
             start_power=float(self.settings[SETTING_PV_START_POWER]),
             start_delay=float(self.settings[SETTING_PV_START_DELAY]),
-            above_start_since=self._pv_above_start_since,
+            above_start_since=above_since,
             now=now,
         )
-        self._pv_release_active = decision.active
-        self._pv_above_start_since = decision.above_start_since
+        if is_ac:
+            self._ac_pv_release_active = decision.active
+            self._ac_pv_above_start_since = decision.above_start_since
+        else:
+            self._pv_release_active = decision.active
+            self._pv_above_start_since = decision.above_start_since
 
         if decision.remaining_delay is None:
-            self._cancel_pv_release_timer()
+            self._cancel_pv_release_timer(source)
             return
 
         due = now + decision.remaining_delay
+        task = self._ac_pv_release_task if is_ac else self._pv_release_task
+        scheduled_due = (
+            self._ac_pv_release_due_monotonic
+            if is_ac
+            else self._pv_release_due_monotonic
+        )
         if (
-            self._pv_release_task is not None
-            and not self._pv_release_task.done()
-            and self._pv_release_due_monotonic is not None
-            and abs(self._pv_release_due_monotonic - due) < 0.1
+            task is not None
+            and not task.done()
+            and scheduled_due is not None
+            and abs(scheduled_due - due) < 0.1
         ):
             return
-        self._cancel_pv_release_timer()
-        self._pv_release_due_monotonic = due
-        self._pv_release_task = self.hass.async_create_task(
-            self._async_pv_release_wait(decision.remaining_delay)
+        self._cancel_pv_release_timer(source)
+        new_task = self.hass.async_create_task(
+            self._async_pv_release_wait(source, decision.remaining_delay)
         )
+        if is_ac:
+            self._ac_pv_release_due_monotonic = due
+            self._ac_pv_release_task = new_task
+        else:
+            self._pv_release_due_monotonic = due
+            self._pv_release_task = new_task
 
-    async def _async_pv_release_wait(self, delay: float) -> None:
+    async def _async_pv_release_wait(self, source: str, delay: float) -> None:
         try:
             await asyncio.sleep(delay)
         except asyncio.CancelledError:
             return
-        self._pv_release_task = None
-        self._pv_release_due_monotonic = None
+        if source == "ac":
+            self._ac_pv_release_task = None
+            self._ac_pv_release_due_monotonic = None
+        else:
+            self._pv_release_task = None
+            self._pv_release_due_monotonic = None
         self.async_calculate()
 
     @callback
-    def _cancel_pv_release_timer(self) -> None:
-        if self._pv_release_task is not None and not self._pv_release_task.done():
-            self._pv_release_task.cancel()
-        self._pv_release_task = None
-        self._pv_release_due_monotonic = None
+    def _cancel_pv_release_timer(self, source: str) -> None:
+        is_ac = source == "ac"
+        task = self._ac_pv_release_task if is_ac else self._pv_release_task
+        if task is not None and not task.done():
+            task.cancel()
+        if is_ac:
+            self._ac_pv_release_task = None
+            self._ac_pv_release_due_monotonic = None
+        else:
+            self._pv_release_task = None
+            self._pv_release_due_monotonic = None
+
+    @callback
+    def _reset_pv_release_gates(self) -> None:
+        """Cancel both independent gate timers and reset their state."""
+        self._cancel_pv_release_timer("dc")
+        self._cancel_pv_release_timer("ac")
+        self._pv_release_active = False
+        self._pv_above_start_since = None
+        self._ac_pv_release_active = False
+        self._ac_pv_above_start_since = None
 
     @property
     def control_error(self) -> float:
@@ -978,7 +1097,7 @@ class XT500Runtime:
             return 0.0
         return overall_control_error(
             public_grid_power=self.result.normalized_grid_power,
-            public_grid_target=float(self.settings[SETTING_TARGET_GRID_POWER]),
+            public_grid_target=self.result.effective_public_grid_target,
             current_grid_setpoint=current_grid,
             requested_grid_setpoint=self.result.recommended_grid_setpoint,
             current_inverter_setpoint=current_inverter,

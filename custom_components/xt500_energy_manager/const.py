@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Final
 
 DOMAIN: Final = "xt500_energy_manager"
-VERSION: Final = "1.8.1"
+VERSION: Final = "1.9.0"
 PLATFORMS: Final = (
     "sensor",
     "binary_sensor",
@@ -18,6 +18,7 @@ PLATFORMS: Final = (
 
 CONF_SOC_ENTITY: Final = "soc_entity"
 CONF_PV_POWER_ENTITY: Final = "pv_power_entity"
+CONF_AC_PV_POWER_ENTITY: Final = "ac_pv_power_entity"
 CONF_GRID_POWER_ENTITY: Final = "grid_power_entity"
 CONF_GRID_PORT_POWER_ENTITY: Final = "grid_port_power_entity"
 CONF_LOAD_PORT_POWER_ENTITY: Final = "load_port_power_entity"
@@ -33,11 +34,13 @@ CONF_GRID_CHARGE_DAILY_ENERGY_ENTITY: Final = "grid_charge_daily_energy_entity"
 CONF_GRID_EXPORT_DAILY_ENERGY_ENTITY: Final = "grid_export_daily_energy_entity"
 CONF_OFFGRID_DAILY_ENERGY_ENTITY: Final = "offgrid_daily_energy_entity"
 CONF_METER_SIGN: Final = "meter_sign"
+CONF_AC_PV_SIGN: Final = "ac_pv_sign"
 CONF_XT500_DEVICE: Final = "xt500_device"
 
 INPUT_LABELS: Final = {
     CONF_SOC_ENTITY: "Speicherstand (SOC)",
-    CONF_PV_POWER_ENTITY: "PV-Gesamteingangsleistung",
+    CONF_PV_POWER_ENTITY: "PV direkt am XT500",
+    CONF_AC_PV_POWER_ENTITY: "PV-Leistung über AC (optional)",
     CONF_GRID_POWER_ENTITY: "Öffentlicher Netzanschlusspunkt",
     CONF_GRID_PORT_POWER_ENTITY: "XT500-Netzanschluss",
     CONF_LOAD_PORT_POWER_ENTITY: "XT500-Lastanschluss",
@@ -51,6 +54,10 @@ METER_IMPORT_POSITIVE: Final = "import_positive"
 METER_EXPORT_POSITIVE: Final = "export_positive"
 METER_SIGNS: Final = (METER_IMPORT_POSITIVE, METER_EXPORT_POSITIVE)
 
+PV_PRODUCTION_POSITIVE: Final = "production_positive"
+PV_PRODUCTION_NEGATIVE: Final = "production_negative"
+PV_SIGNS: Final = (PV_PRODUCTION_POSITIVE, PV_PRODUCTION_NEGATIVE)
+
 MODE_GRID: Final = "grid_charge"
 MODE_PV_SURPLUS: Final = "pv_surplus"
 MODE_PV_PRIORITY: Final = "pv_priority"
@@ -60,6 +67,16 @@ CHARGE_MODES: Final = (MODE_GRID, MODE_PV_SURPLUS, MODE_PV_PRIORITY, MODE_PV_GRI
 BASE_NORMAL: Final = "normal"
 BASE_PV_SURPLUS: Final = "pv_surplus"
 BASE_MODES: Final = (BASE_NORMAL, BASE_PV_SURPLUS)
+
+COUPLING_AUTO: Final = "automatic"
+COUPLING_DC: Final = "dc"
+COUPLING_AC: Final = "ac"
+COUPLING_HYBRID: Final = "hybrid"
+COUPLING_MODES: Final = (
+    COUPLING_AUTO,
+    COUPLING_DC,
+    COUPLING_AC,
+)
 
 SETTING_MANUAL_ACTIVE: Final = "manual_active"
 SETTING_TARIFF_ACTIVE: Final = "tariff_active"
@@ -87,6 +104,7 @@ SETTING_SHOW_ADVANCED: Final = "show_advanced"
 SETTING_MANUAL_MODE: Final = "manual_mode"
 SETTING_AUTO_MODE: Final = "automatic_mode"
 SETTING_BASE_MODE: Final = "base_mode"
+SETTING_COUPLING_MODE: Final = "coupling_mode"
 SETTING_TARGET_SOC: Final = "target_soc"
 SETTING_AUTO_TARGET_SOC: Final = "automatic_target_soc"
 SETTING_NORMAL_CHARGE_LIMIT: Final = "normal_charge_limit"
@@ -130,6 +148,7 @@ DEFAULT_SETTINGS: Final = {
     SETTING_MANUAL_MODE: MODE_PV_PRIORITY,
     SETTING_AUTO_MODE: MODE_PV_PRIORITY,
     SETTING_BASE_MODE: BASE_NORMAL,
+    SETTING_COUPLING_MODE: COUPLING_AUTO,
     SETTING_TARGET_SOC: 100.0,
     SETTING_AUTO_TARGET_SOC: 100.0,
     SETTING_NORMAL_CHARGE_LIMIT: 100.0,

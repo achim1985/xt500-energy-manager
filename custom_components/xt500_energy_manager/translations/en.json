@@ -12,16 +12,20 @@
       },
       "automatic": {
         "title": "Set up XT500 automatically",
-        "description": "Select your SunEnergy XT500 device. Its original battery, power and setpoint entities are detected automatically. Only the external grid meter remains manual.",
+        "description": "Select your SunEnergy XT500 device. Its original entities are detected automatically. The public grid meter and optional AC PV power remain manual.",
         "data": {
           "xt500_device": "SunEnergy XT500 device",
           "grid_power_entity": "Total power at the public grid connection",
-          "meter_sign": "Public meter sign convention"
+          "meter_sign": "Public meter sign convention",
+          "ac_pv_power_entity": "External AC PV production (optional)",
+          "ac_pv_sign": "AC PV sign convention"
         },
         "data_description": {
           "xt500_device": "The device must come from the previously installed SunEnergyXT 500 Series integration.",
           "grid_power_entity": "Total active power of the home, for example from a Shelly Pro 3EM. Do not select one phase or an XT500 port value.",
-          "meter_sign": "Use a current reading to verify which sign your meter reports during grid import."
+          "meter_sign": "Use a current reading to verify which sign your meter reports during grid import.",
+          "ac_pv_power_entity": "Optional power sensor of an AC-coupled inverter. Control remains operational without it by using the public meter.",
+          "ac_pv_sign": "Select whether AC PV production is reported as positive or negative."
         }
       },
       "manual": {
@@ -29,7 +33,8 @@
         "description": "Expert mode: Production control writes all setpoints directly to the selected device entities.",
         "data": {
           "soc_entity": "Battery state of charge",
-          "pv_power_entity": "Total PV input power",
+          "pv_power_entity": "PV power directly at the XT500",
+          "ac_pv_power_entity": "External AC PV production (optional)",
           "grid_power_entity": "Power at the public grid connection",
           "grid_port_power_entity": "XT500 grid-port system power",
           "load_port_power_entity": "XT500 load-port system power",
@@ -40,7 +45,8 @@
           "load_discharge_limit_entity": "System load-port discharge limit",
           "battery_input_power_entity": "Battery charging power (total input)",
           "battery_output_power_entity": "Battery discharging power (total output)",
-          "meter_sign": "Public meter sign convention"
+          "meter_sign": "Public meter sign convention",
+          "ac_pv_sign": "AC PV sign convention"
         }
       }
     },
@@ -59,6 +65,12 @@
         "import_positive": "Grid import is positive",
         "export_positive": "Grid export is positive"
       }
+    },
+    "ac_pv_sign": {
+      "options": {
+        "production_positive": "Production positive, e.g. +350 W",
+        "production_negative": "Production negative, e.g. -350 W"
+      }
     }
   },
   "options": {
@@ -73,16 +85,20 @@
       },
       "automatic": {
         "title": "Detect XT500 entities automatically",
-        "description": "The original entities of the selected SunEnergy XT500 device are used. Select the external total grid meter separately.",
+        "description": "The original entities of the selected SunEnergy XT500 device are used. Select the public grid meter and optional AC PV power separately.",
         "data": {
           "xt500_device": "SunEnergy XT500 device",
           "grid_power_entity": "Total power at the public grid connection",
-          "meter_sign": "Public meter sign convention"
+          "meter_sign": "Public meter sign convention",
+          "ac_pv_power_entity": "External AC PV production (optional)",
+          "ac_pv_sign": "AC PV sign convention"
         },
         "data_description": {
           "xt500_device": "The device must come from the previously installed SunEnergyXT 500 Series integration.",
           "grid_power_entity": "Total active power of the home, for example from a Shelly Pro 3EM. Do not select one phase or an XT500 port value.",
-          "meter_sign": "Use a current reading to verify which sign your meter reports during grid import."
+          "meter_sign": "Use a current reading to verify which sign your meter reports during grid import.",
+          "ac_pv_power_entity": "Optional power sensor of an AC-coupled inverter. Its failure does not stop control.",
+          "ac_pv_sign": "Select whether AC PV production is reported as positive or negative."
         }
       },
       "manual": {
@@ -90,7 +106,8 @@
         "description": "Expert mode: Production control writes all setpoints directly to the selected device entities.",
         "data": {
           "soc_entity": "Battery state of charge",
-          "pv_power_entity": "Total PV input power",
+          "pv_power_entity": "PV power directly at the XT500",
+          "ac_pv_power_entity": "External AC PV production (optional)",
           "grid_power_entity": "Power at the public grid connection",
           "grid_port_power_entity": "XT500 grid-port system power",
           "load_port_power_entity": "XT500 load-port system power",
@@ -101,7 +118,8 @@
           "load_discharge_limit_entity": "System load-port discharge limit",
           "battery_input_power_entity": "Battery charging power (total input)",
           "battery_output_power_entity": "Battery discharging power (total output)",
-          "meter_sign": "Public meter sign convention"
+          "meter_sign": "Public meter sign convention",
+          "ac_pv_sign": "AC PV sign convention"
         }
       }
     },
@@ -170,6 +188,32 @@
           "pv_and_grid": "PV and grid"
         }
       },
+      "selected_mode": {
+        "name": "Selected charging mode",
+        "state": { "normal": "Normal operation", "grid_charge": "Grid charging", "pv_surplus": "PV surplus", "pv_priority": "PV priority", "pv_and_grid": "PV and grid" }
+      },
+      "active_operation": {
+        "name": "Active operation",
+        "state": { "normal": "Normal operation", "manual": "Manual target charge", "cycle_manual": "Manual cycle charge", "cycle_automatic": "Automatic cycle charge", "tariff": "Tariff charge" }
+      },
+      "mode_state": {
+        "name": "Charging mode state",
+        "state": { "normal": "Normal operation", "charging": "Charging", "waiting_for_pv": "Waiting for sufficient PV", "target_reached": "Charge target reached", "minimum_soc_hold": "Discharge locked" }
+      },
+      "selected_coupling_mode": {
+        "name": "Selected PV sources",
+        "state": { "automatic": "Hybrid", "dc": "XT500 PV only", "ac": "External AC PV only" }
+      },
+      "active_coupling_mode": {
+        "name": "Currently usable PV source",
+        "state": { "none": "None", "dc": "XT500 PV", "ac": "External AC PV", "hybrid": "XT500 PV and external AC PV" }
+      },
+      "active_energy_source": {
+        "name": "Actual charging source",
+        "state": { "none": "No charging", "pv": "PV", "grid": "Grid", "pv_and_grid": "PV and grid" }
+      },
+      "ac_pv_power": { "name": "External AC PV production" },
+      "available_ac_surplus": { "name": "AC PV surplus at grid connection" },
       "recommended_grid_setpoint": { "name": "Grid-port setpoint" },
       "recommended_inverter_setpoint": { "name": "Inverter ceiling" },
       "estimated_home_load": { "name": "Estimated home load" },
@@ -212,8 +256,9 @@
       "charge_request": { "name": "Charge request active" },
       "tariff_request": { "name": "Tariff charge request active" },
       "control_ready": { "name": "Production control ready" },
-      "feedback_ready": { "name": "Fresh feedback received" },
-      "pv_release_active": { "name": "PV output released" }
+      "pv_release_active": { "name": "DC PV output released" },
+      "ac_pv_release_active": { "name": "AC PV surplus released" },
+      "ac_pv_input_valid": { "name": "Optional AC PV sensor valid" }
     },
     "switch": {
       "regulation_enabled": { "name": "Energy manager enabled" },
@@ -235,6 +280,10 @@
       "base_mode": {
         "name": "Operation without target charging",
         "state": { "normal": "Normal operation", "pv_surplus": "PV surplus" }
+      },
+      "coupling_mode": {
+        "name": "PV sources used for control",
+        "state": { "automatic": "Hybrid (recommended)", "dc": "XT500 PV only", "ac": "External AC PV only" }
       }
     },
     "number": {

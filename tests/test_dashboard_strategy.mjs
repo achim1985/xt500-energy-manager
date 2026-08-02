@@ -72,6 +72,7 @@ const createLayoutHass = () => {
       ...managerState.attributes,
       source_soc_entity: "sensor.xt500_soc",
       source_pv_power_entity: "sensor.xt500_pv",
+      source_ac_pv_power_entity: "sensor.ac_pv",
       source_pv_daily_energy_entity: "sensor.xt500_pd",
       source_grid_charge_daily_energy_entity: "sensor.xt500_gd1",
       source_grid_export_daily_energy_entity: "sensor.xt500_gd2",
@@ -80,6 +81,7 @@ const createLayoutHass = () => {
   };
   hass.states["sensor.xt500_soc"] = { state: "72", attributes: {} };
   hass.states["sensor.xt500_pv"] = { state: "500", attributes: {} };
+  hass.states["sensor.ac_pv"] = { state: "-300", attributes: {} };
   for (const key of ["pd", "gd1", "gd2", "ld"]) {
     hass.states[`sensor.xt500_${key}`] = {
       state: "1.234",
@@ -88,6 +90,15 @@ const createLayoutHass = () => {
   }
   for (const key of [
     "recommended_grid_setpoint",
+    "selected_mode",
+    "active_mode",
+    "active_operation",
+    "mode_state",
+    "selected_coupling_mode",
+    "active_coupling_mode",
+    "active_energy_source",
+    "ac_pv_power",
+    "available_ac_surplus",
     "cycle_state",
     "battery_charge_power",
     "regulation_enabled",
@@ -101,6 +112,7 @@ const createLayoutHass = () => {
     "automatic_enabled",
     "cycle_start",
     "base_mode",
+    "coupling_mode",
     "show_advanced",
   ]) {
     hass.states[`sensor.xt500_${key}`] = {
@@ -118,6 +130,10 @@ const createLayoutHass = () => {
 const sectionHeadings = (view) => view.sections.map((section) =>
   section.cards[0].heading || section.cards[0].title,
 );
+
+test("zeigt den internen Rückmeldungs-Handshake nicht im Dashboard", () => {
+  assert.doesNotMatch(strategySource, /feedback_ready|Neue Rückmeldungen/);
+});
 
 test("bindet genau die ausgewählte Quellansicht als echten Reiter ein", async () => {
   const source = {
@@ -336,6 +352,49 @@ test("teilt die Speicheransicht standardmäßig in einzeln anordenbare Blöcke",
     "Normalbetrieb und Grenzen",
     "Adaptive Regelung",
   ]);
+});
+
+test("zeigt ausgewählte und aktive Lade- sowie Kopplungszustände genau einmal", async () => {
+  const result = await Strategy.generate({}, createLayoutHass());
+  const overview = result.views.find((view) => view.path === "speicher");
+  const settings = result.views.find((view) => view.path === "einstellungen");
+  const statusSection = overview.sections.find(
+    (section) => section.cards[0].heading === "Regelungsstatus",
+  );
+  const statusNames = statusSection.cards[1].entities.map((item) => item.name);
+
+  for (const name of [
+    "Aktiver Vorgang",
+    "Ausgewählter Lademodus",
+    "Aktiver Lademodus",
+    "Zustand des Lademodus",
+    "Gewählte PV-Berücksichtigung",
+    "Aktuell nutzbare PV-Quelle",
+    "Tatsächliche Ladequelle",
+  ]) {
+    assert.equal(statusNames.filter((value) => value === name).length, 1);
+  }
+
+  const allSettingCards = settings.sections.flatMap((section) => section.cards);
+  assert.equal(
+    allSettingCards.filter((card) => card.name === "PV für Regelung berücksichtigen").length,
+    1,
+  );
+});
+
+test("blendet AC-PV-Werte bei reiner XT500-PV-Auswahl aus", async () => {
+  const hass = createLayoutHass();
+  hass.states["sensor.xt500_coupling_mode"].state = "dc";
+  const result = await Strategy.generate({}, hass);
+  const overview = result.views.find((view) => view.path === "speicher");
+  const flows = overview.sections.find(
+    (section) => section.cards[0].heading === "Aktuelle Leistungsflüsse",
+  );
+  const flowNames = flows.cards.slice(1).map((card) => card.name);
+
+  assert.ok(flowNames.includes("XT500-PV-Erzeugung (DC)"));
+  assert.ok(!flowNames.includes("Externe AC-PV-Erzeugung"));
+  assert.ok(!flowNames.includes("AC-PV-Überschuss am Netzanschluss"));
 });
 
 test("wendet Reihenfolge und ausgeblendete Blöcke für beide Seiten an", async () => {

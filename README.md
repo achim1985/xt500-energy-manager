@@ -174,10 +174,16 @@ für die Regelung nicht erforderlich und werden deshalb im Expertenmodus nicht
 zusätzlich abgefragt. Fehlt einer dieser optionalen Sensoren, bleibt nur die
 entsprechende Kachel unter **Energie heute** ausgeblendet.
 
-Manuell bleiben nur:
+Manuell bleiben:
 
 - die **Gesamtleistung am öffentlichen Netzanschlusspunkt**
 - die dazu passende **Vorzeichenrichtung**
+- optional die **PV-Leistung über AC** und deren Vorzeichenrichtung
+
+Der AC-PV-Sensor ist nicht sicherheitskritisch. Die Integration rekonstruiert
+den nutzbaren AC-Überschuss aus öffentlichem Stromzähler und XT500-Netzport.
+Der optionale Sensor verbessert Anzeige und Diagnose; bei seinem Ausfall läuft
+die Regelung weiter. Der öffentliche Stromzähler bleibt maßgeblich.
 
 Die automatische Erkennung prüft, ob alle für die Regelung notwendigen
 Original-Entitäten am ausgewählten XT500 vorhanden sind. Falls die
@@ -190,7 +196,8 @@ Der Expertenmodus bietet weiterhin die vollständige manuelle Zuordnung:
 | Feld | Benötigte Entität |
 | --- | --- |
 | Speicherstand (SOC) | SunEnergyXT **System-Speicherlevel** (`SC`) |
-| PV-Gesamteingangsleistung | SunEnergyXT **PV-Gesamteingangsleistung** (`PV`) |
+| PV direkt am XT500 | SunEnergyXT **PV-Gesamteingangsleistung** (`PV`) |
+| PV-Leistung über AC (optional) | Leistungssensor eines externen AC-PV-Wechselrichters; Erzeugung darf positiv oder negativ gemeldet werden |
 | Leistung am öffentlichen Netzanschlusspunkt | Leistung des Hauszählers, zum Beispiel Gesamtwirkleistung eines Shelly Pro 3EM |
 | XT500-Systemleistung am Netzanschluss | SunEnergyXT **Systemleistung am Netzanschluss** (`GP`) |
 | XT500-Systemleistung am Lastanschluss | SunEnergyXT **Systemleistung am Lastanschluss** (`LP`) |
@@ -289,7 +296,7 @@ Neuladen auch im Energiemanager-Dashboard.
 5. Als URL exakt eintragen:
 
    ```text
-   /xt500_energy_manager/xt500-energy-dashboard-strategy.js?v=1.8.1
+   /xt500_energy_manager/xt500-energy-dashboard-strategy.js?v=1.9.0
    ```
 
 6. Als Ressourcentyp **JavaScript-Modul** auswählen.
@@ -434,34 +441,52 @@ XT500. Änderungen über SunEnergyXT und über das Energiemanager-Dashboard
 bleiben dadurch identisch. Die Wiederfreigabe-Hysterese gehört weiterhin nur
 zur Regelung des Energiemanagers.
 
+Die Einstellung **PV für Regelung berücksichtigen** bietet drei eindeutige
+Auswahlen: **Hybrid (empfohlen)** verwendet XT500-PV und AC-PV-Überschuss,
+**Nur XT500-PV** ausschließlich die direkt angeschlossenen Module und
+**Nur externe AC-PV** ausschließlich den am öffentlichen Netzanschluss
+erkannten AC-PV-Überschuss.
+
 ### PV-Überschuss
 
-Aktuelle PV-Leistung wird nur passend zum Hausverbrauch freigegeben. Nicht
-benötigte PV-Leistung kann im Akku bleiben. Eine absichtliche Netzladung wird
-nicht angefordert.
+DC-PV und rekonstruierter AC-PV-Überschuss werden genutzt, ohne absichtlich
+Netzstrom zu beziehen. Nicht benötigte direkt angeschlossene PV kann im Akku
+bleiben. Reicht PV nicht aus, wartet der Modus auch über mehrere Tage.
 
 ### PV-Vorrang
 
-Das Ladeziel wird ausschließlich mit PV verfolgt. Die Batterieentladung wird
-währenddessen zurückgehalten. Bei schlechten PV-Tagen bleibt die Anforderung
-über mehrere Tage aktiv, bis das Ziel erreicht ist.
+Das Ladeziel wird ausschließlich mit DC- und AC-PV verfolgt. Direkt am XT500
+angeschlossene PV bleibt bevorzugt für den Akku; AC-PV-Überschuss wird
+aufgenommen. Die Batterieentladung wird zurückgehalten und es wird kein
+absichtlicher Netzbezug erzeugt.
 
 ### Netzladung
 
-Der Speicher darf mit der eingestellten Ladeleistung aus dem Netz laden.
-Damit kann das Ziel auch nachts oder bei schlechtem Wetter erreicht werden.
+Die eingestellte Ladeleistung bezeichnet den gewünschten Anteil aus dem
+öffentlichen Netz. Vorhandener AC-PV-Überschuss kann zusätzlich laden. Beispiel:
+`1200 W` Netzanteil plus `600 W` AC-PV ergeben bis zu `1800 W`
+Batterieladung, sofern das Gerät dies unterstützt.
 Die Einstellung **Maximale Leistung ins Hausnetz** begrenzt diese Ladeleistung
 nicht. Der negative Ladesollwert wird nur durch die gewünschte Ladeleistung
 und den echten Wertebereich des ausgewählten Gerätes begrenzt.
 
 ### PV + Netz
 
-Die eingestellte Ladeleistung ist hier das Ziel für die gesamte Batterieladung.
-Zuerst wird der nach Versorgung des Hauses verbleibende PV-Anteil angerechnet.
-Nur die noch fehlende Leistung wird aus dem Netz angefordert. Beispiel:
-`1200 W` Ladeziel und `700 W` tatsächlich für den Akku verfügbare PV ergeben
-`500 W` Netzladung. Deckt PV das Ladeziel vollständig, wird keine Netzladung
-angefordert.
+Die eingestellte Ladeleistung ist das Ziel für die gesamte Batterieladung.
+DC- und AC-PV tragen dazu bei; nur der fehlende Anteil kommt aus dem Netz.
+Beispiel: `1200 W` Ladeziel und `600 W` AC-PV ergeben ungefähr `600 W`
+Netzbezug. AC-PV wird dabei nicht doppelt abgezogen.
+
+### Status: ausgewählt, aktiv und tatsächlich genutzt
+
+- **Aktiver Vorgang** zeigt, wer die Sollwerte exklusiv besitzt: Normalbetrieb,
+  manuelle Zielladung, manuelle oder automatische Zyklusladung oder Tarifladung.
+- **Ausgewählter Lademodus** zeigt die Einstellung; **Aktiver Lademodus** die
+  momentan wirksame Strategie. **Zustand des Lademodus** unterscheidet unter
+  anderem Laden und Warten auf ausreichende PV.
+- **Ausgewählter Kopplungsmodus** zeigt die Vorgabe. **Aktive Kopplung** zeigt
+  anhand der Messwerte DC, AC, DC + AC oder keine aktive PV.
+- **Aktuelle Ladequelle** unterscheidet PV, Netz, PV + Netz und keine Ladung.
 
 ### Dynamischer Stromtarif
 
@@ -664,7 +689,7 @@ Der separate **Zyklusstatus** unterscheidet:
   Eintrag neu laden oder Home Assistant neu starten. Die optionalen Sensoren
   werden bei jedem Laden der Integration erneut automatisch erkannt.
 - Im Strategy-Editor prüfen, ob der Block **Energie heute** ausgeblendet wurde.
-- Die Dashboard-Ressource auf `?v=1.8.1` setzen und Ressourcen beziehungsweise
+- Die Dashboard-Ressource auf `?v=1.9.0` setzen und Ressourcen beziehungsweise
   Browser vollständig neu laden.
 
 ### Eingangsdaten sind ungültig
@@ -686,9 +711,9 @@ Der separate **Zyklusstatus** unterscheidet:
 
 ## Projektstatus
 
-Version 1.8.1 ist der aktuelle veröffentlichte Stand. Gesucht werden
-Testerinnen und Tester mit unterschiedlichen XT500- und XT500-Pro-Systemen,
-Firmwareständen und Stromzählern.
+Version 1.9.0 ist der aktuelle veröffentlichte Stand. Rückmeldungen aus
+unterschiedlichen XT500- und XT500-Pro-Systemen, Firmwareständen,
+PV-Kopplungen und Stromzählern sind weiterhin willkommen.
 
 Bitte bei einem Fehler ein
 [GitHub Issue](https://github.com/achim1985/xt500-energy-manager/issues)

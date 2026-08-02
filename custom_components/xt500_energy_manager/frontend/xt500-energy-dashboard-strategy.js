@@ -1,7 +1,13 @@
 const XT500_DISPLAY_NAMES = {
   status: "Status",
   recovery_status: "Fehlerwiederherstellung",
-  active_mode: "Lademodus",
+  selected_mode: "Ausgewählter Lademodus",
+  active_mode: "Aktiver Lademodus",
+  active_operation: "Aktiver Vorgang",
+  mode_state: "Zustand des Lademodus",
+  selected_coupling_mode: "Gewählte PV-Berücksichtigung",
+  active_coupling_mode: "Aktuell nutzbare PV-Quelle",
+  active_energy_source: "Tatsächliche Ladequelle",
   data_valid: "Eingangsdaten",
   control_ready: "Produktivregelung",
   charge_request: "Ladeanforderung",
@@ -15,8 +21,11 @@ const XT500_DISPLAY_NAMES = {
   control_error: "Regelabweichung",
   control_interval: "Aktiver Regelabstand",
   control_max_step: "Aktive maximale Änderung",
-  feedback_ready: "Neue Rückmeldungen",
-  pv_release_active: "PV-Ausgabe",
+  pv_release_active: "DC-PV-Freigabe",
+  ac_pv_release_active: "AC-PV-Freigabe",
+  ac_pv_input_valid: "AC-PV-Sensor",
+  ac_pv_power: "Externe AC-PV-Erzeugung",
+  available_ac_surplus: "AC-PV-Überschuss am Netzanschluss",
   active_target_soc: "Aktives Ladeziel",
   cycle_state: "Zyklusstatus",
   cycle_charge_active: "Zyklusladung aktiv",
@@ -1038,8 +1047,9 @@ class XT500EnergyManagerDashboardStrategy extends HTMLElement {
         } : null;
 
       const regulationStatusEntities = namedExisting([
-        "status", "control_ready", "recovery_status", "active_mode", "charge_request",
-        "active_target_soc", "tariff_request", "pv_release_active", "data_valid",
+        "status", "active_operation", "selected_mode", "active_mode", "mode_state",
+        "selected_coupling_mode", "active_coupling_mode", "active_energy_source",
+        "active_target_soc", "control_ready", "recovery_status", "data_valid",
       ]);
       const setpointEntities = namedExisting(["desired_charge_limit"]);
       if (actualGridSetpoint && hass.states[actualGridSetpoint]) {
@@ -1058,11 +1068,17 @@ class XT500EnergyManagerDashboardStrategy extends HTMLElement {
         "days_since_full",
         "next_cycle_at",
       ]);
+      const selectedCouplingMode = entities.coupling_mode
+        ? hass.states[entities.coupling_mode]?.state
+        : undefined;
+      const acPvIsSelected = selectedCouplingMode !== "dc";
 
       const flowEntities = [
         [entities.battery_charge_power, "Akku lädt"],
         [entities.battery_discharge_power, "Akku entlädt"],
-        [sourceAttributes.source_pv_power_entity, "PV-Eingang"],
+        [sourceAttributes.source_pv_power_entity, "XT500-PV-Erzeugung (DC)"],
+        [acPvIsSelected && sourceAttributes.source_ac_pv_power_entity ? entities.ac_pv_power : null, "Externe AC-PV-Erzeugung"],
+        [acPvIsSelected ? entities.available_ac_surplus : null, "AC-PV-Überschuss am Netzanschluss"],
         [sourceAttributes.source_public_grid_power_entity, "Netzleistung"],
         [sourceAttributes.source_grid_port_power_entity, "XT500 Netz"],
         [sourceAttributes.source_load_port_power_entity, "XT500 Last"],
@@ -1075,7 +1091,7 @@ class XT500EnergyManagerDashboardStrategy extends HTMLElement {
       const dailyEnergyTiles = compact([
         compactOverviewTile(
           sourceAttributes.source_pv_daily_energy_entity,
-          "PV heute",
+          "XT500-PV heute",
           "mdi:solar-power",
         ),
         compactOverviewTile(
@@ -1126,6 +1142,7 @@ class XT500EnergyManagerDashboardStrategy extends HTMLElement {
       ]);
       const normalControlCards = compact([
         heading("Normalbetrieb und Grenzen", "mdi:tune-variant"),
+        tile("coupling_mode", "PV für Regelung berücksichtigen", [{ type: "select-options" }]),
         tile("base_mode", "Grundmodus", [{ type: "select-options" }]),
         tile("normal_charge_limit", "Ladelimit Normalbetrieb", [{ type: "numeric-input", style: "buttons" }]),
         actualLoadDischargeLimit && hass.states[actualLoadDischargeLimit] ? {
@@ -1154,10 +1171,10 @@ class XT500EnergyManagerDashboardStrategy extends HTMLElement {
       ]);
       const advancedControlCards = compact([
         heading("Adaptive Regelung", "mdi:speedometer"),
-        existing(["control_band", "control_error", "control_interval", "control_max_step", "feedback_ready"]).length ? {
+        existing(["control_band", "control_error", "control_interval", "control_max_step"]).length ? {
           type: "entities",
           show_header_toggle: false,
-          entities: namedExisting(["control_band", "control_error", "control_interval", "control_max_step", "feedback_ready"]),
+          entities: namedExisting(["control_band", "control_error", "control_interval", "control_max_step"]),
         } : null,
         heading("Fehlergrenzen", "mdi:approximately-equal"),
         tile("control_small_error", "Fein → Mittel", [{ type: "numeric-input", style: "buttons" }]),
@@ -1173,7 +1190,7 @@ class XT500EnergyManagerDashboardStrategy extends HTMLElement {
         tile("feedback_settle_time", "Wartezeit auf Messwerte", [{ type: "numeric-input", style: "buttons" }]),
         heading("Automatische Fehlerwiederherstellung", "mdi:shield-refresh"),
         tile("recovery_stability_time", "Stabile Rückmeldungen abwarten", [{ type: "numeric-input", style: "buttons" }]),
-        heading("PV-Ausgabe bei geringer Leistung", "mdi:solar-power-variant-outline"),
+        heading("PV-Freigabe bei geringer Leistung", "mdi:solar-power-variant-outline"),
         tile("pv_stop_power", "Unterhalb sofort auf 0 W", [{ type: "numeric-input", style: "buttons" }]),
         tile("pv_start_power", "Erneut freigeben oberhalb", [{ type: "numeric-input", style: "buttons" }]),
         tile("pv_start_delay", "Startleistung muss anliegen", [{ type: "numeric-input", style: "buttons" }]),
@@ -1199,6 +1216,7 @@ class XT500EnergyManagerDashboardStrategy extends HTMLElement {
           "<details><summary><b>Anleitung und Beispiele anzeigen</b></summary>\n\n" +
           "**Produktivbetrieb:** Ist **Regelung aktiv** eingeschaltet, prüft die Integration nach jedem Home-Assistant-Start zunächst fünf Sekunden lang alle Eingangsdaten. Danach schreibt sie die Netz-, Wechselrichter- und Ladegrenzen direkt auf das Gerät. Andere Automationen dürfen dieselben Sollwerte nicht gleichzeitig verändern.\n\n" +
           "**Normalbetrieb und Ladelimit**\n\n" +
+          "- **PV für Regelung berücksichtigen:** Hybrid ist die empfohlene Einstellung und berücksichtigt XT500-PV sowie externe AC-PV gemeinsam. Alternativ kann die Regelung auf eine der beiden PV-Arten begrenzt werden. Der öffentliche Stromzähler bleibt in allen Fällen die Sicherheitsinstanz.\n" +
           "- **Normalbetrieb:** Der Speicher gleicht den Hausverbrauch aus und hält das eingestellte Netzziel ein. Oberhalb der Entladegrenze darf er Energie ins Haus abgeben.\n" +
           "- **PV-Überschuss als Grundmodus:** Nur aktuell verfügbare PV-Leistung wird bis zum Hausbedarf freigegeben. Nicht benötigte PV-Leistung bleibt zum Laden im Akku; zusätzliche Batterieentladung wird vermieden.\n" +
           "- **Ladelimit Normalbetrieb:** Dieser Wert wird als echte System-Ladegrenze an den Speicher geschrieben. Der auswählbare Bereich folgt dem Gerät; beim hier verwendeten System sind das 70 bis 100 %.\n" +
@@ -1206,10 +1224,15 @@ class XT500EnergyManagerDashboardStrategy extends HTMLElement {
           "- **Entladegrenze:** Das ist die originale System-Entladegrenze des XT500. Änderungen im Energiemanager oder in SunEnergyXT wirken auf denselben Gerätewert. Unterhalb dieses SOC stoppt die Batterieabgabe; die Energiemanager-Regelung wird erst oberhalb der zusätzlich eingestellten Hysterese wieder freigegeben.\n" +
           "- Startet eine manuelle oder automatische Zielladung oberhalb des normalen Limits, hebt die Integration die System-Ladegrenze vorübergehend auf das benötigte Ziel an. Nach Zielerreichung stellt sie automatisch das normale Ladelimit wieder her.\n\n" +
           "**Lademodi für manuelle und automatische Ladung**\n\n" +
-          "- **Netzladung:** Fordert die eingestellte Ladeleistung fest aus dem Netz an. Vorhandene PV versorgt dabei vorrangig das Haus. Beispiel: 1.200 W und Ziel 100 % erreichen das Ziel auch nachts.\n" +
-          "- **PV-Überschuss:** Gibt aktuelle PV-Leistung nur passend zum Hausverbrauch weiter; der Rest kann den Akku laden. Es wird keine Netzladung angefordert. Das Ziel kann mehrere Tage aktiv bleiben.\n" +
-          "- **PV-Vorrang:** Verfolgt das Ziel ausschließlich mit PV und hält die Batterieentladung zurück. Bei schlechtem Wetter läuft die Anforderung über mehrere Tage weiter.\n" +
-          "- **PV + Netz:** Die eingestellte Ladeleistung ist das Ziel für die gesamte Batterieladung. Der nach Hausversorgung für den Akku verbleibende PV-Anteil wird davon abgezogen; nur die Differenz kommt aus dem Netz. Beispiel: 1.200 W Ziel und 700 W PV-Anteil ergeben 500 W Netzladung. Reicht PV allein aus, bleibt die Netzladung bei 0 W.\n\n" +
+          "- **Netzladung:** Die eingestellte Leistung ist der gewünschte Anteil aus dem öffentlichen Netz. AC-PV kann zusätzlich laden. Beispiel: 1.200 W Netzanteil plus 600 W AC-PV ergeben bis zu 1.800 W Batterieladung, sofern das Gerät dies erlaubt.\n" +
+          "- **PV-Überschuss:** Nutzt DC- und AC-PV-Überschuss ohne absichtlich Netzstrom zu beziehen. Das Ziel kann bei schlechtem Wetter mehrere Tage aktiv bleiben.\n" +
+          "- **PV-Vorrang:** Hält direkt angeschlossene PV bevorzugt für den Akku zurück, nimmt AC-PV-Überschuss auf und verhindert eine Batterieentladung. Es wird kein absichtlicher Netzbezug erzeugt.\n" +
+          "- **PV + Netz:** Die eingestellte Leistung ist das Ziel der gesamten Batterieladung. DC- und AC-PV tragen dazu bei; nur der fehlende Anteil kommt aus dem Netz. Beispiel: 1.200 W Ziel bei 600 W AC-PV führen ungefähr zu 600 W Netzbezug.\n\n" +
+          "**Status richtig lesen**\n\n" +
+          "- **Aktiver Vorgang** nennt den eindeutigen Besitzer der Sollwerte: Normalbetrieb, manuelle Zielladung, Zyklusladung oder Tarifladung. Nur dieser Vorgang darf regeln.\n" +
+          "- **Ausgewählter Lademodus** zeigt die Einstellung, **Aktiver Lademodus** die gerade wirksame Regelstrategie und **Zustand des Lademodus** beispielsweise Lädt oder Wartet auf ausreichend PV.\n" +
+          "- **Gewählte PV-Berücksichtigung** zeigt, welche PV-Anlagen die Regelung verwenden darf. **Aktuell nutzbare PV-Quelle** zeigt, ob XT500-PV, externer AC-PV-Überschuss, beide oder keine davon verfügbar sind. **Tatsächliche Ladequelle** zeigt ausschließlich, womit der Akku gerade wirklich geladen wird.\n" +
+          "- **Externe AC-PV-Erzeugung** ist die gesamte momentane Leistung des separaten Wechselrichters und bedeutet noch keine Akkuladung. Erst **AC-PV-Überschuss am Netzanschluss** zeigt den Anteil, der nach dem Hausverbrauch für den Akku verfügbar wäre. Die wirkliche Nettoladung steht unter **Akku lädt**.\n\n" +
           "**Dynamischer Stromtarif**\n\n" +
           "- Eine externe Preisautomation oder der mitgelieferte Tarif-Blueprint darf eine eigene **Tarifladung** anfordern. Diese verwendet ausschließlich Netzladung mit dem separaten Tarif-Ladeziel und der separaten Netz-Ladeleistung.\n" +
           "- Manuelle Zielladung und Zyklusladung haben Vorrang. Die Tarifanforderung bleibt währenddessen nur bis zu ihrem angezeigten Ablaufzeitpunkt vorgemerkt.\n" +
