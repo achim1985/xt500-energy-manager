@@ -148,10 +148,69 @@ def select_charge_limit(
 ) -> float:
     """Return the device charge limit for normal or temporary target charging."""
     requested = max(normal_limit, target_soc) if charge_active else normal_limit
+    return quantize_number_value(requested, low=low, high=high, step=step)
+
+
+def quantize_number_value(
+    value: float,
+    *,
+    low: float,
+    high: float,
+    step: float,
+) -> float:
+    """Clamp and align a requested value to a number entity's range."""
     safe_step = max(step, 1.0)
-    bounded = clamp(requested, low, high)
+    bounded = clamp(value, low, high)
     rounded = low + round((bounded - low) / safe_step) * safe_step
     return clamp(rounded, low, high)
+
+
+@dataclass(slots=True, frozen=True)
+class ChargeLimitSyncDecision:
+    """Resolved normal charge-limit state for one device feedback sample."""
+
+    normal_limit: float
+    override_active: bool
+    pending_write: float | None
+
+
+def reconcile_normal_charge_limit(
+    *,
+    normal_limit: float,
+    device_limit: float,
+    charge_active: bool,
+    override_active: bool,
+    pending_write: float | None,
+    low: float,
+    high: float,
+    step: float,
+) -> ChargeLimitSyncDecision:
+    """Synchronize the normal limit without adopting temporary charge targets."""
+    normal = quantize_number_value(normal_limit, low=low, high=high, step=step)
+    device = quantize_number_value(device_limit, low=low, high=high, step=step)
+    tolerance = max(float(step) / 2, 0.5)
+
+    if charge_active:
+        return ChargeLimitSyncDecision(normal, True, pending_write)
+
+    if pending_write is not None:
+        pending = quantize_number_value(
+            pending_write, low=low, high=high, step=step
+        )
+        return ChargeLimitSyncDecision(
+            normal,
+            override_active,
+            None if abs(device - pending) < tolerance else pending,
+        )
+
+    if override_active:
+        return ChargeLimitSyncDecision(
+            normal,
+            abs(device - normal) >= tolerance,
+            None,
+        )
+
+    return ChargeLimitSyncDecision(device, False, None)
 
 
 @dataclass(slots=True, frozen=True)

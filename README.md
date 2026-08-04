@@ -203,7 +203,7 @@ Der Expertenmodus bietet weiterhin die vollständige manuelle Zuordnung:
 | XT500-Systemleistung am Lastanschluss | SunEnergyXT **Systemleistung am Lastanschluss** (`LP`) |
 | Sollwert Leistung Netzanschluss | SunEnergyXT **Sollwert Leistung Netzanschluss** (`GS`) |
 | Sollwert max. Wechselrichterleistung | SunEnergyXT **Sollwert max. Wechselrichterleistung** (`IS`) |
-| System-Ladegrenze | SunEnergyXT **System-Ladegrenze** (`SA`) |
+| System-Ladegrenze | SunEnergyXT **System-Ladegrenze** (`SA`); im Normalbetrieb synchronisiert der Energiemanager Änderungen in beide Richtungen |
 | Entladegrenze | SunEnergyXT **System-Entladegrenze** (`SI`); der Energiemanager zeigt und ändert direkt denselben Gerätewert |
 | Systemlastanschluss-Entladegrenze | SunEnergyXT **Systemlastanschluss-Entladegrenze**; wird im Dashboard direkt am Gerät eingestellt |
 | Batterie-Ladeleistung | SunEnergyXT **Gesamteingangsleistung des Systems** |
@@ -296,7 +296,7 @@ Neuladen auch im Energiemanager-Dashboard.
 5. Als URL exakt eintragen:
 
    ```text
-   /xt500_energy_manager/xt500-energy-dashboard-strategy.js?v=1.9.0
+   /xt500_energy_manager/xt500-energy-dashboard-strategy.js?v=1.9.1
    ```
 
 6. Als Ressourcentyp **JavaScript-Modul** auswählen.
@@ -432,8 +432,15 @@ der ursprünglichen Ansicht wirksam.
 ### Normalbetrieb
 
 Der Speicher gleicht den Hausverbrauch aus und hält das eingestellte Netzziel
-ein. Das **Ladelimit im Normalbetrieb** wird als reale System-Ladegrenze auf
-den XT500 geschrieben.
+ein. Das **Ladelimit im Normalbetrieb** und die originale
+SunEnergyXT-System-Ladegrenze (`SA`) werden in beide Richtungen synchronisiert.
+Der Wert kann daher an beiden Stellen geändert werden.
+
+Während einer manuellen Zielladung, Zyklusladung oder Tarifladung verwendet der
+Energiemanager `SA` vorübergehend als aktive Ladegrenze. Das normale Ladelimit
+bleibt dabei separat erhalten und wird nach Zielerreichung oder Abbruch wieder
+auf das Gerät geschrieben. Während einer solchen Ladung sollte das normale
+Ladelimit deshalb im Energiemanager geändert werden.
 
 Die **Entladegrenze** ist kein getrennt gespeicherter Energiemanager-Wert:
 Sie zeigt und verändert direkt die originale System-Entladegrenze (`SI`) des
@@ -632,6 +639,20 @@ Der separate **Zyklusstatus** unterscheidet:
   `0 W` und gibt sie erst nach der eingestellten Startleistung und Wartezeit
   wieder frei.
 
+### Regelung sicher ausschalten
+
+Beim Ausschalten von **Regelung aktiv** beendet der Energiemanager zuerst alle
+laufenden Schreibvorgänge. Anschließend setzt er den Netzanschluss-Sollwert auf
+`0 W`, die Wechselrichter-Obergrenze auf den kleinsten vom Gerät erlaubten Wert
+und stellt eine vorübergehend erhöhte System-Ladegrenze auf das normale
+Ladelimit zurück. Der Schalter wird erst als ausgeschaltet bestätigt, nachdem
+die Gerätewerte zurückgelesen wurden. Erlaubt die SunEnergyXT-Entität keine
+`0 W`, wird ihr technischer Minimalwert verwendet, beispielsweise `1 W`.
+
+Kann das Gerät die sicheren Abschaltwerte nicht bestätigen, bleibt der
+Energiemanager sichtbar im Fehlerzustand und startet keine andere Regelung. So
+wird ein vermeintlich ausgeschalteter Regler mit alten Sollwerten vermieden.
+
 ## Aktualisieren
 
 ### Aktualisierung über HACS
@@ -689,7 +710,7 @@ Der separate **Zyklusstatus** unterscheidet:
   Eintrag neu laden oder Home Assistant neu starten. Die optionalen Sensoren
   werden bei jedem Laden der Integration erneut automatisch erkannt.
 - Im Strategy-Editor prüfen, ob der Block **Energie heute** ausgeblendet wurde.
-- Die Dashboard-Ressource auf `?v=1.9.0` setzen und Ressourcen beziehungsweise
+- Die Dashboard-Ressource auf `?v=1.9.1` setzen und Ressourcen beziehungsweise
   Browser vollständig neu laden.
 
 ### Eingangsdaten sind ungültig
@@ -711,7 +732,7 @@ Der separate **Zyklusstatus** unterscheidet:
 
 ## Projektstatus
 
-Version 1.9.0 ist der aktuelle veröffentlichte Stand. Rückmeldungen aus
+Version 1.9.1 ist der aktuelle veröffentlichte Stand. Rückmeldungen aus
 unterschiedlichen XT500- und XT500-Pro-Systemen, Firmwareständen,
 PV-Kopplungen und Stromzählern sind weiterhin willkommen.
 

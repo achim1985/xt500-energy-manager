@@ -97,7 +97,9 @@ from .controller import (
     next_cycle_check_at,
     normalize_pv_production,
     overall_control_error,
+    quantize_number_value,
     RECOVERY_DELAY_MULTIPLIERS,
+    reconcile_normal_charge_limit,
     recovery_delay_seconds,
     select_adaptive_control_profile,
     select_charge_limit,
@@ -171,6 +173,10 @@ class XT500Runtime:
         self._control_apply_task: asyncio.Task | None = None
         self._startup_ready_task: asyncio.Task | None = None
         self._control_apply_requested = False
+        self._shutdown_in_progress = False
+        self._shutdown_failed = False
+        self._charge_limit_override_active = False
+        self._normal_charge_limit_write_pending: float | None = None
         self._last_control_apply_monotonic = 0.0
         self._last_control_write_at: datetime | None = None
         self._pv_release_active = False
@@ -580,13 +586,36 @@ class XT500Runtime:
         charge_limit_state = self.hass.states.get(
             self.entry.data[CONF_MAX_CHARGE_SOC_ENTITY]
         )
+        charge_limit_low = float(charge_limit_state.attributes.get("min", 0))
+        charge_limit_high = float(charge_limit_state.attributes.get("max", 100))
+        charge_limit_step = float(charge_limit_state.attributes.get("step", 1) or 1)
+        charge_limit_sync = reconcile_normal_charge_limit(
+            normal_limit=float(self.settings[SETTING_NORMAL_CHARGE_LIMIT]),
+            device_limit=values[CONF_MAX_CHARGE_SOC_ENTITY],
+            charge_active=charge_request.active,
+            override_active=self._charge_limit_override_active,
+            pending_write=self._normal_charge_limit_write_pending,
+            low=charge_limit_low,
+            high=charge_limit_high,
+            step=charge_limit_step,
+        )
+        if (
+            float(self.settings[SETTING_NORMAL_CHARGE_LIMIT])
+            != charge_limit_sync.normal_limit
+        ):
+            self.settings[SETTING_NORMAL_CHARGE_LIMIT] = (
+                charge_limit_sync.normal_limit
+            )
+            self._store.async_delay_save(lambda: self.settings, 1)
+        self._charge_limit_override_active = charge_limit_sync.override_active
+        self._normal_charge_limit_write_pending = charge_limit_sync.pending_write
         self.desired_charge_limit = select_charge_limit(
             normal_limit=float(self.settings[SETTING_NORMAL_CHARGE_LIMIT]),
             target_soc=charge_request.target_soc,
             charge_active=charge_request.active,
-            low=float(charge_limit_state.attributes.get("min", 0)),
-            high=float(charge_limit_state.attributes.get("max", 100)),
-            step=float(charge_limit_state.attributes.get("step", 1) or 1),
+            low=charge_limit_low,
+            high=charge_limit_high,
+            step=charge_limit_step,
         )
 
         minimum_soc = values[CONF_MIN_DISCHARGE_SOC_ENTITY]
@@ -953,6 +982,7 @@ class XT500Runtime:
             and self.data_valid
             and self.result is not None
             and not self._write_blocked
+            and not self._shutdown_in_progress
             and not self._communication_pause_active
             and self._data_valid_since_monotonic is not None
             and monotonic() - self._data_valid_since_monotonic
@@ -1184,12 +1214,32 @@ class XT500Runtime:
         self._next_recovery_attempt = None
         self._recovery_attempts = 0
         if not enabled:
-            self._control_apply_requested = False
-            if self._control_apply_task and not self._control_apply_task.done():
-                self._control_apply_task.cancel()
+            self._shutdown_in_progress = True
+            self._shutdown_failed = False
+            await self._async_cancel_control_apply()
+            try:
+                await self._async_neutralize_outputs()
+            except Exception as err:
+                self._shutdown_failed = True
+                self._write_blocked = True
+                self._control_error_at = datetime.now(UTC)
+                self.control_error_message = (
+                    "Sicheres Abschalten fehlgeschlagen: "
+                    f"{self._error_detail(err)}"
+                )
+                self._recovery_status = "manual_required"
+                self._notify()
+                raise HomeAssistantError(self.control_error_message) from err
+            finally:
+                self._shutdown_in_progress = False
+            self._write_blocked = False
+            self._control_error_at = None
+            self.control_error_message = None
             self._last_control_write_at = None
             self._recovery_status = "disabled"
         else:
+            self._shutdown_in_progress = False
+            self._shutdown_failed = False
             self._write_blocked = False
             self._control_error_at = None
             self.control_error_message = None
@@ -1198,6 +1248,59 @@ class XT500Runtime:
         self.settings[SETTING_REGULATION_ENABLED] = enabled
         await self._store.async_save(self.settings)
         self.async_calculate()
+
+    async def _async_cancel_control_apply(self) -> None:
+        """Stop a pending production write before changing controller ownership."""
+        self._control_apply_requested = False
+        task = self._control_apply_task
+        if task is None or task.done() or task is asyncio.current_task():
+            return
+        task.cancel()
+        await asyncio.gather(task, return_exceptions=True)
+
+    async def _async_neutralize_outputs(self) -> None:
+        """Put every device actuator into a deterministic inactive state."""
+        grid_entity = self.entry.data[CONF_GRID_SETPOINT_ENTITY]
+        inverter_entity = self.entry.data[CONF_INVERTER_SETPOINT_ENTITY]
+        charge_limit_entity = self.entry.data[CONF_MAX_CHARGE_SOC_ENTITY]
+        targets = (
+            (grid_entity, self._quantized_entity_target(grid_entity, 0.0)),
+            (inverter_entity, self._quantized_entity_target(inverter_entity, 0.0)),
+            (
+                charge_limit_entity,
+                self._quantized_entity_target(
+                    charge_limit_entity,
+                    float(self.settings[SETTING_NORMAL_CHARGE_LIMIT]),
+                ),
+            ),
+        )
+        confirmation_timeout = max(
+            float(self.settings[SETTING_FEEDBACK_SETTLE_TIME]) * 2,
+            5.0,
+        )
+        wrote = False
+        for entity_id, target in targets:
+            if self._float_state(entity_id) is None:
+                raise TransientCommunicationError(
+                    f"Sollwert beim Abschalten nicht lesbar: {entity_id}"
+                )
+            if not self._entity_target_matches(entity_id, target):
+                await self._async_set_number_resilient(entity_id, target)
+                wrote = True
+            if not self._entity_target_matches(
+                entity_id, target
+            ) and not await self._async_wait_for_entity_target(
+                entity_id, target, confirmation_timeout
+            ):
+                raise HomeAssistantError(
+                    f"Sicherer Abschaltwert {target:g} nicht bestätigt: "
+                    f"{entity_id}"
+                )
+        self._charge_limit_override_active = False
+        self._normal_charge_limit_write_pending = None
+        if wrote:
+            self.last_control_write = dt_util.now().isoformat()
+            self._notify()
 
     @callback
     def _cancel_recovery_task(self) -> None:
@@ -1392,6 +1495,10 @@ class XT500Runtime:
         """Schedule one guarded recovery attempt after stable fresh feedback."""
         if not self._write_blocked:
             self._recovery_status = "ready"
+            return
+        if self._shutdown_failed:
+            self._cancel_recovery_task()
+            self._recovery_status = "manual_required"
             return
         if (
             self._recovery_status == "attempting"
@@ -1729,6 +1836,20 @@ class XT500Runtime:
             current, requested, low, high, step, maximum_change
         )
 
+    def _quantized_entity_target(self, entity_id: str, requested: float) -> float:
+        """Return the nearest supported value for one number entity."""
+        state = self.hass.states.get(entity_id)
+        if state is None:
+            raise TransientCommunicationError(
+                f"Sollwert vorübergehend nicht lesbar: {entity_id}"
+            )
+        return quantize_number_value(
+            requested,
+            low=float(state.attributes.get("min", requested)),
+            high=float(state.attributes.get("max", requested)),
+            step=float(state.attributes.get("step", 1) or 1),
+        )
+
     @property
     def days_since_full(self) -> float | None:
         """Return elapsed days in the current full-charge cycle."""
@@ -1765,6 +1886,27 @@ class XT500Runtime:
         """Write the shared discharge limit through the original XT500 entity."""
         entity_id = self.entry.data[CONF_MIN_DISCHARGE_SOC_ENTITY]
         await self._async_set_number_resilient(entity_id, value)
+        self.async_calculate()
+
+    async def async_set_system_charge_limit(self, value: float) -> None:
+        """Set the shared normal charge limit through the original XT500 entity."""
+        entity_id = self.entry.data[CONF_MAX_CHARGE_SOC_ENTITY]
+        target = self._quantized_entity_target(entity_id, value)
+        previous = float(self.settings[SETTING_NORMAL_CHARGE_LIMIT])
+        self.settings[SETTING_NORMAL_CHARGE_LIMIT] = target
+        await self._store.async_save(self.settings)
+        if self.charge_request_active:
+            self.async_calculate()
+            return
+        self._normal_charge_limit_write_pending = target
+        try:
+            await self._async_set_number_resilient(entity_id, target)
+        except Exception:
+            self._normal_charge_limit_write_pending = None
+            self.settings[SETTING_NORMAL_CHARGE_LIMIT] = previous
+            await self._store.async_save(self.settings)
+            self.async_calculate()
+            raise
         self.async_calculate()
 
     @callback

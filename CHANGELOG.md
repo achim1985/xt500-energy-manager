@@ -1,5 +1,17 @@
 # Änderungsprotokoll
 
+## 1.9.1 – 2026-08-04
+
+- beim Ausschalten werden Netzanschluss-Sollwert und Wechselrichter-Obergrenze
+  neutralisiert, eine temporäre Ladegrenze zurückgestellt und alle Werte vor
+  der Abschaltbestätigung zurückgelesen
+- die Wechselrichter-Obergrenze verwendet bei Geräten ohne zulässige `0 W` den
+  kleinsten von der SunEnergyXT-Entität angebotenen Wert
+- das normale maximale SOC wird im Normalbetrieb zwischen Energiemanager und
+  originaler SunEnergyXT-System-Ladegrenze bidirektional synchronisiert
+- temporäre Ladeziele werden nicht als neues normales Ladelimit übernommen und
+  nach Ende der Zielladung zuverlässig zurückgestellt
+
 ## 1.9.0 – 2026-08-02
 
 - AC-gekoppelte PV wird in Normalbetrieb, manueller Zielladung,

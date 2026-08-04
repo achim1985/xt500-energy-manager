@@ -1,4 +1,4 @@
-# XT500 Energy Manager 1.9.0
+# XT500 Energy Manager 1.9.1
 
 Production-ready Home Assistant controller for SunEnergyXT XT500 and XT500 Pro
 systems. The integration directly controls the grid-port setpoint, inverter
@@ -23,11 +23,14 @@ ceiling, and system charge limit.
 - The integration does not discover, disable, or enable unrelated automations.
   Any existing automation that writes the same device setpoints must be disabled
   before this controller is enabled.
+- Disabling production control first stops pending writes, neutralizes the grid
+  setpoint and inverter ceiling, restores the normal charge limit, and verifies
+  device feedback before the switch reports off.
 
 ## Charge limits and targets
 
-- **Normal-operation charge limit** is written to the selected device system
-  charge-limit entity during normal operation.
+- **Normal-operation charge limit** and the selected device system charge-limit
+  entity are synchronized in both directions during normal operation.
 - Manual or automatic target charging temporarily raises the device limit when
   the requested target is higher than the normal limit.
 - Reaching a target ends the corresponding charge request and restores the
@@ -96,7 +99,7 @@ management hash prevents locally modified copies from being overwritten.
 ## Generated dashboard
 
 Register
-`/xt500_energy_manager/xt500-energy-dashboard-strategy.js?v=1.9.0` once as a
+`/xt500_energy_manager/xt500-energy-dashboard-strategy.js?v=1.9.1` once as a
 JavaScript module under Settings → Dashboards → Resources. Then add the
 **XT500 Energiemanager** community dashboard.
 

@@ -125,6 +125,9 @@ class XT500Number(XT500Entity, NumberEntity):
         return float(self.entity_description.native_step)
 
     async def async_set_native_value(self, value: float) -> None:
+        if self.key == SETTING_NORMAL_CHARGE_LIMIT:
+            await self.runtime.async_set_system_charge_limit(value)
+            return
         if self.key == SETTING_MIN_SOC:
             await self.runtime.async_set_system_discharge_limit(value)
             return

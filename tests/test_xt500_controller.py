@@ -687,6 +687,96 @@ class ControllerTest(unittest.TestCase):
             70,
         )
 
+    def test_zero_target_uses_device_minimum_when_zero_is_not_supported(self):
+        self.assertEqual(
+            1,
+            controller.quantize_number_value(0, low=1, high=2400, step=10),
+        )
+        self.assertEqual(
+            0,
+            controller.quantize_number_value(0, low=-2400, high=800, step=10),
+        )
+
+    def test_external_charge_limit_is_adopted_in_normal_operation(self):
+        decision = controller.reconcile_normal_charge_limit(
+            normal_limit=80,
+            device_limit=85,
+            charge_active=False,
+            override_active=False,
+            pending_write=None,
+            low=70,
+            high=100,
+            step=1,
+        )
+
+        self.assertEqual(85, decision.normal_limit)
+        self.assertFalse(decision.override_active)
+        self.assertIsNone(decision.pending_write)
+
+    def test_temporary_charge_limit_is_not_adopted_as_normal_limit(self):
+        active = controller.reconcile_normal_charge_limit(
+            normal_limit=80,
+            device_limit=100,
+            charge_active=True,
+            override_active=False,
+            pending_write=None,
+            low=70,
+            high=100,
+            step=1,
+        )
+        awaiting_restore = controller.reconcile_normal_charge_limit(
+            normal_limit=active.normal_limit,
+            device_limit=100,
+            charge_active=False,
+            override_active=active.override_active,
+            pending_write=None,
+            low=70,
+            high=100,
+            step=1,
+        )
+        restored = controller.reconcile_normal_charge_limit(
+            normal_limit=awaiting_restore.normal_limit,
+            device_limit=80,
+            charge_active=False,
+            override_active=awaiting_restore.override_active,
+            pending_write=None,
+            low=70,
+            high=100,
+            step=1,
+        )
+
+        self.assertEqual(80, awaiting_restore.normal_limit)
+        self.assertTrue(awaiting_restore.override_active)
+        self.assertEqual(80, restored.normal_limit)
+        self.assertFalse(restored.override_active)
+
+    def test_pending_manager_write_prevents_old_feedback_from_winning(self):
+        old_feedback = controller.reconcile_normal_charge_limit(
+            normal_limit=90,
+            device_limit=80,
+            charge_active=False,
+            override_active=False,
+            pending_write=90,
+            low=70,
+            high=100,
+            step=1,
+        )
+        confirmed = controller.reconcile_normal_charge_limit(
+            normal_limit=old_feedback.normal_limit,
+            device_limit=90,
+            charge_active=False,
+            override_active=old_feedback.override_active,
+            pending_write=old_feedback.pending_write,
+            low=70,
+            high=100,
+            step=1,
+        )
+
+        self.assertEqual(90, old_feedback.normal_limit)
+        self.assertEqual(90, old_feedback.pending_write)
+        self.assertEqual(90, confirmed.normal_limit)
+        self.assertIsNone(confirmed.pending_write)
+
     def test_new_cycle_without_reference_is_not_due(self):
         now = datetime(2026, 7, 23, 12, tzinfo=UTC)
         self.assertFalse(
