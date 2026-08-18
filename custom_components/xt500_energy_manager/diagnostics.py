@@ -62,6 +62,12 @@ async def async_get_config_entry_diagnostics(_hass: HomeAssistant, entry: XT500C
             "net_charge_w": runtime.battery_charge_power,
             "net_discharge_w": runtime.battery_discharge_power,
         },
+        "discharge_lock": {
+            "active": runtime.discharge_hold_active,
+            "temporary_release_active": runtime.discharge_override_active,
+            "configured_lower_limit": runtime.settings["minimum_soc"],
+            "regular_release_soc": runtime.discharge_release_soc,
+        },
         "data_valid": runtime.data_valid,
         "adaptive_control": {
             "band": runtime.control_profile.band,

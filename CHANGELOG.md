@@ -1,5 +1,19 @@
 # Änderungsprotokoll
 
+## 1.9.3 – 2026-08-18
+
+- der Entlade-Haltezustand wird nach Neustart oder Neuladen innerhalb des
+  Hysteresebereichs sicher rekonstruiert; Status und Sollwerte melden dadurch
+  nicht mehr fälschlich Normalbetrieb, während der XT500 noch gesperrt ist
+- neuer Dashboard-Knopf für eine einmalige temporäre Entladefreigabe bis zur
+  eingestellten unteren Entladegrenze
+- die dafür vorübergehend abgesenkte originale XT500-System-Entladegrenze wird
+  beim Erreichen der regulären Grenze, beim Abschalten sowie nach einem
+  Neustart mit Rücklesekontrolle wiederhergestellt
+- eigene Statusanzeigen unterscheiden Entladesperre und temporäre Freigabe
+  eindeutig; die reguläre Entladegrenze bleibt im Energiemanager sichtbar
+- Dashboard-Anleitung und Diagnosedaten erklären den Sicherheitsablauf
+
 ## 1.9.2 – 2026-08-18
 
 - die aktuelle originale SunEnergyXT-System-Batterieleistung (`BP`) wird

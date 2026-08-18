@@ -79,6 +79,8 @@ class XT500Number(XT500Entity, NumberEntity):
     @property
     def native_value(self) -> float:
         if self.key == SETTING_MIN_SOC:
+            if self.runtime.discharge_override_active:
+                return float(self.runtime.settings[SETTING_MIN_SOC])
             state = self.runtime.hass.states.get(
                 self.runtime.entry.data.get(CONF_MIN_DISCHARGE_SOC_ENTITY)
             )

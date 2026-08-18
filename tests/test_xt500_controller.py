@@ -1158,6 +1158,54 @@ class ControllerTest(unittest.TestCase):
         self.assertEqual(result.recommended_grid_setpoint, 0)
         self.assertEqual(result.recommended_inverter_setpoint, 0)
 
+    def test_unknown_discharge_history_is_locked_inside_hysteresis_band(self):
+        self.assertTrue(
+            controller.update_discharge_hold(
+                current_hold=None,
+                soc=31,
+                minimum_soc=30,
+                hysteresis=5,
+            )
+        )
+
+    def test_discharge_hold_remains_until_release_soc(self):
+        self.assertTrue(
+            controller.update_discharge_hold(
+                current_hold=True,
+                soc=34,
+                minimum_soc=30,
+                hysteresis=5,
+            )
+        )
+        self.assertFalse(
+            controller.update_discharge_hold(
+                current_hold=True,
+                soc=35,
+                minimum_soc=30,
+                hysteresis=5,
+            )
+        )
+
+    def test_one_shot_release_ends_at_lower_limit(self):
+        self.assertFalse(
+            controller.update_discharge_hold(
+                current_hold=True,
+                soc=31,
+                minimum_soc=30,
+                hysteresis=5,
+                temporary_release=True,
+            )
+        )
+        self.assertTrue(
+            controller.update_discharge_hold(
+                current_hold=False,
+                soc=30,
+                minimum_soc=30,
+                hysteresis=5,
+                temporary_release=True,
+            )
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

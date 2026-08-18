@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Final
 
 DOMAIN: Final = "xt500_energy_manager"
-VERSION: Final = "1.9.2"
+VERSION: Final = "1.9.3"
 PLATFORMS: Final = (
     "sensor",
     "binary_sensor",
@@ -117,6 +117,8 @@ SETTING_CYCLE_MANUAL_ACTIVE: Final = "cycle_manual_active"
 SETTING_CYCLE_AUTOMATIC_ACTIVE: Final = "cycle_automatic_active"
 SETTING_MIN_SOC: Final = "minimum_soc"
 SETTING_SOC_HYSTERESIS: Final = "soc_hysteresis"
+SETTING_DISCHARGE_OVERRIDE_ACTIVE: Final = "discharge_override_active"
+SETTING_DISCHARGE_OVERRIDE_ORIGINAL_LIMIT: Final = "discharge_override_original_limit"
 SETTING_TARGET_GRID_POWER: Final = "target_grid_power"
 SETTING_MAX_GRID_OUTPUT: Final = "maximum_grid_output"
 SETTING_MAX_INVERTER_OUTPUT: Final = "maximum_inverter_output"
@@ -161,6 +163,8 @@ DEFAULT_SETTINGS: Final = {
     SETTING_CYCLE_AUTOMATIC_ACTIVE: False,
     SETTING_MIN_SOC: 10.0,
     SETTING_SOC_HYSTERESIS: 5.0,
+    SETTING_DISCHARGE_OVERRIDE_ACTIVE: False,
+    SETTING_DISCHARGE_OVERRIDE_ORIGINAL_LIMIT: None,
     SETTING_TARGET_GRID_POWER: 0.0,
     SETTING_MAX_GRID_OUTPUT: 2400.0,
     SETTING_MAX_INVERTER_OUTPUT: 2400.0,

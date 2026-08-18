@@ -63,6 +63,8 @@ from .const import (
     SETTING_CYCLE_CHECK_TIME,
     SETTING_CYCLE_INTERVAL_DAYS,
     SETTING_CYCLE_MANUAL_ACTIVE,
+    SETTING_DISCHARGE_OVERRIDE_ACTIVE,
+    SETTING_DISCHARGE_OVERRIDE_ORIGINAL_LIMIT,
     SETTING_FEEDBACK_SETTLE_TIME,
     SETTING_LAST_FULL,
     SETTING_MANUAL_ACTIVE,
@@ -109,6 +111,7 @@ from .controller import (
     select_charge_limit,
     select_charge_request,
     update_pv_release,
+    update_discharge_hold,
     WRITE_RETRY_DELAY_MULTIPLIERS,
     write_retry_delay_seconds,
 )
@@ -168,7 +171,9 @@ class XT500Runtime:
         self._next_recovery_attempt: str | None = None
         self._recovery_task: asyncio.Task | None = None
         self._full_soc_latched = False
-        self._low_soc_hold = False
+        self._low_soc_hold: bool | None = None
+        self._discharge_override_session_active = False
+        self._discharge_override_restore_task: asyncio.Task | None = None
         self._listeners: set[Callable[[], None]] = set()
         self._unsub_state: Callable[[], None] | None = None
         self._unsub_started: Callable[[], None] | None = None
@@ -290,6 +295,7 @@ class XT500Runtime:
 
     async def async_stop(self) -> None:
         """Stop all observation and writes without controlling external automations."""
+        self._shutdown_in_progress = True
         self._control_apply_requested = False
         pending_tasks = [
             task
@@ -300,6 +306,7 @@ class XT500Runtime:
                 self._ac_pv_release_task,
                 self._recovery_task,
                 self._communication_pause_task,
+                self._discharge_override_restore_task,
             )
             if task is not None and not task.done()
         ]
@@ -313,6 +320,9 @@ class XT500Runtime:
         self._ac_pv_release_task = None
         self._recovery_task = None
         self._communication_pause_task = None
+        self._discharge_override_restore_task = None
+        if self.discharge_override_active:
+            await self._async_restore_discharge_override(raise_on_error=False)
         if self._unsub_started:
             self._unsub_started()
             self._unsub_started = None
@@ -622,15 +632,33 @@ class XT500Runtime:
             step=charge_limit_step,
         )
 
-        minimum_soc = values[CONF_MIN_DISCHARGE_SOC_ENTITY]
-        if float(self.settings[SETTING_MIN_SOC]) != minimum_soc:
-            self.settings[SETTING_MIN_SOC] = minimum_soc
-            self._store.async_delay_save(lambda: self.settings, 1)
+        device_minimum_soc = values[CONF_MIN_DISCHARGE_SOC_ENTITY]
+        override_active = self.discharge_override_active
+        stored_original_limit = self.settings.get(
+            SETTING_DISCHARGE_OVERRIDE_ORIGINAL_LIMIT
+        )
+        if override_active and stored_original_limit is not None:
+            minimum_soc = float(stored_original_limit)
+        else:
+            minimum_soc = device_minimum_soc
+            if float(self.settings[SETTING_MIN_SOC]) != minimum_soc:
+                self.settings[SETTING_MIN_SOC] = minimum_soc
+                self._store.async_delay_save(lambda: self.settings, 1)
         hysteresis = float(self.settings[SETTING_SOC_HYSTERESIS])
-        if values[CONF_SOC_ENTITY] <= minimum_soc:
-            self._low_soc_hold = True
-        elif values[CONF_SOC_ENTITY] >= minimum_soc + hysteresis:
-            self._low_soc_hold = False
+        temporary_release = (
+            override_active
+            and self._discharge_override_session_active
+            and values[CONF_SOC_ENTITY] > minimum_soc
+        )
+        self._low_soc_hold = update_discharge_hold(
+            current_hold=self._low_soc_hold,
+            soc=values[CONF_SOC_ENTITY],
+            minimum_soc=minimum_soc,
+            hysteresis=hysteresis,
+            temporary_release=temporary_release,
+        )
+        if override_active and not temporary_release:
+            self._schedule_discharge_override_restore()
 
         grid_setpoint_state = self.hass.states.get(
             self.entry.data[CONF_GRID_SETPOINT_ENTITY]
@@ -662,7 +690,7 @@ class XT500Runtime:
                 target_soc=charge_request.target_soc,
                 minimum_soc=minimum_soc,
                 soc_hysteresis=hysteresis,
-                discharge_hold=self._low_soc_hold,
+                discharge_hold=bool(self._low_soc_hold),
                 charge_power=charge_request.charge_power,
                 target_grid_power=float(self.settings[SETTING_TARGET_GRID_POWER]),
                 grid_limit=float(self.settings[SETTING_MAX_GRID_OUTPUT]),
@@ -965,6 +993,27 @@ class XT500Runtime:
         return bool(self.settings[SETTING_REGULATION_ENABLED])
 
     @property
+    def discharge_hold_active(self) -> bool:
+        """Return whether battery discharge is currently blocked by SOC."""
+        return bool(self._low_soc_hold)
+
+    @property
+    def discharge_override_active(self) -> bool:
+        """Return whether the one-shot discharge release is active."""
+        return bool(self.settings[SETTING_DISCHARGE_OVERRIDE_ACTIVE])
+
+    @property
+    def discharge_release_soc(self) -> float:
+        """Return the SOC at which the normal hysteresis releases discharge."""
+        minimum = self.settings.get(
+            SETTING_DISCHARGE_OVERRIDE_ORIGINAL_LIMIT,
+            self.settings[SETTING_MIN_SOC],
+        )
+        if minimum is None:
+            minimum = self.settings[SETTING_MIN_SOC]
+        return float(minimum) + float(self.settings[SETTING_SOC_HYSTERESIS])
+
+    @property
     def automatic_recovery_enabled(self) -> bool:
         """Return whether a latched write error may recover automatically."""
         return bool(self.settings[SETTING_AUTOMATIC_RECOVERY_ENABLED])
@@ -1240,6 +1289,8 @@ class XT500Runtime:
             self._shutdown_failed = False
             await self._async_cancel_control_apply()
             try:
+                if self.discharge_override_active:
+                    await self._async_restore_discharge_override()
                 await self._async_neutralize_outputs()
             except Exception as err:
                 self._shutdown_failed = True
@@ -1906,9 +1957,152 @@ class XT500Runtime:
 
     async def async_set_system_discharge_limit(self, value: float) -> None:
         """Write the shared discharge limit through the original XT500 entity."""
+        if self.discharge_override_active:
+            await self._async_restore_discharge_override()
         entity_id = self.entry.data[CONF_MIN_DISCHARGE_SOC_ENTITY]
         await self._async_set_number_resilient(entity_id, value)
         self.async_calculate()
+
+    async def async_release_discharge_once(self) -> None:
+        """Temporarily release the device lock until the lower SOC is hit again."""
+        if not self.regulation_enabled:
+            raise HomeAssistantError(
+                "Die Regelung muss für die temporäre Entladefreigabe aktiv sein."
+            )
+        if not self.data_valid:
+            raise HomeAssistantError(
+                "Die Eingangsdaten müssen für die temporäre Entladefreigabe gültig sein."
+            )
+        if self.discharge_override_active:
+            raise HomeAssistantError(
+                "Die temporäre Entladefreigabe ist bereits aktiv."
+            )
+
+        entity_id = self.entry.data[CONF_MIN_DISCHARGE_SOC_ENTITY]
+        original_limit = self._float_state(entity_id)
+        soc = self._float_state(self.entry.data[CONF_SOC_ENTITY])
+        if original_limit is None or soc is None:
+            raise HomeAssistantError(
+                "SOC oder System-Entladegrenze ist derzeit nicht lesbar."
+            )
+        hysteresis = max(float(self.settings[SETTING_SOC_HYSTERESIS]), 0.0)
+        if soc <= original_limit:
+            raise HomeAssistantError(
+                "Der Speicher steht bereits an der Entladegrenze und darf nicht weiter entladen werden."
+            )
+        if soc >= original_limit + hysteresis or not self.discharge_hold_active:
+            raise HomeAssistantError(
+                "Die Entladesperre ist derzeit nicht aktiv; eine Freigabe ist nicht erforderlich."
+            )
+
+        temporary_limit = self._quantized_entity_target(
+            entity_id, original_limit - max(hysteresis, 1.0)
+        )
+        if temporary_limit >= original_limit:
+            raise HomeAssistantError(
+                "Die Geräte-Entladegrenze kann nicht sicher vorübergehend abgesenkt werden."
+            )
+
+        self.settings[SETTING_DISCHARGE_OVERRIDE_ACTIVE] = True
+        self.settings[SETTING_DISCHARGE_OVERRIDE_ORIGINAL_LIMIT] = original_limit
+        self._discharge_override_session_active = True
+        await self._store.async_save(self.settings)
+        try:
+            await self._async_set_discharge_limit_confirmed(
+                entity_id, temporary_limit
+            )
+        except Exception:
+            self._discharge_override_session_active = False
+            self.settings[SETTING_DISCHARGE_OVERRIDE_ACTIVE] = False
+            self.settings[SETTING_DISCHARGE_OVERRIDE_ORIGINAL_LIMIT] = None
+            await self._store.async_save(self.settings)
+            if not self._entity_target_matches(entity_id, original_limit):
+                try:
+                    await self._async_set_discharge_limit_confirmed(
+                        entity_id, original_limit
+                    )
+                except Exception:
+                    _LOGGER.exception(
+                        "Could not restore XT500 discharge limit after failed release"
+                    )
+            self._low_soc_hold = None
+            self.async_calculate()
+            raise
+
+        self._low_soc_hold = False
+        self.async_calculate()
+
+    @callback
+    def _schedule_discharge_override_restore(self) -> None:
+        """Restore the normal device limit after the one-shot release."""
+        if (
+            not self.discharge_override_active
+            or (
+                self._discharge_override_restore_task is not None
+                and not self._discharge_override_restore_task.done()
+            )
+        ):
+            return
+        self._discharge_override_restore_task = self.hass.async_create_task(
+            self._async_restore_discharge_override(raise_on_error=False)
+        )
+
+    async def _async_restore_discharge_override(
+        self, *, raise_on_error: bool = True
+    ) -> None:
+        """Restore and confirm the saved discharge limit before clearing state."""
+        current_task = asyncio.current_task()
+        restored = False
+        try:
+            original = self.settings.get(
+                SETTING_DISCHARGE_OVERRIDE_ORIGINAL_LIMIT
+            )
+            if not self.discharge_override_active or original is None:
+                return
+            entity_id = self.entry.data[CONF_MIN_DISCHARGE_SOC_ENTITY]
+            await self._async_set_discharge_limit_confirmed(
+                entity_id, float(original)
+            )
+            self.settings[SETTING_MIN_SOC] = float(original)
+            self.settings[SETTING_DISCHARGE_OVERRIDE_ACTIVE] = False
+            self.settings[SETTING_DISCHARGE_OVERRIDE_ORIGINAL_LIMIT] = None
+            self._discharge_override_session_active = False
+            self._low_soc_hold = None
+            await self._store.async_save(self.settings)
+            restored = True
+        except Exception as err:
+            self._discharge_override_session_active = False
+            self._low_soc_hold = True
+            _LOGGER.error(
+                "Could not restore XT500 discharge limit after temporary release: %s",
+                self._error_detail(err),
+            )
+            if raise_on_error:
+                raise
+        finally:
+            if self._discharge_override_restore_task is current_task:
+                self._discharge_override_restore_task = None
+            if restored:
+                self.async_calculate()
+            else:
+                self._notify()
+
+    async def _async_set_discharge_limit_confirmed(
+        self, entity_id: str, target: float
+    ) -> None:
+        """Write the safety-relevant discharge limit and require readback."""
+        await self._async_set_number_resilient(entity_id, target)
+        if self._entity_target_matches(entity_id, target):
+            return
+        timeout = max(
+            float(self.settings[SETTING_FEEDBACK_SETTLE_TIME]) * 2,
+            5.0,
+        )
+        if await self._async_wait_for_entity_target(entity_id, target, timeout):
+            return
+        raise HomeAssistantError(
+            f"System-Entladegrenze {target:g} wurde nicht vom XT500 bestätigt."
+        )
 
     async def async_set_system_charge_limit(self, value: float) -> None:
         """Set the shared normal charge limit through the original XT500 entity."""

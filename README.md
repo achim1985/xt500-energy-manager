@@ -298,7 +298,7 @@ Neuladen auch im Energiemanager-Dashboard.
 5. Als URL exakt eintragen:
 
    ```text
-   /xt500_energy_manager/xt500-energy-dashboard-strategy.js?v=1.9.2
+   /xt500_energy_manager/xt500-energy-dashboard-strategy.js?v=1.9.3
    ```
 
 6. Als Ressourcentyp **JavaScript-Modul** auswählen.
@@ -449,6 +449,15 @@ Sie zeigt und verändert direkt die originale System-Entladegrenze (`SI`) des
 XT500. Änderungen über SunEnergyXT und über das Energiemanager-Dashboard
 bleiben dadurch identisch. Die Wiederfreigabe-Hysterese gehört weiterhin nur
 zur Regelung des Energiemanagers.
+
+Hat der Speicher die Entladegrenze bereits erreicht, bleibt die Entladung bis
+zur Entladegrenze plus Wiederfreigabe-Hysterese gesperrt. Der Knopf
+**Entladesperre einmalig freigeben** erlaubt innerhalb dieses Bereichs eine
+einmalige weitere Entladung. Die reguläre Grenze bleibt im Energiemanager
+sichtbar. Technisch wird nur die originale XT500-System-Entladegrenze
+vorübergehend abgesenkt und mit Rücklesekontrolle wiederhergestellt, sobald die
+reguläre Grenze erneut erreicht wird. Beim Abschalten des Energiemanagers oder
+nach einem Neustart wird die temporäre Freigabe ebenfalls sicher beendet.
 
 Die Einstellung **PV für Regelung berücksichtigen** bietet drei eindeutige
 Auswahlen: **Hybrid (empfohlen)** verwendet XT500-PV und AC-PV-Überschuss,
@@ -712,7 +721,7 @@ wird ein vermeintlich ausgeschalteter Regler mit alten Sollwerten vermieden.
   Eintrag neu laden oder Home Assistant neu starten. Die optionalen Sensoren
   werden bei jedem Laden der Integration erneut automatisch erkannt.
 - Im Strategy-Editor prüfen, ob der Block **Energie heute** ausgeblendet wurde.
-- Die Dashboard-Ressource auf `?v=1.9.2` setzen und Ressourcen beziehungsweise
+- Die Dashboard-Ressource auf `?v=1.9.3` setzen und Ressourcen beziehungsweise
   Browser vollständig neu laden.
 
 ### Eingangsdaten sind ungültig
@@ -734,7 +743,7 @@ wird ein vermeintlich ausgeschalteter Regler mit alten Sollwerten vermieden.
 
 ## Projektstatus
 
-Version 1.9.2 ist der aktuelle veröffentlichte Stand. Rückmeldungen aus
+Version 1.9.3 ist der aktuelle veröffentlichte Stand. Rückmeldungen aus
 unterschiedlichen XT500- und XT500-Pro-Systemen, Firmwareständen,
 PV-Kopplungen und Stromzählern sind weiterhin willkommen.
 

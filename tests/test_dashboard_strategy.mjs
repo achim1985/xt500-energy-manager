@@ -111,6 +111,9 @@ const createLayoutHass = () => {
     "tariff_expires_at",
     "automatic_enabled",
     "cycle_start",
+    "discharge_hold",
+    "discharge_override_active",
+    "discharge_release",
     "base_mode",
     "coupling_mode",
     "show_advanced",
@@ -378,6 +381,31 @@ test("zeigt ausgewählte und aktive Lade- sowie Kopplungszustände genau einmal"
   const allSettingCards = settings.sections.flatMap((section) => section.cards);
   assert.equal(
     allSettingCards.filter((card) => card.name === "PV für Regelung berücksichtigen").length,
+    1,
+  );
+});
+
+test("zeigt Entladesperre und einmalige Freigabe eindeutig", async () => {
+  const result = await Strategy.generate({}, createLayoutHass());
+  const overview = result.views.find((view) => view.path === "speicher");
+  const settings = result.views.find((view) => view.path === "einstellungen");
+  const statusSection = overview.sections.find(
+    (section) => section.cards[0].heading === "Regelungsstatus",
+  );
+  const statusNames = statusSection.cards[1].entities.map((item) => item.name);
+  assert.equal(statusNames.filter((name) => name === "Entladesperre aktiv").length, 1);
+  assert.equal(
+    statusNames.filter((name) => name === "Temporäre Entladefreigabe aktiv").length,
+    1,
+  );
+
+  const normalSection = settings.sections.find(
+    (section) => section.cards[0].heading === "Normalbetrieb und Grenzen",
+  );
+  assert.equal(
+    normalSection.cards.filter(
+      (card) => card.name === "Entladesperre einmalig freigeben",
+    ).length,
     1,
   );
 });

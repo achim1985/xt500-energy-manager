@@ -10,6 +10,8 @@ const XT500_DISPLAY_NAMES = {
   active_energy_source: "Tatsächliche Ladequelle",
   data_valid: "Eingangsdaten",
   control_ready: "Produktivregelung",
+  discharge_hold: "Entladesperre aktiv",
+  discharge_override_active: "Temporäre Entladefreigabe aktiv",
   charge_request: "Ladeanforderung",
   tariff_request: "Tarif-Ladeanforderung",
   tariff_expires_at: "Tarifanforderung gültig bis",
@@ -39,6 +41,8 @@ const XT500_DISPLAY_NAMES = {
 
 const XT500_DISPLAY_ICONS = {
   active_target_soc: "mdi:battery-charging",
+  discharge_hold: "mdi:battery-lock",
+  discharge_override_active: "mdi:battery-unlock",
 };
 
 const XT500_STRATEGY_TYPE = "custom:xt500-energy-manager";
@@ -1049,7 +1053,8 @@ class XT500EnergyManagerDashboardStrategy extends HTMLElement {
       const regulationStatusEntities = namedExisting([
         "status", "active_operation", "selected_mode", "active_mode", "mode_state",
         "selected_coupling_mode", "active_coupling_mode", "active_energy_source",
-        "active_target_soc", "control_ready", "recovery_status", "data_valid",
+        "active_target_soc", "discharge_hold", "discharge_override_active",
+        "control_ready", "recovery_status", "data_valid",
       ]);
       const setpointEntities = namedExisting(["desired_charge_limit"]);
       if (actualGridSetpoint && hass.states[actualGridSetpoint]) {
@@ -1154,6 +1159,7 @@ class XT500EnergyManagerDashboardStrategy extends HTMLElement {
         } : null,
         tile("minimum_soc", "Entladegrenze", [{ type: "numeric-input", style: "buttons" }]),
         tile("soc_hysteresis", "Wiederfreigabe", [{ type: "numeric-input", style: "buttons" }]),
+        tile("discharge_release", "Entladesperre einmalig freigeben", [{ type: "button" }]),
         tile("target_grid_power", "Netzziel", [{ type: "numeric-input", style: "buttons" }]),
         tile("maximum_grid_output", "Hausnetz-Limit", [{ type: "numeric-input", style: "buttons" }]),
       ]);
@@ -1222,6 +1228,7 @@ class XT500EnergyManagerDashboardStrategy extends HTMLElement {
           "- **Ladelimit Normalbetrieb:** Dieser Wert wird als echte System-Ladegrenze an den Speicher geschrieben. Der auswählbare Bereich folgt dem Gerät; beim hier verwendeten System sind das 70 bis 100 %.\n" +
           "- **Lastanschluss-Entladegrenze:** Das ist die originale Geräte-Einstellung für den gesonderten XT500-Lastanschluss. Sie wird direkt am Speicher geändert und ist von der Entladegrenze der Energiemanager-Regelung getrennt.\n" +
           "- **Entladegrenze:** Das ist die originale System-Entladegrenze des XT500. Änderungen im Energiemanager oder in SunEnergyXT wirken auf denselben Gerätewert. Unterhalb dieses SOC stoppt die Batterieabgabe; die Energiemanager-Regelung wird erst oberhalb der zusätzlich eingestellten Hysterese wieder freigegeben.\n" +
+          "- **Entladesperre einmalig freigeben:** Ist der Speicher nach Erreichen der Entladegrenze noch bis zur regulären Wiederfreigabe gesperrt, kann er innerhalb dieses Bereichs einmalig wieder entladen. Die Integration senkt dafür die Geräte-Entladegrenze vorübergehend ab. Sobald die eingestellte Entladegrenze erneut erreicht wird, bei Abschalten der Regelung oder nach einem Neustart wird der originale Wert automatisch zurückgestellt.\n" +
           "- Startet eine manuelle oder automatische Zielladung oberhalb des normalen Limits, hebt die Integration die System-Ladegrenze vorübergehend auf das benötigte Ziel an. Nach Zielerreichung stellt sie automatisch das normale Ladelimit wieder her.\n\n" +
           "**Lademodi für manuelle und automatische Ladung**\n\n" +
           "- **Netzladung:** Die eingestellte Leistung ist der gewünschte Anteil aus dem öffentlichen Netz. AC-PV kann zusätzlich laden. Beispiel: 1.200 W Netzanteil plus 600 W AC-PV ergeben bis zu 1.800 W Batterieladung, sofern das Gerät dies erlaubt.\n" +

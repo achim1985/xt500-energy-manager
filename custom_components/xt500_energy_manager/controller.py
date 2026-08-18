@@ -96,6 +96,31 @@ def clamp(value: float, low: float, high: float) -> float:
     return max(low, min(value, high))
 
 
+def update_discharge_hold(
+    *,
+    current_hold: bool | None,
+    soc: float,
+    minimum_soc: float,
+    hysteresis: float,
+    temporary_release: bool = False,
+) -> bool:
+    """Return the safe discharge-lock state for the SOC hysteresis band.
+
+    The XT500 itself keeps discharging locked after the lower limit was reached
+    until the configured hysteresis has been recovered.  After an integration
+    reload that previous edge is unknown, so the middle of the band must be
+    reconstructed conservatively as locked.  A user-requested one-shot release
+    is the only exception and ends as soon as the lower limit is reached again.
+    """
+    if soc <= minimum_soc:
+        return True
+    if temporary_release:
+        return False
+    if soc >= minimum_soc + max(hysteresis, 0.0):
+        return False
+    return True if current_hold is None else current_hold
+
+
 def recovery_delay_seconds(
     base_delay: float,
     attempts_completed: int,

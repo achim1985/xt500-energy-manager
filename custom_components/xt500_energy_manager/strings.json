@@ -258,6 +258,8 @@
       "charge_request": { "name": "Ladeanforderung aktiv" },
       "tariff_request": { "name": "Tarif-Ladeanforderung aktiv" },
       "control_ready": { "name": "Produktivregelung bereit" },
+      "discharge_hold": { "name": "Entladesperre aktiv" },
+      "discharge_override_active": { "name": "Temporäre Entladefreigabe aktiv" },
       "pv_release_active": { "name": "DC-PV-Ausgabe freigegeben" },
       "ac_pv_release_active": { "name": "AC-PV-Überschuss freigegeben" },
       "ac_pv_input_valid": { "name": "Optionaler AC-PV-Sensor gültig" }
@@ -322,7 +324,8 @@
     "button": {
       "recalculate": { "name": "Jetzt neu berechnen" },
       "cycle_start": { "name": "Zyklusladung jetzt manuell starten" },
-      "cycle_reset": { "name": "Zyklustage auf 0 zurücksetzen" }
+      "cycle_reset": { "name": "Zyklustage auf 0 zurücksetzen" },
+      "discharge_release": { "name": "Entladesperre einmalig freigeben" }
     }
   }
 }

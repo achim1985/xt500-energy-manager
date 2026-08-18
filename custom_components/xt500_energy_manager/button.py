@@ -47,6 +47,19 @@ class XT500CycleResetButton(XT500Entity, ButtonEntity):
         await self.runtime.async_reset_cycle()
 
 
+class XT500DischargeReleaseButton(XT500Entity, ButtonEntity):
+    """Release the SOC discharge lock once, until the lower limit is hit."""
+
+    _attr_translation_key = "discharge_release"
+    _attr_icon = "mdi:battery-unlock"
+
+    def __init__(self, runtime) -> None:
+        super().__init__(runtime, "discharge_release")
+
+    async def async_press(self) -> None:
+        await self.runtime.async_release_discharge_once()
+
+
 async def async_setup_entry(_hass: HomeAssistant, entry: XT500ConfigEntry, async_add_entities: AddConfigEntryEntitiesCallback) -> None:
     runtime = entry.runtime_data
     async_add_entities(
@@ -54,5 +67,6 @@ async def async_setup_entry(_hass: HomeAssistant, entry: XT500ConfigEntry, async
             XT500RecalculateButton(runtime),
             XT500CycleStartButton(runtime),
             XT500CycleResetButton(runtime),
+            XT500DischargeReleaseButton(runtime),
         ]
     )
