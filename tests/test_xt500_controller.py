@@ -859,6 +859,84 @@ class ControllerTest(unittest.TestCase):
     def test_battery_flows_never_return_negative_values(self):
         self.assertEqual(controller.net_battery_flows(-20, -10), (0.0, 0.0))
 
+    def test_signed_battery_power_uses_original_xt500_sign(self):
+        self.assertEqual(controller.signed_battery_flows(275), (275, 0))
+        self.assertEqual(controller.signed_battery_flows(-90), (0, 90))
+
+    def test_normal_direct_pv_charge_is_reported_as_actual_pv_source(self):
+        self.assertEqual(
+            controller.classify_actual_energy_source(
+                net_charge_power=154,
+                planned_source="none",
+                coupling_mode="dc",
+                dc_pv_power=154,
+                available_ac_surplus=0,
+            ),
+            "pv",
+        )
+
+    def test_planned_charge_without_measured_charge_reports_no_source(self):
+        self.assertEqual(
+            controller.classify_actual_energy_source(
+                net_charge_power=0,
+                planned_source="grid",
+                coupling_mode="dc",
+                dc_pv_power=0,
+                available_ac_surplus=0,
+            ),
+            "none",
+        )
+
+    def test_measured_grid_charge_with_direct_pv_reports_both_sources(self):
+        self.assertEqual(
+            controller.classify_actual_energy_source(
+                net_charge_power=700,
+                planned_source="grid",
+                coupling_mode="dc",
+                dc_pv_power=200,
+                available_ac_surplus=0,
+            ),
+            "pv_and_grid",
+        )
+
+    def test_pv_surplus_uses_available_pv_without_false_battery_feedback(self):
+        result = controller.calculate_control(
+            self.input(
+                pv_power=100,
+                grid_power=300,
+                grid_port_power=44,
+                current_grid_setpoint=100,
+                current_inverter_setpoint=101,
+            ),
+            controller.ControlSettings(
+                base_mode="pv_surplus",
+                meter_export_positive=False,
+                pv_release_allowed=True,
+                grid_limit=800,
+                inverter_limit=2400,
+            ),
+        )
+        self.assertEqual(result.recommended_grid_setpoint, 100)
+        self.assertEqual(result.recommended_inverter_setpoint, 100)
+
+    def test_pv_surplus_control_still_stops_below_release_threshold(self):
+        result = controller.calculate_control(
+            self.input(
+                pv_power=49,
+                grid_power=284,
+                grid_port_power=0,
+                current_grid_setpoint=0,
+                current_inverter_setpoint=1,
+            ),
+            controller.ControlSettings(
+                base_mode="pv_surplus",
+                meter_export_positive=False,
+                pv_release_allowed=False,
+            ),
+        )
+        self.assertEqual(result.recommended_grid_setpoint, 0)
+        self.assertEqual(result.recommended_inverter_setpoint, 0)
+
     def test_xt500_grid_output_is_limited_to_800_watts(self):
         result = controller.calculate_control(
             self.input(grid_power=2000, grid_port_power=300),

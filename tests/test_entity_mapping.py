@@ -38,6 +38,7 @@ mapping_module = _load_module(
 from custom_components.xt500_energy_manager.const import (  # noqa: E402
     CONF_BATTERY_INPUT_POWER_ENTITY,
     CONF_BATTERY_OUTPUT_POWER_ENTITY,
+    CONF_BATTERY_POWER_ENTITY,
     CONF_GRID_CHARGE_DAILY_ENERGY_ENTITY,
     CONF_GRID_EXPORT_DAILY_ENERGY_ENTITY,
     CONF_GRID_PORT_POWER_ENTITY,
@@ -75,6 +76,7 @@ class EntityMappingTests(unittest.TestCase):
             CONF_MAX_CHARGE_SOC_ENTITY: "number.xt_sa",
             CONF_MIN_DISCHARGE_SOC_ENTITY: "number.xt_si",
             CONF_LOAD_DISCHARGE_LIMIT_ENTITY: "number.xt_so",
+            CONF_BATTERY_POWER_ENTITY: "sensor.xt_bp",
             CONF_BATTERY_INPUT_POWER_ENTITY: "sensor.xt_iw",
             CONF_BATTERY_OUTPUT_POWER_ENTITY: "sensor.xt_op",
             CONF_PV_DAILY_ENERGY_ENTITY: "sensor.xt_pd",
@@ -94,6 +96,7 @@ class EntityMappingTests(unittest.TestCase):
                 ("number.xt_sa", "SA"),
                 ("number.xt_si", "SI"),
                 ("number.xt_so", "SO"),
+                ("sensor.xt_bp", "BP"),
                 ("sensor.xt_iw", "IW"),
                 ("sensor.xt_op", "OP"),
                 ("sensor.xt_pd", "PD"),

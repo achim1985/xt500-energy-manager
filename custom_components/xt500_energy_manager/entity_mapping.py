@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from .const import (
+    CONF_BATTERY_POWER_ENTITY,
     CONF_BATTERY_INPUT_POWER_ENTITY,
     CONF_BATTERY_OUTPUT_POWER_ENTITY,
     CONF_GRID_CHARGE_DAILY_ENERGY_ENTITY,
@@ -46,6 +47,7 @@ XT500_ENTITY_MAPPINGS = (
     EntityMapping(CONF_MAX_CHARGE_SOC_ENTITY, "SA"),
     EntityMapping(CONF_MIN_DISCHARGE_SOC_ENTITY, "SI"),
     EntityMapping(CONF_LOAD_DISCHARGE_LIMIT_ENTITY, "SO", required=False),
+    EntityMapping(CONF_BATTERY_POWER_ENTITY, "BP", required=False),
     EntityMapping(CONF_BATTERY_INPUT_POWER_ENTITY, "IW", required=False),
     EntityMapping(CONF_BATTERY_OUTPUT_POWER_ENTITY, "OP", required=False),
     EntityMapping(CONF_PV_DAILY_ENERGY_ENTITY, "PD", required=False),

@@ -18,6 +18,7 @@ from .const import (
     CONF_AC_PV_SIGN,
     CONF_BATTERY_INPUT_POWER_ENTITY,
     CONF_BATTERY_OUTPUT_POWER_ENTITY,
+    CONF_BATTERY_POWER_ENTITY,
     CONF_GRID_CHARGE_DAILY_ENERGY_ENTITY,
     CONF_GRID_EXPORT_DAILY_ENERGY_ENTITY,
     CONF_GRID_PORT_POWER_ENTITY,
@@ -45,7 +46,8 @@ type XT500ConfigEntry = ConfigEntry[XT500Runtime]
 
 _LOGGER = logging.getLogger(__name__)
 
-_OPTIONAL_DAILY_ENERGY_KEYS = (
+_OPTIONAL_DISCOVERED_KEYS = (
+    CONF_BATTERY_POWER_ENTITY,
     CONF_PV_DAILY_ENERGY_ENTITY,
     CONF_GRID_CHARGE_DAILY_ENERGY_ENTITY,
     CONF_GRID_EXPORT_DAILY_ENERGY_ENTITY,
@@ -79,17 +81,17 @@ def _detect_configured_xt500_entities(
     )
 
 
-def _discover_daily_energy_entities(
+def _discover_optional_entities(
     hass: HomeAssistant, entry: XT500ConfigEntry
 ) -> None:
-    """Attach original daily-energy sensors from the configured XT500 device."""
+    """Attach newly available optional sensors from the configured XT500 device."""
     result = _detect_configured_xt500_entities(hass, dict(entry.data))
     if result is None:
         return
     detected, _missing, ambiguous = result
     additions = {
         key: detected[key]
-        for key in _OPTIONAL_DAILY_ENERGY_KEYS
+        for key in _OPTIONAL_DISCOVERED_KEYS
         if key in detected and key not in ambiguous and entry.data.get(key) != detected[key]
     }
     if additions:
@@ -161,7 +163,7 @@ async def async_setup(hass: HomeAssistant, _config: dict) -> bool:
 
 async def async_setup_entry(hass: HomeAssistant, entry: XT500ConfigEntry) -> bool:
     """Set up one XT500 energy controller."""
-    _discover_daily_energy_entities(hass, entry)
+    _discover_optional_entities(hass, entry)
     runtime = XT500Runtime(hass, entry)
     entry.runtime_data = runtime
     await runtime.async_start()
@@ -194,6 +196,7 @@ async def async_migrate_entry(
             CONF_LOAD_DISCHARGE_LIMIT_ENTITY,
             CONF_BATTERY_INPUT_POWER_ENTITY,
             CONF_BATTERY_OUTPUT_POWER_ENTITY,
+            CONF_BATTERY_POWER_ENTITY,
             CONF_PV_DAILY_ENERGY_ENTITY,
             CONF_GRID_CHARGE_DAILY_ENERGY_ENTITY,
             CONF_GRID_EXPORT_DAILY_ENERGY_ENTITY,
@@ -228,7 +231,18 @@ async def async_migrate_entry(
 
     if entry.version < 4:
         data.setdefault(CONF_AC_PV_SIGN, PV_PRODUCTION_POSITIVE)
-        hass.config_entries.async_update_entry(entry, data=data, version=4)
+    if entry.version < 5:
+        result = _detect_configured_xt500_entities(hass, data)
+        if result is not None:
+            detected, _missing, ambiguous = result
+            if (
+                CONF_BATTERY_POWER_ENTITY in detected
+                and CONF_BATTERY_POWER_ENTITY not in ambiguous
+            ):
+                data[CONF_BATTERY_POWER_ENTITY] = detected[
+                    CONF_BATTERY_POWER_ENTITY
+                ]
+        hass.config_entries.async_update_entry(entry, data=data, version=5)
     return True
 
 

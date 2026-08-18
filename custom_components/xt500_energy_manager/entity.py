@@ -10,6 +10,7 @@ from .const import (
     CONF_AC_PV_SIGN,
     CONF_BATTERY_INPUT_POWER_ENTITY,
     CONF_BATTERY_OUTPUT_POWER_ENTITY,
+    CONF_BATTERY_POWER_ENTITY,
     CONF_GRID_CHARGE_DAILY_ENERGY_ENTITY,
     CONF_GRID_EXPORT_DAILY_ENERGY_ENTITY,
     CONF_GRID_PORT_POWER_ENTITY,
@@ -67,6 +68,7 @@ class XT500Entity(Entity):
             ),
             "source_battery_input_power_entity": self.runtime.entry.data.get(CONF_BATTERY_INPUT_POWER_ENTITY),
             "source_battery_output_power_entity": self.runtime.entry.data.get(CONF_BATTERY_OUTPUT_POWER_ENTITY),
+            "source_battery_power_entity": self.runtime.entry.data.get(CONF_BATTERY_POWER_ENTITY),
             "source_pv_power_entity": self.runtime.entry.data.get(CONF_PV_POWER_ENTITY),
             "source_ac_pv_power_entity": self.runtime.entry.data.get(
                 CONF_AC_PV_POWER_ENTITY

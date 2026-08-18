@@ -1,5 +1,20 @@
 # Änderungsprotokoll
 
+## 1.9.2 – 2026-08-18
+
+- die aktuelle originale SunEnergyXT-System-Batterieleistung (`BP`) wird
+  automatisch erkannt und für die tatsächliche Lade- und Entladeleistung im
+  Dashboard verwendet
+- bestehende Einrichtungen werden beim Update automatisch auf den eindeutigen,
+  vorzeichenbehafteten Batteriesensor migriert; Gesamt-Ein- und Ausgang bleiben
+  nur als Rückfalllösung für ältere SunEnergyXT-Versionen erhalten
+- die tatsächliche Ladequelle wird aus einer gemessenen Akkuladung und den
+  real verfügbaren PV-/Netzquellen bestimmt; normales Laden aus direkt
+  angeschlossener PV wird dadurch korrekt angezeigt
+- PV-Überschuss bleibt auf die wirklich verfügbare PV-Leistung begrenzt und
+  erhöht Sollwerte nicht aufgrund einer vermeintlichen, aus Gesamtleistungen
+  berechneten Akkuladung
+
 ## 1.9.1 – 2026-08-04
 
 - beim Ausschalten werden Netzanschluss-Sollwert und Wechselrichter-Obergrenze

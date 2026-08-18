@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Final
 
 DOMAIN: Final = "xt500_energy_manager"
-VERSION: Final = "1.9.1"
+VERSION: Final = "1.9.2"
 PLATFORMS: Final = (
     "sensor",
     "binary_sensor",
@@ -27,6 +27,7 @@ CONF_INVERTER_SETPOINT_ENTITY: Final = "inverter_setpoint_entity"
 CONF_MAX_CHARGE_SOC_ENTITY: Final = "max_charge_soc_entity"
 CONF_MIN_DISCHARGE_SOC_ENTITY: Final = "min_discharge_soc_entity"
 CONF_LOAD_DISCHARGE_LIMIT_ENTITY: Final = "load_discharge_limit_entity"
+CONF_BATTERY_POWER_ENTITY: Final = "battery_power_entity"
 CONF_BATTERY_INPUT_POWER_ENTITY: Final = "battery_input_power_entity"
 CONF_BATTERY_OUTPUT_POWER_ENTITY: Final = "battery_output_power_entity"
 CONF_PV_DAILY_ENERGY_ENTITY: Final = "pv_daily_energy_entity"
@@ -48,6 +49,7 @@ INPUT_LABELS: Final = {
     CONF_INVERTER_SETPOINT_ENTITY: "Sollwert Wechselrichter-Obergrenze",
     CONF_MAX_CHARGE_SOC_ENTITY: "System-Ladegrenze",
     CONF_MIN_DISCHARGE_SOC_ENTITY: "System-Entladegrenze",
+    CONF_BATTERY_POWER_ENTITY: "System-Batterieleistung",
 }
 
 METER_IMPORT_POSITIVE: Final = "import_positive"

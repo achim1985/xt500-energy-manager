@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Callable
+from dataclasses import replace
 from datetime import UTC, datetime, time, timedelta
 import logging
 from time import monotonic
@@ -26,6 +27,7 @@ from .const import (
     CONF_AC_PV_SIGN,
     CONF_BATTERY_INPUT_POWER_ENTITY,
     CONF_BATTERY_OUTPUT_POWER_ENTITY,
+    CONF_BATTERY_POWER_ENTITY,
     CONF_GRID_PORT_POWER_ENTITY,
     CONF_GRID_POWER_ENTITY,
     CONF_GRID_SETPOINT_ENTITY,
@@ -89,11 +91,13 @@ from .controller import (
     ControlResult,
     ControlSettings,
     calculate_control,
+    classify_actual_energy_source,
     cycle_is_due,
     decode_signed_16,
     feedback_samples_are_fresh,
     limit_setpoint_change,
     net_battery_flows,
+    signed_battery_flows,
     next_cycle_check_at,
     normalize_pv_production,
     overall_control_error,
@@ -638,6 +642,7 @@ class XT500Runtime:
             )
         )
 
+        battery_flows = self._battery_flows()
         self.result = calculate_control(
             ControlInput(
                 soc=values[CONF_SOC_ENTITY],
@@ -669,6 +674,18 @@ class XT500Runtime:
                 pv_release_allowed=self._pv_release_active,
                 ac_pv_release_allowed=self._ac_pv_release_active,
                 coupling_mode=self.settings[SETTING_COUPLING_MODE],
+            ),
+        )
+        self.result = replace(
+            self.result,
+            active_energy_source=classify_actual_energy_source(
+                net_charge_power=(
+                    battery_flows[0] if battery_flows is not None else None
+                ),
+                planned_source=self.result.active_energy_source,
+                coupling_mode=self.result.selected_coupling_mode,
+                dc_pv_power=self.result.dc_pv_power,
+                available_ac_surplus=self.result.available_ac_surplus,
             ),
         )
         if self.control_ready:
@@ -805,7 +822,12 @@ class XT500Runtime:
         )
 
     def _battery_flows(self) -> tuple[float, float] | None:
-        """Return actual net charge/discharge derived from original XT500 totals."""
+        """Return actual charge/discharge, preferring the original signed BP."""
+        battery_entity = self.entry.data.get(CONF_BATTERY_POWER_ENTITY)
+        if battery_entity:
+            battery_power = self._float_state(battery_entity)
+            if battery_power is not None:
+                return signed_battery_flows(battery_power)
         input_entity = self.entry.data.get(CONF_BATTERY_INPUT_POWER_ENTITY)
         output_entity = self.entry.data.get(CONF_BATTERY_OUTPUT_POWER_ENTITY)
         if not input_entity or not output_entity:

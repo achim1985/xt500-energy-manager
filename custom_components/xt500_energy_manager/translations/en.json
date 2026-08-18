@@ -43,8 +43,9 @@
           "max_charge_soc_entity": "System charge limit",
           "min_discharge_soc_entity": "System discharge limit",
           "load_discharge_limit_entity": "System load-port discharge limit",
-          "battery_input_power_entity": "Battery charging power (total input)",
-          "battery_output_power_entity": "Battery discharging power (total output)",
+          "battery_power_entity": "System battery power (recommended)",
+          "battery_input_power_entity": "Total input power (legacy integration only)",
+          "battery_output_power_entity": "Total output power (legacy integration only)",
           "meter_sign": "Public meter sign convention",
           "ac_pv_sign": "AC PV sign convention"
         }
@@ -116,8 +117,9 @@
           "max_charge_soc_entity": "System charge limit",
           "min_discharge_soc_entity": "System discharge limit",
           "load_discharge_limit_entity": "System load-port discharge limit",
-          "battery_input_power_entity": "Battery charging power (total input)",
-          "battery_output_power_entity": "Battery discharging power (total output)",
+          "battery_power_entity": "System battery power (recommended)",
+          "battery_input_power_entity": "Total input power (legacy integration only)",
+          "battery_output_power_entity": "Total output power (legacy integration only)",
           "meter_sign": "Public meter sign convention",
           "ac_pv_sign": "AC PV sign convention"
         }

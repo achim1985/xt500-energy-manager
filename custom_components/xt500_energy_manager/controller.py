@@ -350,6 +350,48 @@ def net_battery_flows(
     return round(max(net_power, 0.0), 1), round(max(-net_power, 0.0), 1)
 
 
+def signed_battery_flows(battery_power: float) -> tuple[float, float]:
+    """Split original XT500 BP: positive charges, negative discharges."""
+    power = float(battery_power)
+    return round(max(power, 0.0), 1), round(max(-power, 0.0), 1)
+
+
+def classify_actual_energy_source(
+    *,
+    net_charge_power: float | None,
+    planned_source: str,
+    coupling_mode: str,
+    dc_pv_power: float,
+    available_ac_surplus: float,
+) -> str:
+    """Classify the source of a measured net battery charge.
+
+    The controller's planned source alone is insufficient in normal operation:
+    direct PV may charge the battery without an explicit charge request.  Gate
+    the classification with the original XT500 net battery flow and then add
+    the PV paths that are physically available for the selected coupling.
+    """
+    if net_charge_power is None:
+        return planned_source
+    if net_charge_power <= 0:
+        return "none"
+
+    grid_source = planned_source in ("grid", "pv_and_grid")
+    pv_source = planned_source in ("pv", "pv_and_grid")
+    if coupling_mode in (COUPLING_AUTO, COUPLING_DC):
+        pv_source = pv_source or dc_pv_power > 0
+    if coupling_mode in (COUPLING_AUTO, COUPLING_AC):
+        pv_source = pv_source or available_ac_surplus > 0
+
+    if grid_source and pv_source:
+        return "pv_and_grid"
+    if grid_source:
+        return "grid"
+    if pv_source:
+        return "pv"
+    return "none"
+
+
 @dataclass(slots=True, frozen=True)
 class ControlInput:
     """Current measurements used by the production controller."""
@@ -564,9 +606,7 @@ def calculate_control(data: ControlInput, cfg: ControlSettings) -> ControlResult
     elif charge_active and active_mode == MODE_PV_PRIORITY:
         grid_target = feedback_grid_target
     elif pv_direct:
-        grid_target = (
-            pv_direct_target if raw_grid_target >= 0 else feedback_grid_target
-        )
+        grid_target = pv_direct_target if raw_grid_target >= 0 else feedback_grid_target
     else:
         grid_target = feedback_grid_target
 
