@@ -1,5 +1,63 @@
 # Änderungsprotokoll
 
+## 1.10.3 – 2026-08-21
+
+- Die Einstellung heißt im Dashboard nun eindeutig **Bevorzugte
+  Akku-Ladeleistung im PV-Überschussmodus**.
+- Anleitung und Dokumentation erklären den gemessenen Netto-Ladezielwert, die
+  vollständige Gegenregelung jeder Akkuentladung, das Halteband gegen Pendeln
+  und die Abgrenzung zu einer festen Netzladung.
+- Die Totzone wird korrekt als reine Netzeinspeisungs-Totzone bezeichnet.
+
+## 1.10.2 – 2026-08-21
+
+- Der PV-Überschussmodus regelt jetzt jede gemessene Akkuentladung vollständig
+  gegen. Die einstellbare Totzone gilt nur noch für die Netzeinspeisung.
+- Die bevorzugte Akku-Ladeleistung bleibt auch bei kurzzeitigem Netzbezug aktiv,
+  damit der Sollwert nicht wieder in die Akkuentladung zurückpendelt.
+- Die Einstellungsseiten verwenden kompakte Zeilen statt großer Zahlenkacheln.
+  Laden und Feinabstimmung sind übersichtliche Unterseiten der Einstellungen.
+
+## 1.10.1 – 2026-08-21
+
+- Die bisher sehr lange Einstellungsseite wurde in die drei klar getrennten
+  Reiter Einstellungen, Laden und Feinabstimmung aufgeteilt. Lange Bereiche
+  sind zusätzlich in gleichmäßigere, logisch benannte Abschnitte zerlegt.
+- Der PV-Überschussmodus kann nun eine gemessene Akku-Ladereserve halten
+  (Standard: 50 W). Dadurch liegt der Arbeitspunkt bevorzugt leicht auf der
+  Ladeseite statt direkt an der instabilen Grenze zur Batterieentladung. Bei
+  bestehendem Netzbezug wird keine zusätzliche Ladereserve erzwungen.
+
+## 1.10.0 – 2026-08-21
+
+- Die automatische 100-%-Zyklusladung endet nicht mehr allein anhand des
+  gerundeten SOC-Werts. Sie hält 100 % zunächst standardmäßig zehn Minuten und
+  bestätigt das Ladeende erst, wenn die gemessene Batterieladeleistung fünf
+  Minuten lang höchstens 30 W beträgt.
+- Während dieser Bestätigung wird die Zyklus-Ladeleistung auf standardmäßig
+  300 W begrenzt. Nach spätestens 60 Minuten endet der Vorgang mit einem im
+  Status sichtbaren Zeitlimit, damit keine endlose Zwangsladung entsteht.
+- Haltezeit, Ladeende-Schwelle, Bestätigungsdauer, Zeitlimit und
+  Nachladeleistung sind einstellbar. Laufende Bestätigungen überstehen einen
+  Neustart oder ein Neuladen der Integration.
+
+- kompatibel mit SunEnergyXT 500 Series 1.1.3 und dessen einstellbarem
+  Geräte-Abfrageintervall von 3 bis 60 Sekunden
+- die neuen optionalen Gerätewerte `SI1` und `SA1` werden bei Einrichtung und
+  Upgrade automatisch erkannt; die Entlade-Hysterese des Energiemanagers wird
+  mit `SI1` synchronisiert und beide Werte sind im Dashboard beschreibbar
+- Rücklese-, Wiederherstellungs- und Kommunikationsfristen berücksichtigen das
+  tatsächlich in der Originalintegration eingestellte Abfrageintervall
+- der PV-Überschussmodus verwendet die gemessene Akkuentladung und die
+  öffentliche Netzeinspeisung als gemeinsame Rückkopplung; `GS` und `IS`
+  werden mit dem größeren der beiden Fehler abgeregelt, ohne denselben
+  Leistungsüberschuss doppelt zu zählen
+- eine im Dashboard einstellbare Totzone verhindert Flattern um 0 W; Diagnose
+  und Übersicht zeigen die aktuell wirksame PV-Überschuss-Abregelung
+- Dokumentation weist auf die Geräte-Standardwerte von jeweils 5 % hin; nach
+  einem Test sollen benutzerdefinierte SI1-/SA1-Werte wieder auf 5 % gesetzt
+  werden, wenn sie nicht dauerhaft benötigt werden
+
 ## 1.9.3 – 2026-08-18
 
 - der Entlade-Haltezustand wird nach Neustart oder Neuladen innerhalb des

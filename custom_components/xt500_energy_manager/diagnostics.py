@@ -20,7 +20,7 @@ async def async_get_config_entry_diagnostics(_hass: HomeAssistant, entry: XT500C
             "since": runtime.communication_pause_since,
             "message": runtime.communication_pause_message,
             "resume_after_stable_seconds": 15,
-            "hard_stop_after_seconds": 90,
+            "hard_stop_after_seconds": runtime.communication_failure_seconds,
         },
         "automatic_recovery": {
             "enabled": runtime.automatic_recovery_enabled,
@@ -39,6 +39,7 @@ async def async_get_config_entry_diagnostics(_hass: HomeAssistant, entry: XT500C
             "last_recovery": runtime.last_transient_write_recovery,
         },
         "configured_entities": dict(entry.data),
+        "sunenergyxt_polling_interval_seconds": runtime.source_polling_interval,
         "settings": dict(runtime.settings),
         "cycle_schedule": {
             "enabled": bool(runtime.settings["automatic_enabled"]),
@@ -51,6 +52,18 @@ async def async_get_config_entry_diagnostics(_hass: HomeAssistant, entry: XT500C
             "reference": runtime.settings["cycle_reference"],
             "next_cycle": runtime.next_cycle_at,
         },
+        "full_charge_confirmation": {
+            "state": runtime.full_charge_confirmation_state,
+            "active": runtime.full_charge_confirmation_active,
+            "started_at": runtime.settings["full_charge_confirmation_started"],
+            "taper_started_at": runtime.settings["full_charge_taper_started"],
+            "actual_charge_power_w": runtime.battery_charge_power,
+            "minimum_hold_minutes": runtime.settings["full_charge_min_hold_minutes"],
+            "taper_threshold_w": runtime.settings["full_charge_taper_power"],
+            "taper_minutes": runtime.settings["full_charge_taper_minutes"],
+            "timeout_minutes": runtime.settings["full_charge_timeout_minutes"],
+            "top_off_power_w": runtime.settings["full_charge_top_off_power"],
+        },
         "tariff_request": {
             "active": runtime.tariff_request_active,
             "target_soc": runtime.settings["tariff_target_soc"],
@@ -61,6 +74,18 @@ async def async_get_config_entry_diagnostics(_hass: HomeAssistant, entry: XT500C
         "battery_flows": {
             "net_charge_w": runtime.battery_charge_power,
             "net_discharge_w": runtime.battery_discharge_power,
+        },
+        "pv_surplus_feedback": {
+            "deadband_w": runtime.settings["pv_surplus_deadband"],
+            "charge_reserve_w": runtime.settings["pv_surplus_charge_reserve"],
+            "battery_charge_w": runtime.battery_charge_power,
+            "battery_discharge_w": runtime.battery_discharge_power,
+            "public_grid_w": (
+                runtime.result.normalized_grid_power if runtime.result else None
+            ),
+            "applied_correction_w": (
+                runtime.result.pv_surplus_correction if runtime.result else None
+            ),
         },
         "discharge_lock": {
             "active": runtime.discharge_hold_active,

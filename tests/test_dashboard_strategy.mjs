@@ -90,6 +90,7 @@ const createLayoutHass = () => {
   }
   for (const key of [
     "recommended_grid_setpoint",
+    "pv_surplus_correction",
     "selected_mode",
     "active_mode",
     "active_operation",
@@ -100,6 +101,7 @@ const createLayoutHass = () => {
     "ac_pv_power",
     "available_ac_surplus",
     "cycle_state",
+    "full_charge_confirmation",
     "battery_charge_power",
     "regulation_enabled",
     "automatic_recovery_enabled",
@@ -114,6 +116,31 @@ const createLayoutHass = () => {
     "discharge_hold",
     "discharge_override_active",
     "discharge_release",
+    "charge_soc_hysteresis",
+    "pv_surplus_deadband",
+    "pv_surplus_charge_reserve",
+    "full_charge_min_hold_minutes",
+    "full_charge_taper_power",
+    "full_charge_taper_minutes",
+    "full_charge_timeout_minutes",
+    "full_charge_top_off_power",
+    "control_band",
+    "control_error",
+    "control_interval",
+    "control_max_step",
+    "control_small_error",
+    "control_large_error",
+    "control_small_max_step",
+    "control_medium_max_step",
+    "control_large_max_step",
+    "control_slow_interval",
+    "control_medium_interval",
+    "control_fast_interval",
+    "feedback_settle_time",
+    "recovery_stability_time",
+    "pv_stop_power",
+    "pv_start_power",
+    "pv_start_delay",
     "base_mode",
     "coupling_mode",
     "show_advanced",
@@ -170,7 +197,7 @@ test("bindet genau die ausgewählte Quellansicht als echten Reiter ein", async (
     createHass({ "dashboard-achim": source }),
   );
 
-  assert.equal(result.views.length, 7);
+  assert.equal(result.views.length, 9);
   const imported = result.views[1];
   assert.equal(imported.title, "PV");
   assert.equal(imported.icon, "mdi:solar-power");
@@ -186,8 +213,10 @@ test("bindet genau die ausgewählte Quellansicht als echten Reiter ein", async (
     "energie-verbraucher",
     "energie-live",
     "einstellungen",
+    "laden",
+    "feinabstimmung",
   ]);
-  assert.equal(result.views.at(-1).path, "einstellungen");
+  assert.equal(result.views.at(-1).path, "feinabstimmung");
   assert.deepEqual(source, originalSource);
 });
 
@@ -209,7 +238,7 @@ test("Nur für mich setzt die Ansicht auf den beim Speichern erfassten Benutzer"
   );
 
   assert.deepEqual(plain(result.views[1].visible), [{ user: "saved-user" }]);
-  assert.equal(result.views.at(-1).path, "einstellungen");
+  assert.equal(result.views.at(-1).path, "feinabstimmung");
 });
 
 test("ignoriert doppelte Einträge und Strategie-Ansichten", async () => {
@@ -234,7 +263,7 @@ test("ignoriert doppelte Einträge und Strategie-Ansichten", async () => {
     }),
   );
 
-  assert.equal(result.views.length, 7);
+  assert.equal(result.views.length, 9);
 });
 
 test("verhindert Selbstimport und lässt das Energiemanager-Dashboard benutzbar", async () => {
@@ -260,9 +289,9 @@ test("verhindert Selbstimport und lässt das Energiemanager-Dashboard benutzbar"
     }),
   );
 
-  assert.equal(result.views.length, 6);
+  assert.equal(result.views.length, 8);
   assert.equal(result.views[0].path, "speicher");
-  assert.equal(result.views.at(-1).path, "einstellungen");
+  assert.equal(result.views.at(-1).path, "feinabstimmung");
 });
 
 test("stellt einen grafischen Strategy-Editor bereit", () => {
@@ -349,12 +378,27 @@ test("teilt die Speicheransicht standardmäßig in einzeln anordenbare Blöcke",
   const settings = result.views.find((view) => view.path === "einstellungen");
   assert.deepEqual(plain(sectionHeadings(settings)), [
     "Bedienung und Sicherheit",
+    "Weitere Einstellungen",
     "Hauptsteuerung",
-    "Manuelle Zielladung",
-    "Dynamischer Stromtarif",
-    "Normalbetrieb und Grenzen",
-    "Adaptive Regelung",
+    "Betriebsart und Netzziel",
+    "Batteriegrenzen und Schutz",
   ]);
+  const charging = result.views.find((view) => view.path === "laden");
+  assert.deepEqual(plain(sectionHeadings(charging)), [
+    "Manuelle Zielladung",
+    "Zyklusladung",
+    "Dynamischer Stromtarif",
+    "Bestätigung der 100-%-Vollladung",
+  ]);
+  const tuning = result.views.find((view) => view.path === "feinabstimmung");
+  assert.deepEqual(plain(sectionHeadings(tuning)), [
+    "Regelstatus und Abweichungen",
+    "Leistungsschritte und Reaktionszeiten",
+    "Automatische Fehlerwiederherstellung",
+  ]);
+  assert.equal(charging.subview, true);
+  assert.equal(tuning.subview, true);
+  assert.equal(charging.back_path, "/xt500-energiemanager/einstellungen");
 });
 
 test("zeigt ausgewählte und aktive Lade- sowie Kopplungszustände genau einmal", async () => {
@@ -378,9 +422,17 @@ test("zeigt ausgewählte und aktive Lade- sowie Kopplungszustände genau einmal"
     assert.equal(statusNames.filter((value) => value === name).length, 1);
   }
 
-  const allSettingCards = settings.sections.flatMap((section) => section.cards);
+  const allSettingNames = settings.sections
+    .flatMap((section) => section.cards)
+    .flatMap((card) => card.entities?.map((item) => item.name) || [card.name]);
   assert.equal(
-    allSettingCards.filter((card) => card.name === "PV für Regelung berücksichtigen").length,
+    allSettingNames.filter((name) => name === "PV für Regelung berücksichtigen").length,
+    1,
+  );
+  assert.equal(
+    allSettingNames.filter(
+      (name) => name === "Bevorzugte Akku-Ladeleistung im PV-Überschussmodus",
+    ).length,
     1,
   );
 });
@@ -400,7 +452,7 @@ test("zeigt Entladesperre und einmalige Freigabe eindeutig", async () => {
   );
 
   const normalSection = settings.sections.find(
-    (section) => section.cards[0].heading === "Normalbetrieb und Grenzen",
+    (section) => section.cards[0].heading === "Batteriegrenzen und Schutz",
   );
   assert.equal(
     normalSection.cards.filter(
@@ -461,25 +513,34 @@ test("wendet Reihenfolge und ausgeblendete Blöcke für beide Seiten an", async 
   ]);
   const settings = result.views.find((view) => view.path === "einstellungen");
   assert.deepEqual(plain(sectionHeadings(settings)), [
-    "Normalbetrieb und Grenzen",
-    "Manuelle Zielladung",
-    "Dynamischer Stromtarif",
+    "Betriebsart und Netzziel",
+    "Weitere Einstellungen",
+    "Batteriegrenzen und Schutz",
     "Hauptsteuerung",
   ]);
+  const charging = result.views.find((view) => view.path === "laden");
+  assert.deepEqual(plain(sectionHeadings(charging)), [
+    "Manuelle Zielladung",
+    "Zyklusladung",
+    "Dynamischer Stromtarif",
+    "Bestätigung der 100-%-Vollladung",
+  ]);
+  assert.equal(result.views.find((view) => view.path === "feinabstimmung").sections.length, 0);
 });
 
 test("ordnet die Schnellsteuerung eindeutig und zeigt Fehlerbehebung nur in Einstellungen", async () => {
   const result = await Strategy.generate({}, createLayoutHass());
   const overview = result.views.find((view) => view.path === "speicher");
   const settings = result.views.find((view) => view.path === "einstellungen");
+  const charging = result.views.find((view) => view.path === "laden");
   const quickControls = overview.sections.find(
     (section) => section.cards[0].heading === "Schnellsteuerung",
   );
   const mainControl = settings.sections.find(
     (section) => section.cards[0].heading === "Hauptsteuerung",
   );
-  const targetCharge = settings.sections.find(
-    (section) => section.cards[0].heading === "Manuelle Zielladung",
+  const targetCharge = charging.sections.find(
+    (section) => section.cards[0].heading === "Zyklusladung",
   );
 
   assert.deepEqual(plain(quickControls.cards.slice(1).map((card) => card.name)), [
@@ -493,28 +554,33 @@ test("ordnet die Schnellsteuerung eindeutig und zeigt Fehlerbehebung nur in Eins
     false,
   );
   assert.equal(
-    mainControl.cards.some((card) => card.entity?.includes("automatic_recovery")),
+    mainControl.cards.some((card) =>
+      card.entities?.some((item) => item.entity.includes("automatic_recovery"))
+    ),
     true,
   );
 
-  const cycleMonitorIndex = targetCharge.cards.findIndex(
-    (card) => card.name === "Automatische Zyklusüberwachung",
+  assert.equal(
+    targetCharge.cards.some((card) =>
+      card.entities?.some((item) => item.name === "Automatische Zyklusüberwachung")
+    ),
+    true,
   );
-  const cycleStartIndex = targetCharge.cards.findIndex(
-    (card) => card.name === "Jetzt manuell starten",
+  assert.equal(
+    targetCharge.cards.some((card) => card.name === "Jetzt manuell starten"),
+    true,
   );
-  assert.equal(cycleStartIndex, cycleMonitorIndex + 1);
 });
 
 test("zeigt die Tarifladung nur einmal als eigenen Einstellungsblock", async () => {
   const result = await Strategy.generate({}, createLayoutHass());
-  const settings = result.views.find((view) => view.path === "einstellungen");
-  const tariffSections = settings.sections.filter(
+  const charging = result.views.find((view) => view.path === "laden");
+  const tariffSections = charging.sections.filter(
     (section) => section.cards[0].heading === "Dynamischer Stromtarif",
   );
 
   assert.equal(tariffSections.length, 1);
-  assert.deepEqual(plain(tariffSections[0].cards.slice(1, 5).map((card) => card.name)), [
+  assert.deepEqual(plain(tariffSections[0].cards[1].entities.slice(0, 4).map((item) => item.name)), [
     "Tarifladung anfordern",
     "Ladeziel",
     "Netz-Ladeleistung",
@@ -534,7 +600,7 @@ test("erzeugt historische und aktuelle Energieansichten vor der Einstellungsseit
     "energie-verbraucher",
     "energie-live",
   ]);
-  assert.equal(result.views.at(-1).path, "einstellungen");
+  assert.equal(result.views.at(-1).path, "feinabstimmung");
 
   const historicalViews = energyViews.filter((view) =>
     view.path !== "energie-live"
@@ -592,6 +658,8 @@ test("unterstützt kompakte und ausgeblendete Energieseiten", async () => {
     "speicher",
     "energie",
     "einstellungen",
+    "laden",
+    "feinabstimmung",
   ]);
   assert.ok(compact.views[1].sections
     .flatMap((section) => section.cards)
@@ -606,5 +674,7 @@ test("unterstützt kompakte und ausgeblendete Energieseiten", async () => {
   assert.deepEqual(plain(hidden.views.map((view) => view.path)), [
     "speicher",
     "einstellungen",
+    "laden",
+    "feinabstimmung",
   ]);
 });

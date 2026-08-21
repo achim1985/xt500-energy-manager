@@ -11,6 +11,8 @@ from .const import (
     CONF_BATTERY_INPUT_POWER_ENTITY,
     CONF_BATTERY_OUTPUT_POWER_ENTITY,
     CONF_BATTERY_POWER_ENTITY,
+    CONF_CHARGE_SOC_HYSTERESIS_ENTITY,
+    CONF_DISCHARGE_SOC_HYSTERESIS_ENTITY,
     CONF_GRID_CHARGE_DAILY_ENERGY_ENTITY,
     CONF_GRID_EXPORT_DAILY_ENERGY_ENTITY,
     CONF_GRID_PORT_POWER_ENTITY,
@@ -63,6 +65,13 @@ class XT500Entity(Entity):
             "source_min_discharge_soc_entity": self.runtime.entry.data.get(
                 CONF_MIN_DISCHARGE_SOC_ENTITY
             ),
+            "source_discharge_soc_hysteresis_entity": self.runtime.entry.data.get(
+                CONF_DISCHARGE_SOC_HYSTERESIS_ENTITY
+            ),
+            "source_charge_soc_hysteresis_entity": self.runtime.entry.data.get(
+                CONF_CHARGE_SOC_HYSTERESIS_ENTITY
+            ),
+            "source_polling_interval_seconds": self.runtime.source_polling_interval,
             "source_load_discharge_limit_entity": self.runtime.entry.data.get(
                 CONF_LOAD_DISCHARGE_LIMIT_ENTITY
             ),

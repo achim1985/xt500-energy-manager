@@ -27,6 +27,66 @@ RECOVERY_DELAY_MULTIPLIERS = (1.0, 5.0, 15.0)
 WRITE_RETRY_DELAY_MULTIPLIERS = (1.0, 2.0)
 
 
+@dataclass(slots=True, frozen=True)
+class FullChargeConfirmationDecision:
+    """Restart-safe progress of one observed 100 percent charge."""
+
+    state: str
+    started_at: datetime | None
+    taper_started_at: datetime | None
+    complete: bool = False
+    timed_out: bool = False
+
+
+def update_full_charge_confirmation(
+    *,
+    now: datetime,
+    soc: float,
+    target_soc: float,
+    battery_charge_power: float | None,
+    started_at: datetime | None,
+    taper_started_at: datetime | None,
+    minimum_hold_minutes: float,
+    taper_power_w: float,
+    taper_minutes: float,
+    timeout_minutes: float,
+) -> FullChargeConfirmationDecision:
+    """Confirm a full charge only after SOC hold and measured charge taper.
+
+    Persisting the two timestamps lets Home Assistant continue the observation
+    across an integration reload or restart. A missing charge-power sample is
+    deliberately not accepted as proof that the battery has stopped charging.
+    """
+    if soc < target_soc:
+        return FullChargeConfirmationDecision("idle", None, None)
+
+    started = started_at or now
+    elapsed = max((now - started).total_seconds(), 0.0)
+    timeout_seconds = max(float(timeout_minutes), 0.0) * 60
+    if elapsed >= timeout_seconds:
+        return FullChargeConfirmationDecision(
+            "timeout", started, taper_started_at, complete=True, timed_out=True
+        )
+
+    taper = taper_started_at
+    if battery_charge_power is None or battery_charge_power > max(taper_power_w, 0):
+        taper = None
+    elif taper is None:
+        taper = now
+
+    hold_complete = elapsed >= max(float(minimum_hold_minutes), 0.0) * 60
+    taper_complete = taper is not None and max(
+        (now - taper).total_seconds(), 0.0
+    ) >= max(float(taper_minutes), 0.0) * 60
+    if hold_complete and taper_complete:
+        return FullChargeConfirmationDecision(
+            "confirmed", started, taper, complete=True
+        )
+    return FullChargeConfirmationDecision(
+        "waiting_taper" if hold_complete else "holding", started, taper
+    )
+
+
 def cycle_is_due(
     *,
     now: datetime,
@@ -429,6 +489,8 @@ class ControlInput:
     current_grid_setpoint: float
     current_inverter_setpoint: float
     ac_pv_power: float = 0.0
+    battery_charge_power: float | None = None
+    battery_discharge_power: float | None = None
 
 
 @dataclass(slots=True, frozen=True)
@@ -451,6 +513,8 @@ class ControlSettings:
     meter_export_positive: bool = True
     pv_release_allowed: bool = True
     ac_pv_release_allowed: bool = True
+    pv_surplus_deadband: float = 20.0
+    pv_surplus_charge_reserve: float = 50.0
     coupling_mode: str = COUPLING_AUTO
 
 
@@ -476,6 +540,8 @@ class ControlResult:
     ac_pv_power: float
     available_ac_surplus: float
     effective_public_grid_target: float
+    battery_discharge_power: float | None
+    pv_surplus_correction: float
 
 
 @dataclass(slots=True, frozen=True)
@@ -665,6 +731,99 @@ def calculate_control(data: ControlInput, cfg: ControlSettings) -> ControlResult
         inverter_target = min(inverter_target, dc_pv_power)
     inverter_target = clamp(inverter_target, 0.0, cfg.inverter_limit)
 
+    battery_discharge = (
+        max(float(data.battery_discharge_power), 0.0)
+        if data.battery_discharge_power is not None
+        else None
+    )
+    battery_charge = (
+        max(float(data.battery_charge_power), 0.0)
+        if data.battery_charge_power is not None
+        else None
+    )
+    pv_surplus_correction = 0.0
+    if pv_direct:
+        deadband = max(float(cfg.pv_surplus_deadband), 0.0)
+        # Battery discharge is never part of the public-grid deadband. In
+        # PV-surplus mode every measured watt of discharge must reduce the
+        # XT500 output again; otherwise the controller can settle at a small
+        # but permanent battery discharge.
+        discharge_error = (
+            battery_discharge
+            if battery_discharge is not None
+            else 0.0
+        )
+        charge_reserve = max(float(cfg.pv_surplus_charge_reserve), 0.0)
+        # Keep the measured battery on the charging side of the unstable
+        # charge/discharge boundary. Do not disable this feedback merely
+        # because the public meter briefly shows import: doing so lets the
+        # feed-forward target rise again and causes repeated battery discharge.
+        # This correction only lowers the XT500 output; DC PV therefore remains
+        # in the battery instead of becoming intentional grid charging.
+        if (
+            charge_reserve > 0
+            and (battery_charge is not None or battery_discharge is not None)
+        ):
+            discharge_error = max(
+                discharge_error,
+                charge_reserve
+                - (battery_charge or 0.0)
+                + (battery_discharge or 0.0),
+            )
+        export_error = max(
+            normalized_grid - cfg.target_grid_power - deadband,
+            0.0,
+        )
+        # Export and battery discharge often describe the same excess XT500
+        # output. Use the larger feedback error so it is not corrected twice.
+        pv_surplus_correction = max(discharge_error, export_error)
+        if pv_surplus_correction > 0:
+            grid_target = min(
+                grid_target,
+                clamp(
+                    data.current_grid_setpoint - pv_surplus_correction,
+                    min_grid,
+                    max_grid,
+                ),
+            )
+            inverter_target = min(
+                inverter_target,
+                clamp(
+                    data.current_inverter_setpoint - pv_surplus_correction,
+                    0.0,
+                    cfg.inverter_limit,
+                ),
+            )
+            if grid_target >= 0 and inverter_target >= 0:
+                common_output_target = min(grid_target, inverter_target)
+                grid_target = common_output_target
+                inverter_target = common_output_target
+        if (
+            charge_reserve > 0
+            and (battery_charge is not None or battery_discharge is not None)
+            and (battery_charge or 0.0) <= charge_reserve + deadband
+        ):
+            # Once the preferred charge band has been reached, hold the current
+            # output instead of immediately jumping back to the feed-forward
+            # target. Output may rise again only with a clear charging margin;
+            # this hysteresis prevents a charge/discharge sawtooth.
+            grid_target = min(
+                grid_target,
+                clamp(data.current_grid_setpoint, min_grid, max_grid),
+            )
+            inverter_target = min(
+                inverter_target,
+                clamp(
+                    data.current_inverter_setpoint,
+                    0.0,
+                    cfg.inverter_limit,
+                ),
+            )
+            if grid_target >= 0 and inverter_target >= 0:
+                common_output_target = min(grid_target, inverter_target)
+                grid_target = common_output_target
+                inverter_target = common_output_target
+
     pv_available_for_charge = (
         (cfg.pv_release_allowed and dc_pv_power > 0)
         or (cfg.ac_pv_release_allowed and available_ac_surplus > 0)
@@ -743,4 +902,10 @@ def calculate_control(data: ControlInput, cfg: ControlSettings) -> ControlResult
         ac_pv_power=round(ac_pv_power, 1),
         available_ac_surplus=round(available_ac_surplus, 1),
         effective_public_grid_target=round(effective_public_grid_target, 1),
+        battery_discharge_power=(
+            round(battery_discharge, 1)
+            if battery_discharge is not None
+            else None
+        ),
+        pv_surplus_correction=round(pv_surplus_correction, 1),
     )

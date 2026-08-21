@@ -11,8 +11,11 @@ from . import XT500ConfigEntry
 from .const import (
     CONF_MAX_CHARGE_SOC_ENTITY,
     CONF_MIN_DISCHARGE_SOC_ENTITY,
+    CONF_CHARGE_SOC_HYSTERESIS_ENTITY,
+    CONF_DISCHARGE_SOC_HYSTERESIS_ENTITY,
     SETTING_AUTO_TARGET_SOC,
     SETTING_CHARGE_POWER,
+    SETTING_CHARGE_SOC_HYSTERESIS,
     SETTING_CONTROL_FAST_INTERVAL,
     SETTING_CONTROL_LARGE_ERROR,
     SETTING_CONTROL_LARGE_MAX_STEP,
@@ -23,6 +26,11 @@ from .const import (
     SETTING_CONTROL_SLOW_INTERVAL,
     SETTING_CYCLE_INTERVAL_DAYS,
     SETTING_FEEDBACK_SETTLE_TIME,
+    SETTING_FULL_CHARGE_MIN_HOLD_MINUTES,
+    SETTING_FULL_CHARGE_TAPER_MINUTES,
+    SETTING_FULL_CHARGE_TAPER_POWER,
+    SETTING_FULL_CHARGE_TIMEOUT_MINUTES,
+    SETTING_FULL_CHARGE_TOP_OFF_POWER,
     SETTING_MAX_GRID_OUTPUT,
     SETTING_MAX_INVERTER_OUTPUT,
     SETTING_MIN_SOC,
@@ -30,6 +38,8 @@ from .const import (
     SETTING_PV_START_DELAY,
     SETTING_PV_START_POWER,
     SETTING_PV_STOP_POWER,
+    SETTING_PV_SURPLUS_DEADBAND,
+    SETTING_PV_SURPLUS_CHARGE_RESERVE,
     SETTING_RECOVERY_STABILITY_TIME,
     SETTING_SOC_HYSTERESIS,
     SETTING_TARGET_GRID_POWER,
@@ -50,6 +60,11 @@ NUMBERS = (
     NumberEntityDescription(key=SETTING_NORMAL_CHARGE_LIMIT, translation_key="normal_charge_limit", icon="mdi:battery-lock", native_min_value=0, native_max_value=100, native_step=1, native_unit_of_measurement="%", mode=NumberMode.BOX),
     NumberEntityDescription(key=SETTING_CHARGE_POWER, translation_key="charge_power", icon="mdi:flash", native_min_value=0, native_max_value=2400, native_step=50, native_unit_of_measurement=UnitOfPower.WATT, mode=NumberMode.BOX),
     NumberEntityDescription(key=SETTING_CYCLE_INTERVAL_DAYS, translation_key="cycle_interval_days", icon="mdi:calendar-range", native_min_value=1, native_max_value=90, native_step=1, native_unit_of_measurement="d", mode=NumberMode.BOX),
+    NumberEntityDescription(key=SETTING_FULL_CHARGE_MIN_HOLD_MINUTES, translation_key="full_charge_min_hold_minutes", icon="mdi:timer-sand-full", native_min_value=1, native_max_value=60, native_step=1, native_unit_of_measurement="min", mode=NumberMode.BOX),
+    NumberEntityDescription(key=SETTING_FULL_CHARGE_TAPER_POWER, translation_key="full_charge_taper_power", icon="mdi:battery-arrow-down-outline", native_min_value=0, native_max_value=300, native_step=5, native_unit_of_measurement=UnitOfPower.WATT, mode=NumberMode.BOX),
+    NumberEntityDescription(key=SETTING_FULL_CHARGE_TAPER_MINUTES, translation_key="full_charge_taper_minutes", icon="mdi:timer-check-outline", native_min_value=1, native_max_value=30, native_step=1, native_unit_of_measurement="min", mode=NumberMode.BOX),
+    NumberEntityDescription(key=SETTING_FULL_CHARGE_TIMEOUT_MINUTES, translation_key="full_charge_timeout_minutes", icon="mdi:timer-alert-outline", native_min_value=15, native_max_value=180, native_step=5, native_unit_of_measurement="min", mode=NumberMode.BOX),
+    NumberEntityDescription(key=SETTING_FULL_CHARGE_TOP_OFF_POWER, translation_key="full_charge_top_off_power", icon="mdi:battery-charging-outline", native_min_value=50, native_max_value=1000, native_step=50, native_unit_of_measurement=UnitOfPower.WATT, mode=NumberMode.BOX),
     NumberEntityDescription(key=SETTING_RECOVERY_STABILITY_TIME, translation_key="recovery_stability_time", icon="mdi:timer-shield-outline", native_min_value=15, native_max_value=300, native_step=5, native_unit_of_measurement="s", mode=NumberMode.BOX),
     NumberEntityDescription(key=SETTING_FEEDBACK_SETTLE_TIME, translation_key="feedback_settle_time", icon="mdi:timer-cog-outline", native_min_value=1, native_max_value=30, native_step=1, native_unit_of_measurement="s", mode=NumberMode.BOX),
     NumberEntityDescription(key=SETTING_CONTROL_LARGE_MAX_STEP, translation_key="control_large_max_step", icon="mdi:delta", native_min_value=50, native_max_value=2400, native_step=10, native_unit_of_measurement=UnitOfPower.WATT, mode=NumberMode.BOX),
@@ -63,8 +78,11 @@ NUMBERS = (
     NumberEntityDescription(key=SETTING_PV_STOP_POWER, translation_key="pv_stop_power", icon="mdi:solar-power-variant-outline", native_min_value=0, native_max_value=500, native_step=5, native_unit_of_measurement=UnitOfPower.WATT, mode=NumberMode.BOX),
     NumberEntityDescription(key=SETTING_PV_START_POWER, translation_key="pv_start_power", icon="mdi:solar-power-variant", native_min_value=0, native_max_value=1000, native_step=5, native_unit_of_measurement=UnitOfPower.WATT, mode=NumberMode.BOX),
     NumberEntityDescription(key=SETTING_PV_START_DELAY, translation_key="pv_start_delay", icon="mdi:timer-play-outline", native_min_value=0, native_max_value=300, native_step=5, native_unit_of_measurement="s", mode=NumberMode.BOX),
+    NumberEntityDescription(key=SETTING_PV_SURPLUS_DEADBAND, translation_key="pv_surplus_deadband", icon="mdi:battery-arrow-down-outline", native_min_value=0, native_max_value=200, native_step=5, native_unit_of_measurement=UnitOfPower.WATT, mode=NumberMode.BOX),
+    NumberEntityDescription(key=SETTING_PV_SURPLUS_CHARGE_RESERVE, translation_key="pv_surplus_charge_reserve", icon="mdi:battery-plus-outline", native_min_value=0, native_max_value=300, native_step=5, native_unit_of_measurement=UnitOfPower.WATT, mode=NumberMode.BOX),
     NumberEntityDescription(key=SETTING_MIN_SOC, translation_key="minimum_soc", icon="mdi:battery-low", native_min_value=1, native_max_value=40, native_step=1, native_unit_of_measurement="%", mode=NumberMode.BOX),
     NumberEntityDescription(key=SETTING_SOC_HYSTERESIS, translation_key="soc_hysteresis", icon="mdi:arrow-expand-vertical", native_min_value=1, native_max_value=20, native_step=1, native_unit_of_measurement="%", mode=NumberMode.BOX),
+    NumberEntityDescription(key=SETTING_CHARGE_SOC_HYSTERESIS, translation_key="charge_soc_hysteresis", icon="mdi:battery-sync", native_min_value=0, native_max_value=100, native_step=1, native_unit_of_measurement="%", mode=NumberMode.BOX),
     NumberEntityDescription(key=SETTING_TARGET_GRID_POWER, translation_key="target_grid_power", icon="mdi:transmission-tower", native_min_value=-500, native_max_value=500, native_step=10, native_unit_of_measurement=UnitOfPower.WATT, mode=NumberMode.BOX),
     NumberEntityDescription(key=SETTING_MAX_GRID_OUTPUT, translation_key="maximum_grid_output", icon="mdi:transmission-tower-export", native_min_value=0, native_max_value=2400, native_step=50, native_unit_of_measurement=UnitOfPower.WATT, mode=NumberMode.BOX),
     NumberEntityDescription(key=SETTING_MAX_INVERTER_OUTPUT, translation_key="maximum_inverter_output", icon="mdi:solar-power-variant", native_min_value=0, native_max_value=2400, native_step=50, native_unit_of_measurement=UnitOfPower.WATT, mode=NumberMode.BOX),
@@ -81,20 +99,27 @@ class XT500Number(XT500Entity, NumberEntity):
         if self.key == SETTING_MIN_SOC:
             if self.runtime.discharge_override_active:
                 return float(self.runtime.settings[SETTING_MIN_SOC])
-            state = self.runtime.hass.states.get(
-                self.runtime.entry.data.get(CONF_MIN_DISCHARGE_SOC_ENTITY)
-            )
-            if state is not None:
-                try:
-                    return float(state.state)
-                except ValueError:
-                    pass
+            state = self._source_number_state()
+        elif self.key in (
+            SETTING_SOC_HYSTERESIS,
+            SETTING_CHARGE_SOC_HYSTERESIS,
+        ):
+            state = self._source_number_state()
+        else:
+            state = None
+        if state is not None:
+            try:
+                return float(state.state)
+            except ValueError:
+                pass
         return float(self.runtime.settings[self.key])
 
     def _source_number_state(self):
         source_key = {
             SETTING_NORMAL_CHARGE_LIMIT: CONF_MAX_CHARGE_SOC_ENTITY,
             SETTING_MIN_SOC: CONF_MIN_DISCHARGE_SOC_ENTITY,
+            SETTING_SOC_HYSTERESIS: CONF_DISCHARGE_SOC_HYSTERESIS_ENTITY,
+            SETTING_CHARGE_SOC_HYSTERESIS: CONF_CHARGE_SOC_HYSTERESIS_ENTITY,
         }.get(self.key)
         if source_key is None:
             return None
@@ -133,8 +158,29 @@ class XT500Number(XT500Entity, NumberEntity):
         if self.key == SETTING_MIN_SOC:
             await self.runtime.async_set_system_discharge_limit(value)
             return
+        if self.key == SETTING_SOC_HYSTERESIS and self.runtime.entry.data.get(
+            CONF_DISCHARGE_SOC_HYSTERESIS_ENTITY
+        ):
+            await self.runtime.async_set_device_soc_hysteresis(
+                CONF_DISCHARGE_SOC_HYSTERESIS_ENTITY,
+                SETTING_SOC_HYSTERESIS,
+                value,
+            )
+            return
+        if self.key == SETTING_CHARGE_SOC_HYSTERESIS:
+            await self.runtime.async_set_device_soc_hysteresis(
+                CONF_CHARGE_SOC_HYSTERESIS_ENTITY,
+                SETTING_CHARGE_SOC_HYSTERESIS,
+                value,
+            )
+            return
         self.runtime.async_set_setting(self.key, value)
 
 
 async def async_setup_entry(_hass: HomeAssistant, entry: XT500ConfigEntry, async_add_entities: AddConfigEntryEntitiesCallback) -> None:
-    async_add_entities(XT500Number(entry.runtime_data, description) for description in NUMBERS)
+    async_add_entities(
+        XT500Number(entry.runtime_data, description)
+        for description in NUMBERS
+        if description.key != SETTING_CHARGE_SOC_HYSTERESIS
+        or entry.data.get(CONF_CHARGE_SOC_HYSTERESIS_ENTITY)
+    )

@@ -14,6 +14,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EVENT_HOMEASSISTANT_STARTED
 from homeassistant.core import Event, HomeAssistant, State, callback
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.event import (
     async_call_later,
     async_track_state_change_event,
@@ -28,6 +29,8 @@ from .const import (
     CONF_BATTERY_INPUT_POWER_ENTITY,
     CONF_BATTERY_OUTPUT_POWER_ENTITY,
     CONF_BATTERY_POWER_ENTITY,
+    CONF_CHARGE_SOC_HYSTERESIS_ENTITY,
+    CONF_DISCHARGE_SOC_HYSTERESIS_ENTITY,
     CONF_GRID_PORT_POWER_ENTITY,
     CONF_GRID_POWER_ENTITY,
     CONF_GRID_SETPOINT_ENTITY,
@@ -49,6 +52,7 @@ from .const import (
     SETTING_AUTOMATIC_RECOVERY_ENABLED,
     SETTING_BASE_MODE,
     SETTING_CHARGE_POWER,
+    SETTING_CHARGE_SOC_HYSTERESIS,
     SETTING_COUPLING_MODE,
     SETTING_CONTROL_FAST_INTERVAL,
     SETTING_CONTROL_LARGE_ERROR,
@@ -66,6 +70,14 @@ from .const import (
     SETTING_DISCHARGE_OVERRIDE_ACTIVE,
     SETTING_DISCHARGE_OVERRIDE_ORIGINAL_LIMIT,
     SETTING_FEEDBACK_SETTLE_TIME,
+    SETTING_FULL_CHARGE_CONFIRMATION_STARTED,
+    SETTING_FULL_CHARGE_LAST_RESULT,
+    SETTING_FULL_CHARGE_MIN_HOLD_MINUTES,
+    SETTING_FULL_CHARGE_TAPER_MINUTES,
+    SETTING_FULL_CHARGE_TAPER_POWER,
+    SETTING_FULL_CHARGE_TAPER_STARTED,
+    SETTING_FULL_CHARGE_TIMEOUT_MINUTES,
+    SETTING_FULL_CHARGE_TOP_OFF_POWER,
     SETTING_LAST_FULL,
     SETTING_MANUAL_ACTIVE,
     SETTING_MANUAL_MODE,
@@ -76,6 +88,8 @@ from .const import (
     SETTING_PV_START_DELAY,
     SETTING_PV_START_POWER,
     SETTING_PV_STOP_POWER,
+    SETTING_PV_SURPLUS_DEADBAND,
+    SETTING_PV_SURPLUS_CHARGE_RESERVE,
     SETTING_RECOVERY_STABILITY_TIME,
     SETTING_REGULATION_ENABLED,
     SETTING_SOC_HYSTERESIS,
@@ -92,6 +106,7 @@ from .controller import (
     ControlInput,
     ControlResult,
     ControlSettings,
+    FullChargeConfirmationDecision,
     calculate_control,
     classify_actual_energy_source,
     cycle_is_due,
@@ -110,6 +125,7 @@ from .controller import (
     select_adaptive_control_profile,
     select_charge_limit,
     select_charge_request,
+    update_full_charge_confirmation,
     update_pv_release,
     update_discharge_hold,
     WRITE_RETRY_DELAY_MULTIPLIERS,
@@ -122,6 +138,9 @@ _COMMUNICATION_STABILITY_SECONDS = 15.0
 _COMMUNICATION_FAILURE_SECONDS = 90.0
 _RECOVERY_FEEDBACK_TIMEOUT_SECONDS = 30.0
 _WRITE_MAX_ATTEMPTS = len(WRITE_RETRY_DELAY_MULTIPLIERS) + 1
+_DEFAULT_SOURCE_POLLING_INTERVAL = 3.0
+_MIN_SOURCE_POLLING_INTERVAL = 3.0
+_MAX_SOURCE_POLLING_INTERVAL = 60.0
 
 
 class TransientCommunicationError(HomeAssistantError):
@@ -179,6 +198,7 @@ class XT500Runtime:
         self._unsub_started: Callable[[], None] | None = None
         self._unsub_cycle_check: Callable[[], None] | None = None
         self._unsub_tariff_expiry: Callable[[], None] | None = None
+        self._unsub_full_charge_confirmation: Callable[[], None] | None = None
         self._control_apply_task: asyncio.Task | None = None
         self._startup_ready_task: asyncio.Task | None = None
         self._control_apply_requested = False
@@ -214,6 +234,9 @@ class XT500Runtime:
                 CONF_INVERTER_SETPOINT_ENTITY,
                 CONF_MAX_CHARGE_SOC_ENTITY,
                 CONF_MIN_DISCHARGE_SOC_ENTITY,
+                CONF_DISCHARGE_SOC_HYSTERESIS_ENTITY,
+                CONF_CHARGE_SOC_HYSTERESIS_ENTITY,
+                CONF_BATTERY_POWER_ENTITY,
                 CONF_BATTERY_INPUT_POWER_ENTITY,
                 CONF_BATTERY_OUTPUT_POWER_ENTITY,
             )
@@ -258,6 +281,16 @@ class XT500Runtime:
             self.settings[SETTING_NORMAL_CHARGE_LIMIT] = current_limit
             migrated = True
 
+        for entity_key, setting_key in (
+            (CONF_DISCHARGE_SOC_HYSTERESIS_ENTITY, SETTING_SOC_HYSTERESIS),
+            (CONF_CHARGE_SOC_HYSTERESIS_ENTITY, SETTING_CHARGE_SOC_HYSTERESIS),
+        ):
+            entity_id = self.entry.data.get(entity_key)
+            if entity_id and (value := self._float_state(entity_id)) is not None:
+                if float(self.settings[setting_key]) != value:
+                    self.settings[setting_key] = value
+                    migrated = True
+
         if (
             bool(self.settings[SETTING_AUTO_ENABLED])
             and self._setting_datetime(SETTING_LAST_FULL) is None
@@ -268,6 +301,9 @@ class XT500Runtime:
 
         if self._automatic_cycle_should_start_now():
             self.settings[SETTING_CYCLE_AUTOMATIC_ACTIVE] = True
+            self.settings[SETTING_FULL_CHARGE_CONFIRMATION_STARTED] = None
+            self.settings[SETTING_FULL_CHARGE_TAPER_STARTED] = None
+            self.settings[SETTING_FULL_CHARGE_LAST_RESULT] = "idle"
             migrated = True
 
         if not self._tariff_request_is_valid():
@@ -280,6 +316,18 @@ class XT500Runtime:
 
         if migrated:
             await self._store.async_save(self.settings)
+
+        soc_entity = self.entry.data.get(CONF_SOC_ENTITY)
+        current_soc = self._float_state(soc_entity) if soc_entity else None
+        if (
+            current_soc is not None
+            and current_soc >= float(self.settings[SETTING_AUTO_TARGET_SOC])
+            and self.settings[SETTING_FULL_CHARGE_LAST_RESULT]
+            in ("confirmed", "timeout")
+            and self._setting_datetime(SETTING_FULL_CHARGE_CONFIRMATION_STARTED)
+            is None
+        ):
+            self._full_soc_latched = True
 
         self._schedule_cycle_check()
         self._schedule_tariff_expiry()
@@ -314,6 +362,9 @@ class XT500Runtime:
             task.cancel()
         if pending_tasks:
             await asyncio.gather(*pending_tasks, return_exceptions=True)
+        if self._unsub_full_charge_confirmation:
+            self._unsub_full_charge_confirmation()
+            self._unsub_full_charge_confirmation = None
         self._control_apply_task = None
         self._startup_ready_task = None
         self._pv_release_task = None
@@ -534,7 +585,21 @@ class XT500Runtime:
             _LOGGER.info("XT500 input data is valid again")
         if self._data_valid_since_monotonic is None:
             self._data_valid_since_monotonic = monotonic()
-        self._update_full_charge(values[CONF_SOC_ENTITY])
+        battery_flows = self._battery_flows()
+        self._update_full_charge(
+            values[CONF_SOC_ENTITY],
+            battery_flows[0] if battery_flows is not None else None,
+        )
+        charge_hysteresis_entity = self.entry.data.get(
+            CONF_CHARGE_SOC_HYSTERESIS_ENTITY
+        )
+        if charge_hysteresis_entity and (
+            charge_hysteresis := self._float_state(charge_hysteresis_entity)
+        ) is not None and float(
+            self.settings[SETTING_CHARGE_SOC_HYSTERESIS]
+        ) != charge_hysteresis:
+            self.settings[SETTING_CHARGE_SOC_HYSTERESIS] = charge_hysteresis
+            self._store.async_delay_save(lambda: self.settings, 1)
 
         if not self.regulation_enabled:
             self._cancel_recovery_task()
@@ -591,6 +656,17 @@ class XT500Runtime:
             charge_power=float(self.settings[SETTING_CHARGE_POWER]),
             tariff_charge_power=float(self.settings[SETTING_TARIFF_CHARGE_POWER]),
         )
+        if (
+            charge_request.source in ("cycle_manual", "cycle_automatic")
+            and self.full_charge_confirmation_active
+        ):
+            charge_request = replace(
+                charge_request,
+                charge_power=min(
+                    charge_request.charge_power,
+                    float(self.settings[SETTING_FULL_CHARGE_TOP_OFF_POWER]),
+                ),
+            )
         self.charge_request_active = charge_request.active
         self.active_charge_source = charge_request.source
         self.active_target_soc = (
@@ -645,6 +721,16 @@ class XT500Runtime:
                 self.settings[SETTING_MIN_SOC] = minimum_soc
                 self._store.async_delay_save(lambda: self.settings, 1)
         hysteresis = float(self.settings[SETTING_SOC_HYSTERESIS])
+        device_hysteresis_entity = self.entry.data.get(
+            CONF_DISCHARGE_SOC_HYSTERESIS_ENTITY
+        )
+        if device_hysteresis_entity and (
+            device_hysteresis := self._float_state(device_hysteresis_entity)
+        ) is not None:
+            hysteresis = device_hysteresis
+            if float(self.settings[SETTING_SOC_HYSTERESIS]) != hysteresis:
+                self.settings[SETTING_SOC_HYSTERESIS] = hysteresis
+                self._store.async_delay_save(lambda: self.settings, 1)
         temporary_release = (
             override_active
             and self._discharge_override_session_active
@@ -670,7 +756,6 @@ class XT500Runtime:
             )
         )
 
-        battery_flows = self._battery_flows()
         self.result = calculate_control(
             ControlInput(
                 soc=values[CONF_SOC_ENTITY],
@@ -681,13 +766,27 @@ class XT500Runtime:
                 current_grid_setpoint=values[CONF_GRID_SETPOINT_ENTITY],
                 current_inverter_setpoint=values[CONF_INVERTER_SETPOINT_ENTITY],
                 ac_pv_power=ac_pv_power,
+                battery_charge_power=(
+                    battery_flows[0] if battery_flows is not None else None
+                ),
+                battery_discharge_power=(
+                    battery_flows[1] if battery_flows is not None else None
+                ),
             ),
             ControlSettings(
                 charge_active=charge_request.active,
                 charge_source=charge_request.source,
                 charge_mode=charge_request.mode,
                 base_mode=self.settings[SETTING_BASE_MODE],
-                target_soc=charge_request.target_soc,
+                # At 100 percent the cycle remains active only while the
+                # measured full-charge confirmation is still running.
+                target_soc=(
+                    101.0
+                    if charge_request.source
+                    in ("cycle_manual", "cycle_automatic")
+                    and self.full_charge_confirmation_active
+                    else charge_request.target_soc
+                ),
                 minimum_soc=minimum_soc,
                 soc_hysteresis=hysteresis,
                 discharge_hold=bool(self._low_soc_hold),
@@ -701,6 +800,12 @@ class XT500Runtime:
                 ),
                 pv_release_allowed=self._pv_release_active,
                 ac_pv_release_allowed=self._ac_pv_release_active,
+                pv_surplus_deadband=float(
+                    self.settings[SETTING_PV_SURPLUS_DEADBAND]
+                ),
+                pv_surplus_charge_reserve=float(
+                    self.settings[SETTING_PV_SURPLUS_CHARGE_RESERVE]
+                ),
                 coupling_mode=self.settings[SETTING_COUPLING_MODE],
             ),
         )
@@ -725,9 +830,64 @@ class XT500Runtime:
         self._notify()
 
     @callback
-    def _update_full_charge(self, soc: float) -> None:
-        """Record one full-charge event when SOC crosses the automatic target."""
+    def _update_full_charge(
+        self, soc: float, battery_charge_power: float | None
+    ) -> None:
+        """Record a full charge after a restart-safe 100 percent confirmation."""
         target = float(self.settings[SETTING_AUTO_TARGET_SOC])
+        if target < 100:
+            self._cancel_full_charge_confirmation_check()
+            if self.full_charge_confirmation_state != "idle":
+                self._clear_full_charge_confirmation("idle")
+            self._update_immediate_full_charge(soc, target)
+            return
+
+        if self._full_soc_latched:
+            if soc < target - 1:
+                self._full_soc_latched = False
+                self._clear_full_charge_confirmation("idle")
+            self._cancel_full_charge_confirmation_check()
+            return
+
+        decision = update_full_charge_confirmation(
+            now=dt_util.now(),
+            soc=soc,
+            target_soc=target,
+            battery_charge_power=battery_charge_power,
+            started_at=self._setting_datetime(
+                SETTING_FULL_CHARGE_CONFIRMATION_STARTED
+            ),
+            taper_started_at=self._setting_datetime(SETTING_FULL_CHARGE_TAPER_STARTED),
+            minimum_hold_minutes=float(
+                self.settings[SETTING_FULL_CHARGE_MIN_HOLD_MINUTES]
+            ),
+            taper_power_w=float(self.settings[SETTING_FULL_CHARGE_TAPER_POWER]),
+            taper_minutes=float(self.settings[SETTING_FULL_CHARGE_TAPER_MINUTES]),
+            timeout_minutes=float(
+                self.settings[SETTING_FULL_CHARGE_TIMEOUT_MINUTES]
+            ),
+        )
+        changed = self._store_full_charge_decision(decision)
+        if decision.complete:
+            timestamp = dt_util.now().isoformat()
+            self.settings[SETTING_LAST_FULL] = timestamp
+            self.settings[SETTING_CYCLE_REFERENCE] = timestamp
+            self.settings[SETTING_CYCLE_MANUAL_ACTIVE] = False
+            self.settings[SETTING_CYCLE_AUTOMATIC_ACTIVE] = False
+            self.settings[SETTING_FULL_CHARGE_CONFIRMATION_STARTED] = None
+            self.settings[SETTING_FULL_CHARGE_TAPER_STARTED] = None
+            self._full_soc_latched = True
+            changed = True
+            self._cancel_full_charge_confirmation_check()
+        elif decision.started_at is not None:
+            self._schedule_full_charge_confirmation_check()
+        else:
+            self._cancel_full_charge_confirmation_check()
+        if changed:
+            self._store.async_delay_save(lambda: self.settings, 1)
+
+    def _update_immediate_full_charge(self, soc: float, target: float) -> None:
+        """Retain the historical immediate behavior for targets below 100%."""
         if soc >= target:
             changed = False
             if not self._full_soc_latched:
@@ -746,6 +906,70 @@ class XT500Runtime:
                 self._store.async_delay_save(lambda: self.settings, 1)
         elif soc < target - 1:
             self._full_soc_latched = False
+
+    def _store_full_charge_decision(
+        self, decision: FullChargeConfirmationDecision
+    ) -> bool:
+        """Persist confirmation progress only when one of its values changed."""
+        values = {
+            SETTING_FULL_CHARGE_CONFIRMATION_STARTED: (
+                decision.started_at.isoformat() if decision.started_at else None
+            ),
+            SETTING_FULL_CHARGE_TAPER_STARTED: (
+                decision.taper_started_at.isoformat()
+                if decision.taper_started_at
+                else None
+            ),
+            SETTING_FULL_CHARGE_LAST_RESULT: decision.state,
+        }
+        changed = any(self.settings.get(key) != value for key, value in values.items())
+        self.settings.update(values)
+        return changed
+
+    def _clear_full_charge_confirmation(self, state: str = "idle") -> None:
+        """Clear persisted progress after SOC leaves the full-charge band."""
+        self._cancel_full_charge_confirmation_check()
+        self.settings[SETTING_FULL_CHARGE_CONFIRMATION_STARTED] = None
+        self.settings[SETTING_FULL_CHARGE_TAPER_STARTED] = None
+        self.settings[SETTING_FULL_CHARGE_LAST_RESULT] = state
+        self._store.async_delay_save(lambda: self.settings, 1)
+
+    @callback
+    def _schedule_full_charge_confirmation_check(self) -> None:
+        """Keep confirmation moving even when repeated values do not change."""
+        self._cancel_full_charge_confirmation_check()
+        self._unsub_full_charge_confirmation = async_call_later(
+            self.hass,
+            max(self.source_polling_interval, 3.0),
+            self._async_full_charge_confirmation_check,
+        )
+
+    @callback
+    def _cancel_full_charge_confirmation_check(self) -> None:
+        """Cancel the pending confirmation reevaluation."""
+        if self._unsub_full_charge_confirmation:
+            self._unsub_full_charge_confirmation()
+            self._unsub_full_charge_confirmation = None
+
+    @callback
+    def _async_full_charge_confirmation_check(self, _now: datetime) -> None:
+        """Reevaluate a pending full charge from its persisted timestamps."""
+        self._unsub_full_charge_confirmation = None
+        self.async_calculate()
+
+    @property
+    def full_charge_confirmation_active(self) -> bool:
+        """Return whether a 100 percent observation is currently pending."""
+        return (
+            not self._full_soc_latched
+            and self._setting_datetime(SETTING_FULL_CHARGE_CONFIRMATION_STARTED)
+            is not None
+        )
+
+    @property
+    def full_charge_confirmation_state(self) -> str:
+        """Return the persisted state of the latest confirmation attempt."""
+        return str(self.settings.get(SETTING_FULL_CHARGE_LAST_RESULT, "idle"))
 
     @property
     def cycle_due(self) -> bool:
@@ -943,6 +1167,10 @@ class XT500Runtime:
         ):
             return False
         self.settings[SETTING_CYCLE_AUTOMATIC_ACTIVE] = True
+        self.settings[SETTING_FULL_CHARGE_CONFIRMATION_STARTED] = None
+        self.settings[SETTING_FULL_CHARGE_TAPER_STARTED] = None
+        self.settings[SETTING_FULL_CHARGE_LAST_RESULT] = "idle"
+        self._full_soc_latched = False
         return True
 
     @property
@@ -980,6 +1208,8 @@ class XT500Runtime:
                 or bool(self.settings[SETTING_MANUAL_ACTIVE])
             ):
                 return "paused"
+            if self.full_charge_confirmation_active:
+                return "confirming_full"
             return "manual_active" if manual else "automatic_active"
         if not bool(self.settings[SETTING_AUTO_ENABLED]):
             return "monitoring_disabled"
@@ -1235,6 +1465,43 @@ class XT500Runtime:
         )
 
     @property
+    def source_polling_interval(self) -> float:
+        """Return the polling interval configured on SunEnergyXT 1.1.3+."""
+        source_entity = self.entry.data.get(CONF_GRID_PORT_POWER_ENTITY)
+        registry_entry = (
+            er.async_get(self.hass).async_get(source_entity)
+            if source_entity
+            else None
+        )
+        source_entry = (
+            self.hass.config_entries.async_get_entry(registry_entry.config_entry_id)
+            if registry_entry is not None and registry_entry.config_entry_id
+            else None
+        )
+        try:
+            interval = float(
+                source_entry.options.get(
+                    "polling_interval", _DEFAULT_SOURCE_POLLING_INTERVAL
+                )
+                if source_entry is not None
+                else _DEFAULT_SOURCE_POLLING_INTERVAL
+            )
+        except (TypeError, ValueError):
+            interval = _DEFAULT_SOURCE_POLLING_INTERVAL
+        return max(
+            _MIN_SOURCE_POLLING_INTERVAL,
+            min(_MAX_SOURCE_POLLING_INTERVAL, interval),
+        )
+
+    @property
+    def communication_failure_seconds(self) -> float:
+        """Allow at least two source polling cycles before a hard stop."""
+        return max(
+            _COMMUNICATION_FAILURE_SECONDS,
+            self.source_polling_interval * 2,
+        )
+
+    @property
     def feedback_ready(self) -> bool:
         """Return whether both feedback sources updated after the last setpoint write."""
         return feedback_samples_are_fresh(
@@ -1269,6 +1536,7 @@ class XT500Runtime:
         max_age = max(
             float(self.settings[SETTING_RECOVERY_STABILITY_TIME]) * 1.5,
             _RECOVERY_FEEDBACK_TIMEOUT_SECONDS,
+            self.source_polling_interval * 1.5 + 5.0,
         )
         now = datetime.now(UTC)
         return all(
@@ -1546,12 +1814,12 @@ class XT500Runtime:
                 if (
                     self._communication_pause_started_monotonic is not None
                     and now - self._communication_pause_started_monotonic
-                    >= _COMMUNICATION_FAILURE_SECONDS
+                    >= self.communication_failure_seconds
                 ):
                     self._begin_control_error(
                         HomeAssistantError(
                             "XT500-Kommunikation länger als "
-                            f"{_COMMUNICATION_FAILURE_SECONDS:g} Sekunden "
+                            f"{self.communication_failure_seconds:g} Sekunden "
                             "nicht stabil"
                         )
                     )
@@ -1670,6 +1938,7 @@ class XT500Runtime:
             feedback_timeout = max(
                 _RECOVERY_FEEDBACK_TIMEOUT_SECONDS,
                 float(self.settings[SETTING_FEEDBACK_SETTLE_TIME]) * 3,
+                self.source_polling_interval + 10.0,
             )
             deadline = monotonic() + feedback_timeout
             while monotonic() < deadline:
@@ -1942,6 +2211,10 @@ class XT500Runtime:
         self.settings[SETTING_MANUAL_ACTIVE] = False
         self.settings[SETTING_CYCLE_AUTOMATIC_ACTIVE] = False
         self.settings[SETTING_CYCLE_MANUAL_ACTIVE] = True
+        self.settings[SETTING_FULL_CHARGE_CONFIRMATION_STARTED] = None
+        self.settings[SETTING_FULL_CHARGE_TAPER_STARTED] = None
+        self.settings[SETTING_FULL_CHARGE_LAST_RESULT] = "idle"
+        self._full_soc_latched = False
         await self._store.async_save(self.settings)
         self.async_calculate()
 
@@ -1951,6 +2224,9 @@ class XT500Runtime:
         self.settings[SETTING_CYCLE_REFERENCE] = dt_util.now().isoformat()
         self.settings[SETTING_CYCLE_MANUAL_ACTIVE] = False
         self.settings[SETTING_CYCLE_AUTOMATIC_ACTIVE] = False
+        self.settings[SETTING_FULL_CHARGE_CONFIRMATION_STARTED] = None
+        self.settings[SETTING_FULL_CHARGE_TAPER_STARTED] = None
+        self.settings[SETTING_FULL_CHARGE_LAST_RESULT] = "idle"
         self._full_soc_latched = False
         await self._store.async_save(self.settings)
         self.async_calculate()
@@ -1961,6 +2237,24 @@ class XT500Runtime:
             await self._async_restore_discharge_override()
         entity_id = self.entry.data[CONF_MIN_DISCHARGE_SOC_ENTITY]
         await self._async_set_number_resilient(entity_id, value)
+        self.async_calculate()
+
+    async def async_set_device_soc_hysteresis(
+        self,
+        entity_key: str,
+        setting_key: str,
+        value: float,
+    ) -> None:
+        """Write an SI1/SA1 device hysteresis and keep the manager in sync."""
+        entity_id = self.entry.data.get(entity_key)
+        if not entity_id:
+            raise HomeAssistantError(
+                "Die geräteseitige SOC-Hysterese ist nicht eingerichtet."
+            )
+        target = self._quantized_entity_target(entity_id, value)
+        await self._async_set_number_resilient(entity_id, target)
+        self.settings[setting_key] = target
+        await self._store.async_save(self.settings)
         self.async_calculate()
 
     async def async_release_discharge_once(self) -> None:

@@ -49,7 +49,7 @@ Wechselrichterleistung.
   Home Assistant 2026.5 oder neuer
 
 Die Integration wurde mit Home Assistant 2026.7 und der SunEnergyXT-Integration
-1.1.2 getestet.
+1.1.3 getestet.
 
 ## 1. SunEnergyXT 500 Series installieren
 
@@ -86,6 +86,8 @@ Die Integration wurde mit Home Assistant 2026.7 und der SunEnergyXT-Integration
    - Sollwert maximale Wechselrichterleistung (`IS`)
    - System-Ladegrenze (`SA`)
    - System-Entladegrenze (`SI`)
+   - Entlade-SOC-Hysterese (`SI1`, ab SunEnergyXT 1.1.3)
+   - Lade-SOC-Hysterese (`SA1`, ab SunEnergyXT 1.1.3)
    - Systemlastanschluss-Entladegrenze
    - System-Batterieleistung (`BP`, mit aktueller SunEnergyXT-Version)
    - Gesamteingangs- und Gesamtausgangsleistung des Systems (Rückfalllösung
@@ -101,6 +103,18 @@ Die Integration wurde mit Home Assistant 2026.7 und der SunEnergyXT-Integration
 Erst wenn die für die Regelung zuerst genannten Entitäten verfügbar und nicht
 `unavailable` sind, mit dem XT500 Energy Manager fortfahren. Die vier
 Tagesenergien sind reine optionale Dashboard-Werte.
+
+Ab SunEnergyXT 1.1.3 lässt sich unter **Einstellungen → Geräte & Dienste →
+SunEnergyXT 500 Series → Konfigurieren** das Geräte-Abfrageintervall von 3 bis
+60 Sekunden einstellen. Der XT500 Energy Manager erkennt diesen Wert und passt
+seine Kommunikations- und Wiederherstellungsfristen daran an. Für eine schnelle
+Nulleinspeiseregelung werden weiterhin 3 Sekunden empfohlen; längere Intervalle
+reduzieren die Geräteabfragen, verlangsamen aber Messwerte und Regelreaktionen.
+
+`SI1` und `SA1` haben geräteseitig jeweils den Standardwert 5 %. Werden eigene
+Werte nur testweise verwendet, beide anschließend wieder auf 5 % stellen. Die
+im Energy Manager angezeigte Entlade-Hysterese schreibt ab SunEnergyXT 1.1.3
+direkt auf `SI1`; `SA1` erscheint zusätzlich als Lade-Hysterese im Dashboard.
 
 ## 2. XT500 Energy Manager installieren
 
@@ -208,11 +222,11 @@ Der Expertenmodus bietet weiterhin die vollständige manuelle Zuordnung:
 | System-Ladegrenze | SunEnergyXT **System-Ladegrenze** (`SA`); im Normalbetrieb synchronisiert der Energiemanager Änderungen in beide Richtungen |
 | Entladegrenze | SunEnergyXT **System-Entladegrenze** (`SI`); der Energiemanager zeigt und ändert direkt denselben Gerätewert |
 | Systemlastanschluss-Entladegrenze | SunEnergyXT **Systemlastanschluss-Entladegrenze**; wird im Dashboard direkt am Gerät eingestellt |
-| Batterie-Ladeleistung | SunEnergyXT **Gesamteingangsleistung des Systems** |
-| Batterie-Entladeleistung | SunEnergyXT **Gesamtausgangsleistung des Systems** |
+| Batterie-Lade-/Entladeleistung | SunEnergyXT **System-Batterieleistung** (`BP`, positiv lädt, negativ entlädt); Gesamt-Ein-/Ausgang dienen bei älteren Versionen als Rückfalllösung |
 
-Aus Gesamt-Eingang und Gesamt-Ausgang berechnet der Energiemanager zwei
-gegenseitig ausschließende Nettowerte. Bei 200 W Eingang und 300 W Ausgang
+Der vorzeichenbehaftete Wert `BP` wird bevorzugt in zwei gegenseitig
+ausschließende Werte aufgeteilt. Fehlt `BP`, berechnet der Energiemanager sie
+aus Gesamt-Eingang und Gesamt-Ausgang. Bei 200 W Eingang und 300 W Ausgang
 zeigt das Dashboard daher `0 W` Laden und `100 W` tatsächliches Entladen.
 
 ### Öffentlichen Netzsensor richtig auswählen
@@ -298,7 +312,7 @@ Neuladen auch im Energiemanager-Dashboard.
 5. Als URL exakt eintragen:
 
    ```text
-   /xt500_energy_manager/xt500-energy-dashboard-strategy.js?v=1.9.3
+   /xt500_energy_manager/xt500-energy-dashboard-strategy.js?v=1.10.3
    ```
 
 6. Als Ressourcentyp **JavaScript-Modul** auswählen.
@@ -447,8 +461,8 @@ Ladelimit deshalb im Energiemanager geändert werden.
 Die **Entladegrenze** ist kein getrennt gespeicherter Energiemanager-Wert:
 Sie zeigt und verändert direkt die originale System-Entladegrenze (`SI`) des
 XT500. Änderungen über SunEnergyXT und über das Energiemanager-Dashboard
-bleiben dadurch identisch. Die Wiederfreigabe-Hysterese gehört weiterhin nur
-zur Regelung des Energiemanagers.
+bleiben dadurch identisch. Ab SunEnergyXT 1.1.3 wird auch die
+Wiederfreigabe-Hysterese mit der Geräteentität `SI1` synchronisiert.
 
 Hat der Speicher die Entladegrenze bereits erreicht, bleibt die Entladung bis
 zur Entladegrenze plus Wiederfreigabe-Hysterese gesperrt. Der Knopf
@@ -470,6 +484,26 @@ erkannten AC-PV-Überschuss.
 DC-PV und rekonstruierter AC-PV-Überschuss werden genutzt, ohne absichtlich
 Netzstrom zu beziehen. Nicht benötigte direkt angeschlossene PV kann im Akku
 bleiben. Reicht PV nicht aus, wartet der Modus auch über mehrere Tage.
+
+Die Regelung verwendet dabei zwei reale Rückmeldungen: **Batterie entlädt
+tatsächlich** und die Einspeisung am öffentlichen Netzanschluss. Jede gemessene
+Akkuentladung wird vollständig gegengeregelt; für sie gilt keine Totzone. Die
+einstellbare **Netzeinspeisungs-Totzone im PV-Überschussmodus** beruhigt nur
+kleine Schwankungen am öffentlichen Netzanschluss. Da Akkuentladung und
+Einspeisung häufig denselben Leistungsüberschuss abbilden, wird nur der größere
+Fehler verwendet.
+
+**Bevorzugte Akku-Ladeleistung im PV-Überschussmodus** bezeichnet die gewünschte
+gemessene Netto-Ladeleistung des Akkus und ist ausschließlich in diesem Modus
+wirksam. Es handelt sich nicht um eine feste Ladeanforderung aus dem Netz.
+Entlädt der Akku, senkt die Regelung Netzanschluss-Sollwert (`GS`) und
+Wechselrichter-Obergrenze (`IS`) um die vollständige Entladeleistung plus den
+noch fehlenden Ladeanteil. Im erreichten Ladebereich hält sie den aktuellen
+Sollwert und erhöht ihn erst wieder mit zusätzlicher Ladereserve. Damit wird
+Laden gegenüber Entladen bevorzugt und ein Pendeln an der 0-W-Grenze vermieden.
+Standardwerte sind 50 W bevorzugte Akkuladung und 20 W Netzeinspeisungs-Totzone;
+für schnelle Rückmeldung sollte das SunEnergyXT-Abfrageintervall auf 3 Sekunden
+stehen.
 
 ### PV-Vorrang
 
@@ -714,14 +748,14 @@ wird ein vermeintlich ausgeschalteter Regler mit alten Sollwerten vermieden.
 
 ### Der Block „Energie heute“ fehlt oder ist unvollständig
 
-- SunEnergyXT 500 Series auf Version 1.1.2 oder neuer aktualisieren.
+- SunEnergyXT 500 Series auf Version 1.1.3 oder neuer aktualisieren.
 - Prüfen, ob am ausgewählten XT500 die Sensoren `PD`, `GD1`, `GD2` und `LD`
   vorhanden und verfügbar sind.
 - Unter **Einstellungen → Geräte & Dienste → XT500 Energy Manager** den
   Eintrag neu laden oder Home Assistant neu starten. Die optionalen Sensoren
   werden bei jedem Laden der Integration erneut automatisch erkannt.
 - Im Strategy-Editor prüfen, ob der Block **Energie heute** ausgeblendet wurde.
-- Die Dashboard-Ressource auf `?v=1.9.3` setzen und Ressourcen beziehungsweise
+- Die Dashboard-Ressource auf `?v=1.10.3` setzen und Ressourcen beziehungsweise
   Browser vollständig neu laden.
 
 ### Eingangsdaten sind ungültig
@@ -743,7 +777,25 @@ wird ein vermeintlich ausgeschalteter Regler mit alten Sollwerten vermieden.
 
 ## Projektstatus
 
-Version 1.9.3 ist der aktuelle veröffentlichte Stand. Rückmeldungen aus
+Bei einem Zyklusziel von 100 % beendet der Energiemanager die Ladung nicht mehr
+allein aufgrund des gerundeten SOC. Ab Erreichen von 100 % hält er den Zustand
+standardmäßig mindestens zehn Minuten. Gleichzeitig muss die tatsächlich am
+Akku gemessene Ladeleistung fünf Minuten durchgehend höchstens 30 W betragen.
+Während dieser Phase wird eine aktive Zyklusladung auf 300 W begrenzt. Nach
+spätestens 60 Minuten wird sie sicher beendet und als Zeitlimit im Sensor
+**Bestätigung der Vollladung** ausgewiesen. Alle Zeiten, die Ladeende-Schwelle
+und die Nachladeleistung sind in der Feinabstimmung änderbar. Eine laufende
+Bestätigung wird über Neustarts und Integrations-Neuladungen hinweg fortgesetzt.
+
+Die Einstellung **Bevorzugte Akku-Ladeleistung im PV-Überschussmodus** hält
+standardmäßig eine kleine gemessene Netto-Ladung von 50 W. Damit wird
+Batterieentladung nicht nur nachträglich korrigiert, sondern der Arbeitspunkt
+bewusst auf die Ladeseite verschoben.
+Auch bei einem kurzen Netzbezug bleibt diese Rückführung aktiv, damit der
+Sollwert nicht wieder in die Akkuentladung zurückpendelt. Die Regelung senkt
+dabei ausschließlich die XT500-Ausgangsleistung.
+
+Version 1.10.3 ist der für SunEnergyXT 1.1.3 vorbereitete Stand. Rückmeldungen aus
 unterschiedlichen XT500- und XT500-Pro-Systemen, Firmwareständen,
 PV-Kopplungen und Stromzählern sind weiterhin willkommen.
 

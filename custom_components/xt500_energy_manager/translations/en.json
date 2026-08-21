@@ -42,6 +42,8 @@
           "inverter_setpoint_entity": "Maximum inverter power setpoint",
           "max_charge_soc_entity": "System charge limit",
           "min_discharge_soc_entity": "System discharge limit",
+          "discharge_soc_hysteresis_entity": "Discharge SOC hysteresis SI1 (optional, SunEnergyXT 1.1.3+)",
+          "charge_soc_hysteresis_entity": "Charge SOC hysteresis SA1 (optional, SunEnergyXT 1.1.3+)",
           "load_discharge_limit_entity": "System load-port discharge limit",
           "battery_power_entity": "System battery power (recommended)",
           "battery_input_power_entity": "Total input power (legacy integration only)",
@@ -116,6 +118,8 @@
           "inverter_setpoint_entity": "Maximum inverter power setpoint",
           "max_charge_soc_entity": "System charge limit",
           "min_discharge_soc_entity": "System discharge limit",
+          "discharge_soc_hysteresis_entity": "Discharge SOC hysteresis SI1 (optional, SunEnergyXT 1.1.3+)",
+          "charge_soc_hysteresis_entity": "Charge SOC hysteresis SA1 (optional, SunEnergyXT 1.1.3+)",
           "load_discharge_limit_entity": "System load-port discharge limit",
           "battery_power_entity": "System battery power (recommended)",
           "battery_input_power_entity": "Total input power (legacy integration only)",
@@ -231,6 +235,11 @@
       "desired_charge_limit": { "name": "Applied system charge limit" },
       "battery_charge_power": { "name": "Actual battery charging power" },
       "battery_discharge_power": { "name": "Actual battery discharging power" },
+      "pv_surplus_correction": { "name": "PV-surplus output correction" },
+      "full_charge_confirmation": {
+        "name": "Full-charge confirmation",
+        "state": { "idle": "Idle", "holding": "Holding at 100%", "waiting_taper": "Waiting for charge taper", "confirmed": "Confirmed by charge taper", "timeout": "Stopped after timeout" }
+      },
       "cycle_state": {
         "name": "Cycle status",
         "state": {
@@ -239,6 +248,7 @@
           "due_waiting": "Due - waiting for daily check time",
           "manual_active": "Cycle charging active - manual",
           "automatic_active": "Cycle charging active - automatic",
+          "confirming_full": "Confirming 100% full charge",
           "paused": "Cycle charging paused"
         }
       },
@@ -299,9 +309,15 @@
       "normal_charge_limit": { "name": "Normal-operation charge limit" },
       "charge_power": { "name": "Requested charging power" },
       "cycle_interval_days": { "name": "Interval between full charges" },
+      "full_charge_min_hold_minutes": { "name": "Minimum hold time at 100%" },
+      "full_charge_taper_power": { "name": "Charge taper threshold" },
+      "full_charge_taper_minutes": { "name": "Confirmation time below taper threshold" },
+      "full_charge_timeout_minutes": { "name": "Maximum confirmation time" },
+      "full_charge_top_off_power": { "name": "Maximum top-off power at 100%" },
       "recovery_stability_time": { "name": "Stability time before recovery" },
       "minimum_soc": { "name": "Lower discharge limit" },
       "soc_hysteresis": { "name": "Discharge re-enable margin" },
+      "charge_soc_hysteresis": { "name": "Device charge SOC hysteresis" },
       "target_grid_power": { "name": "Public grid connection target" },
       "maximum_grid_output": { "name": "Maximum power supplied to the home" },
       "maximum_inverter_output": { "name": "Overall maximum inverter power" },
@@ -316,7 +332,9 @@
       "control_medium_max_step": { "name": "Maximum change for a medium deviation" },
       "pv_stop_power": { "name": "PV stop threshold" },
       "pv_start_power": { "name": "PV restart power" },
-      "pv_start_delay": { "name": "PV restart delay" }
+      "pv_start_delay": { "name": "PV restart delay" },
+      "pv_surplus_deadband": { "name": "Grid-export deadband in PV-surplus mode" },
+      "pv_surplus_charge_reserve": { "name": "Preferred battery charging power in PV-surplus mode" }
     },
     "time": {
       "cycle_check_time": { "name": "Daily automatic cycle check time" }

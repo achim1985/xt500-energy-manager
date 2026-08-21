@@ -37,6 +37,8 @@ const XT500_DISPLAY_NAMES = {
   next_cycle_at: "Nächste Zyklusladung",
   battery_charge_power: "Batterie lädt",
   battery_discharge_power: "Batterie entlädt",
+  pv_surplus_correction: "PV-Überschuss-Abregelung",
+  full_charge_confirmation: "Bestätigung der Vollladung",
 };
 
 const XT500_DISPLAY_ICONS = {
@@ -113,7 +115,7 @@ const orderedVisibleBlocks = (config, page, blocks) => {
   const hidden = new Set(normalizedHiddenBlocks(config, page));
   return normalizedBlockOrder(config, page)
     .filter((key) => !hidden.has(key) && blocks[key])
-    .map((key) => blocks[key]);
+    .flatMap((key) => Array.isArray(blocks[key]) ? blocks[key] : [blocks[key]]);
 };
 
 const additionalViewPath = (entry, sourceView, usedPaths) => {
@@ -1041,6 +1043,28 @@ class XT500EnergyManagerDashboardStrategy extends HTMLElement {
         grid_options: { columns: "full", rows: "auto" },
       } : null;
       const compact = (cards) => cards.filter(Boolean);
+      const settingRows = (items) => items
+        .map(([keyOrEntity, name, icon]) => {
+          const entityId = entities[keyOrEntity] || keyOrEntity;
+          return entityId && hass.states[entityId] ? {
+            entity: entityId,
+            name,
+            ...(icon ? { icon } : {}),
+          } : null;
+        })
+        .filter(Boolean);
+      const compactSettingGroup = (title, icon, items, extraCards = []) => {
+        const rows = settingRows(items);
+        return compact([
+          heading(title, icon),
+          rows.length ? {
+            type: "entities",
+            show_header_toggle: false,
+            entities: rows,
+          } : null,
+          ...extraCards,
+        ]);
+      };
       const compactOverviewTile = (entityId, name, icon) =>
         entityId && hass.states[entityId] ? {
           type: "tile",
@@ -1066,10 +1090,12 @@ class XT500EnergyManagerDashboardStrategy extends HTMLElement {
       setpointEntities.push(...namedExisting([
         "recommended_grid_setpoint",
         "recommended_inverter_setpoint",
+        "pv_surplus_correction",
         "estimated_home_load",
       ]));
       const cycleEntities = namedExisting([
         "cycle_state",
+        "full_charge_confirmation",
         "days_since_full",
         "next_cycle_at",
       ]);
@@ -1116,90 +1142,84 @@ class XT500EnergyManagerDashboardStrategy extends HTMLElement {
         ),
       ]);
 
-      const mainControlCards = compact([
-        heading("Hauptsteuerung", "mdi:power"),
-        tile("regulation_enabled", "Regelung aktiv", [{ type: "toggle" }]),
-        tile("automatic_recovery_enabled", "Fehler automatisch beheben", [{ type: "toggle" }]),
-        tile("show_advanced", "Feinabstimmung anzeigen", [{ type: "toggle" }]),
+      const mainControlCards = compactSettingGroup("Hauptsteuerung", "mdi:power", [
+        ["regulation_enabled", "Regelung aktiv"],
+        ["automatic_recovery_enabled", "Fehler automatisch beheben"],
       ]);
-      const chargeControlCards = compact([
-        heading("Manuelle Zielladung", "mdi:battery-arrow-up"),
-        tile("manual_active", "Zielladung starten", [{ type: "toggle" }]),
-        tile("manual_mode", "Lademodus", [{ type: "select-options" }]),
-        tile("target_soc", "Ladeziel", [{ type: "numeric-input", style: "buttons" }]),
-        tile("charge_power", "Gewünschte Ladeleistung", [{ type: "numeric-input", style: "buttons" }]),
-        heading("Zyklusladung", "mdi:battery-sync"),
-        tile("automatic_enabled", "Automatische Zyklusüberwachung", [{ type: "toggle" }]),
+      const manualChargeCards = compactSettingGroup("Manuelle Zielladung", "mdi:battery-arrow-up", [
+        ["manual_active", "Zielladung starten"],
+        ["manual_mode", "Lademodus"],
+        ["target_soc", "Ladeziel"],
+        ["charge_power", "Gewünschte Ladeleistung"],
+      ]);
+      const cycleChargeCards = compactSettingGroup("Zyklusladung", "mdi:battery-sync", [
+        ["automatic_enabled", "Automatische Zyklusüberwachung"],
+        ["cycle_check_time", "Tägliche Prüfzeit", "mdi:clock-check-outline"],
+        ["automatic_mode", "Lademodus der Zyklusladung"],
+        ["automatic_target_soc", "Vollladeziel"],
+        ["cycle_interval_days", "Intervall in Tagen"],
+      ], compact([
         tile("cycle_start", "Jetzt manuell starten", [{ type: "button" }]),
         tile("cycle_reset", "Zyklustage auf 0 setzen", [{ type: "button" }]),
-        entities.cycle_check_time ? {
-          type: "entities",
-          show_header_toggle: false,
-          entities: [{
-            entity: entities.cycle_check_time,
-            name: "Tägliche Prüfzeit",
-            icon: "mdi:clock-check-outline",
-          }],
-        } : null,
-        tile("automatic_mode", "Lademodus der Zyklusladung", [{ type: "select-options" }]),
-        tile("automatic_target_soc", "Vollladeziel", [{ type: "numeric-input", style: "buttons" }]),
-        tile("cycle_interval_days", "Intervall in Tagen", [{ type: "numeric-input", style: "buttons" }]),
+      ]));
+      const normalOperationCards = compactSettingGroup("Betriebsart und Netzziel", "mdi:tune-variant", [
+        ["coupling_mode", "PV für Regelung berücksichtigen"],
+        ["base_mode", "Grundmodus"],
+        ["normal_charge_limit", "Ladelimit Normalbetrieb"],
+        ["pv_surplus_deadband", "Netzeinspeisungs-Totzone"],
+        ["pv_surplus_charge_reserve", "Bevorzugte Akku-Ladeleistung im PV-Überschussmodus"],
+        ["target_grid_power", "Netzziel"],
+        ["maximum_grid_output", "Hausnetz-Limit"],
       ]);
-      const normalControlCards = compact([
-        heading("Normalbetrieb und Grenzen", "mdi:tune-variant"),
-        tile("coupling_mode", "PV für Regelung berücksichtigen", [{ type: "select-options" }]),
-        tile("base_mode", "Grundmodus", [{ type: "select-options" }]),
-        tile("normal_charge_limit", "Ladelimit Normalbetrieb", [{ type: "numeric-input", style: "buttons" }]),
-        actualLoadDischargeLimit && hass.states[actualLoadDischargeLimit] ? {
-          type: "tile",
-          entity: actualLoadDischargeLimit,
-          name: "Lastanschluss-Entladegrenze",
-          features: [{ type: "numeric-input", style: "buttons" }],
-          grid_options: { columns: "full", rows: "auto" },
-        } : null,
-        tile("minimum_soc", "Entladegrenze", [{ type: "numeric-input", style: "buttons" }]),
-        tile("soc_hysteresis", "Wiederfreigabe", [{ type: "numeric-input", style: "buttons" }]),
+      const batteryProtectionCards = compactSettingGroup("Batteriegrenzen und Schutz", "mdi:battery-lock", [
+        [actualLoadDischargeLimit, "Lastanschluss-Entladegrenze"],
+        ["minimum_soc", "Entladegrenze"],
+        ["soc_hysteresis", "Entlade-Hysterese (SI1)"],
+        ["charge_soc_hysteresis", "Lade-Hysterese (SA1)"],
+      ], compact([
         tile("discharge_release", "Entladesperre einmalig freigeben", [{ type: "button" }]),
-        tile("target_grid_power", "Netzziel", [{ type: "numeric-input", style: "buttons" }]),
-        tile("maximum_grid_output", "Hausnetz-Limit", [{ type: "numeric-input", style: "buttons" }]),
+      ]));
+      const tariffControlCards = compactSettingGroup("Dynamischer Stromtarif", "mdi:currency-eur", [
+        ["tariff_active", "Tarifladung anfordern"],
+        ["tariff_target_soc", "Ladeziel"],
+        ["tariff_charge_power", "Netz-Ladeleistung"],
+        ["tariff_request_duration", "Gültigkeit je Anforderung"],
+        ["tariff_expires_at", "Tarifanforderung gültig bis"],
       ]);
-      const tariffControlCards = compact([
-        heading("Dynamischer Stromtarif", "mdi:currency-eur"),
-        tile("tariff_active", "Tarifladung anfordern", [{ type: "toggle" }]),
-        tile("tariff_target_soc", "Ladeziel", [{ type: "numeric-input", style: "buttons" }]),
-        tile("tariff_charge_power", "Netz-Ladeleistung", [{ type: "numeric-input", style: "buttons" }]),
-        tile("tariff_request_duration", "Gültigkeit je Anforderung", [{ type: "numeric-input", style: "buttons" }]),
-        entities.tariff_expires_at ? {
-          type: "entities",
-          show_header_toggle: false,
-          entities: namedExisting(["tariff_expires_at"]),
-        } : null,
-      ]);
-      const advancedControlCards = compact([
-        heading("Adaptive Regelung", "mdi:speedometer"),
+      const adaptiveThresholdCards = compact([
+        heading("Regelstatus und Abweichungen", "mdi:speedometer"),
         existing(["control_band", "control_error", "control_interval", "control_max_step"]).length ? {
           type: "entities",
           show_header_toggle: false,
           entities: namedExisting(["control_band", "control_error", "control_interval", "control_max_step"]),
         } : null,
         heading("Fehlergrenzen", "mdi:approximately-equal"),
-        tile("control_small_error", "Fein → Mittel", [{ type: "numeric-input", style: "buttons" }]),
-        tile("control_large_error", "Mittel → Schnell", [{ type: "numeric-input", style: "buttons" }]),
-        heading("Maximale Änderung je Regelvorgang", "mdi:delta"),
-        tile("control_small_max_step", "Kleine Abweichung", [{ type: "numeric-input", style: "buttons" }]),
-        tile("control_medium_max_step", "Mittlere Abweichung", [{ type: "numeric-input", style: "buttons" }]),
-        tile("control_large_max_step", "Große Abweichung", [{ type: "numeric-input", style: "buttons" }]),
-        heading("Zeitverhalten", "mdi:timer-cog-outline"),
-        tile("control_slow_interval", "Bei kleiner Abweichung", [{ type: "numeric-input", style: "buttons" }]),
-        tile("control_medium_interval", "Bei mittlerer Abweichung", [{ type: "numeric-input", style: "buttons" }]),
-        tile("control_fast_interval", "Bei großer Abweichung", [{ type: "numeric-input", style: "buttons" }]),
-        tile("feedback_settle_time", "Wartezeit auf Messwerte", [{ type: "numeric-input", style: "buttons" }]),
-        heading("Automatische Fehlerwiederherstellung", "mdi:shield-refresh"),
-        tile("recovery_stability_time", "Stabile Rückmeldungen abwarten", [{ type: "numeric-input", style: "buttons" }]),
-        heading("PV-Freigabe bei geringer Leistung", "mdi:solar-power-variant-outline"),
-        tile("pv_stop_power", "Unterhalb sofort auf 0 W", [{ type: "numeric-input", style: "buttons" }]),
-        tile("pv_start_power", "Erneut freigeben oberhalb", [{ type: "numeric-input", style: "buttons" }]),
-        tile("pv_start_delay", "Startleistung muss anliegen", [{ type: "numeric-input", style: "buttons" }]),
+        ...compactSettingGroup("Fehlergrenzen", "mdi:approximately-equal", [
+          ["control_small_error", "Fein → Mittel"],
+          ["control_large_error", "Mittel → Schnell"],
+        ]).slice(1),
+      ]);
+      const adaptiveResponseCards = compactSettingGroup("Leistungsschritte und Reaktionszeiten", "mdi:delta", [
+        ["control_small_max_step", "Schritt bei kleiner Abweichung"],
+        ["control_medium_max_step", "Schritt bei mittlerer Abweichung"],
+        ["control_large_max_step", "Schritt bei großer Abweichung"],
+        ["control_slow_interval", "Abstand bei kleiner Abweichung"],
+        ["control_medium_interval", "Abstand bei mittlerer Abweichung"],
+        ["control_fast_interval", "Abstand bei großer Abweichung"],
+        ["feedback_settle_time", "Wartezeit auf Messwerte"],
+      ]);
+      const pvRecoveryCards = compactSettingGroup("Automatische Fehlerwiederherstellung", "mdi:shield-refresh", [
+        ["recovery_stability_time", "Stabile Rückmeldungen abwarten"],
+        ["pv_stop_power", "PV: unterhalb sofort auf 0 W"],
+        ["pv_start_power", "PV: erneut freigeben oberhalb"],
+        ["pv_start_delay", "PV: Startleistung muss anliegen"],
+      ]);
+      const fullChargeConfirmationCards = compactSettingGroup("Bestätigung der 100-%-Vollladung", "mdi:battery-check-outline", [
+        ["full_charge_min_hold_minutes", "Mindesthaltezeit bei 100 %"],
+        ["full_charge_taper_power", "Ladeende-Schwelle"],
+        ["full_charge_taper_minutes", "Dauer unter Ladeende-Schwelle"],
+        ["full_charge_timeout_minutes", "Maximale Bestätigungszeit"],
+        ["full_charge_top_off_power", "Nachladeleistung bei 100 %"],
       ]);
 
       let storageGauge = null;
@@ -1225,6 +1245,8 @@ class XT500EnergyManagerDashboardStrategy extends HTMLElement {
           "- **PV für Regelung berücksichtigen:** Hybrid ist die empfohlene Einstellung und berücksichtigt XT500-PV sowie externe AC-PV gemeinsam. Alternativ kann die Regelung auf eine der beiden PV-Arten begrenzt werden. Der öffentliche Stromzähler bleibt in allen Fällen die Sicherheitsinstanz.\n" +
           "- **Normalbetrieb:** Der Speicher gleicht den Hausverbrauch aus und hält das eingestellte Netzziel ein. Oberhalb der Entladegrenze darf er Energie ins Haus abgeben.\n" +
           "- **PV-Überschuss als Grundmodus:** Nur aktuell verfügbare PV-Leistung wird bis zum Hausbedarf freigegeben. Nicht benötigte PV-Leistung bleibt zum Laden im Akku; zusätzliche Batterieentladung wird vermieden.\n" +
+          "- **Bevorzugte Akku-Ladeleistung im PV-Überschussmodus:** Dieser Wert ist ausschließlich im PV-Überschussmodus wirksam und bezeichnet die gewünschte gemessene Netto-Ladeleistung des Akkus – nicht eine feste Ladeanforderung aus dem Netz. Entlädt der Akku, wird die XT500-Ausgangsleistung um die vollständige Entladeleistung plus den fehlenden Ladeanteil reduziert. Ist der Zielbereich erreicht, hält die Regelung den aktuellen Sollwert und gibt ihn erst mit zusätzlicher Ladereserve wieder nach oben frei. Dadurch wird Laden gegenüber Entladen bevorzugt und ein Pendeln an der 0-W-Grenze vermieden.\n" +
+          "- **Netzeinspeisungs-Totzone im PV-Überschussmodus:** Die Totzone beruhigt nur die Rückführung der öffentlichen Netzeinspeisung. Für gemessene Akkuentladung gilt keine Totzone; sie wird vollständig gegengeregelt.\n" +
           "- **Ladelimit Normalbetrieb:** Dieser Wert wird als echte System-Ladegrenze an den Speicher geschrieben. Der auswählbare Bereich folgt dem Gerät; beim hier verwendeten System sind das 70 bis 100 %.\n" +
           "- **Lastanschluss-Entladegrenze:** Das ist die originale Geräte-Einstellung für den gesonderten XT500-Lastanschluss. Sie wird direkt am Speicher geändert und ist von der Entladegrenze der Energiemanager-Regelung getrennt.\n" +
           "- **Entladegrenze:** Das ist die originale System-Entladegrenze des XT500. Änderungen im Energiemanager oder in SunEnergyXT wirken auf denselben Gerätewert. Unterhalb dieses SOC stoppt die Batterieabgabe; die Energiemanager-Regelung wird erst oberhalb der zusätzlich eingestellten Hysterese wieder freigegeben.\n" +
@@ -1354,27 +1376,19 @@ class XT500EnergyManagerDashboardStrategy extends HTMLElement {
           type: "grid",
           cards: mainControlCards,
         } : null,
-        target_charge: chargeControlCards.length > 2 ? {
-          type: "grid",
-          cards: chargeControlCards,
-        } : null,
+        target_charge: [manualChargeCards, cycleChargeCards]
+          .filter((cards) => cards.length > 1)
+          .map((cards) => ({ type: "grid", cards })),
         tariff_charge: tariffControlCards.length > 1 ? {
           type: "grid",
           cards: tariffControlCards,
         } : null,
-        normal_limits: normalControlCards.length > 1 ? {
-          type: "grid",
-          cards: normalControlCards,
-        } : null,
-        advanced: entities.show_advanced ? {
-          type: "grid",
-          cards: advancedControlCards,
-          visibility: [{
-            condition: "state",
-            entity: entities.show_advanced,
-            state: "on",
-          }],
-        } : null,
+        normal_limits: [normalOperationCards, batteryProtectionCards]
+          .filter((cards) => cards.length > 1)
+          .map((cards) => ({ type: "grid", cards })),
+        advanced: [adaptiveThresholdCards, adaptiveResponseCards, pvRecoveryCards]
+          .filter((cards) => cards.length > 1)
+          .map((cards) => ({ type: "grid", cards })),
       };
 
       views.push({
@@ -1386,13 +1400,80 @@ class XT500EnergyManagerDashboardStrategy extends HTMLElement {
         sections: orderedVisibleBlocks(config, "overview", overviewBlocks),
       });
 
+      const settingsSuffix = managers.size > 1 ? `-${index}` : "";
+      const settingsNavigation = {
+        type: "grid",
+        cards: [
+          heading("Weitere Einstellungen", "mdi:view-dashboard-outline"),
+          {
+            type: "button",
+            name: "Laden und Zyklus",
+            icon: "mdi:battery-charging-high",
+            tap_action: {
+              action: "navigate",
+              navigation_path: `/xt500-energiemanager/laden${settingsSuffix}`,
+            },
+            grid_options: { columns: 6, rows: 1 },
+          },
+          {
+            type: "button",
+            name: "Feinabstimmung",
+            icon: "mdi:tune-vertical",
+            tap_action: {
+              action: "navigate",
+              navigation_path: `/xt500-energiemanager/feinabstimmung${settingsSuffix}`,
+            },
+            grid_options: { columns: 6, rows: 1 },
+          },
+        ],
+      };
       settingsViews.push({
         title: managers.size > 1 ? `Einstellungen ${index}` : "Einstellungen",
-        path: managers.size > 1 ? `einstellungen-${index}` : "einstellungen",
+        path: `einstellungen${settingsSuffix}`,
         icon: "mdi:cog-outline",
         type: "sections",
-        max_columns: 3,
-        sections: orderedVisibleBlocks(config, "settings", settingsBlocks),
+        max_columns: 2,
+        sections: orderedVisibleBlocks(config, "settings", {
+          guide: settingsBlocks.guide ? {
+            ...settingsBlocks.guide,
+            column_span: 2,
+          } : null,
+          main_control: settingsBlocks.main_control,
+          normal_limits: settingsBlocks.normal_limits,
+        }).flatMap((section, sectionIndex) =>
+          sectionIndex === 1 ? [settingsNavigation, section] : [section]
+        ),
+      });
+      settingsViews.push({
+        title: managers.size > 1 ? `Laden ${index}` : "Laden",
+        path: `laden${settingsSuffix}`,
+        icon: "mdi:battery-charging-high",
+        subview: true,
+        back_path: `/xt500-energiemanager/einstellungen${settingsSuffix}`,
+        type: "sections",
+        max_columns: 2,
+        sections: [
+          ...orderedVisibleBlocks(config, "settings", {
+            target_charge: settingsBlocks.target_charge,
+            tariff_charge: settingsBlocks.tariff_charge,
+          }),
+          ...(fullChargeConfirmationCards.length > 1 ? [{
+            type: "grid",
+            cards: fullChargeConfirmationCards,
+          }] : []),
+        ],
+      });
+      settingsViews.push({
+        title: managers.size > 1 ? `Feinabstimmung ${index}` : "Feinabstimmung",
+        path: `feinabstimmung${settingsSuffix}`,
+        icon: "mdi:tune-vertical",
+        subview: true,
+        back_path: `/xt500-energiemanager/einstellungen${settingsSuffix}`,
+        type: "sections",
+        max_columns: 2,
+        sections: orderedVisibleBlocks(config, "settings", {
+          advanced: settingsBlocks.advanced,
+        }),
       });
     }
 

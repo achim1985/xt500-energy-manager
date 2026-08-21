@@ -75,6 +75,8 @@ SENSORS = (
     XT500SensorDescription(key="desired_charge_limit", translation_key="desired_charge_limit", icon="mdi:battery-lock", native_unit_of_measurement=PERCENTAGE, value_fn=lambda r: r.desired_charge_limit),
     XT500SensorDescription(key="battery_charge_power", translation_key="battery_charge_power", icon="mdi:battery-arrow-up", device_class=SensorDeviceClass.POWER, native_unit_of_measurement=UnitOfPower.WATT, value_fn=lambda r: r.battery_charge_power),
     XT500SensorDescription(key="battery_discharge_power", translation_key="battery_discharge_power", icon="mdi:battery-arrow-down", device_class=SensorDeviceClass.POWER, native_unit_of_measurement=UnitOfPower.WATT, value_fn=lambda r: r.battery_discharge_power),
+    XT500SensorDescription(key="pv_surplus_correction", translation_key="pv_surplus_correction", icon="mdi:solar-power-variant-outline", device_class=SensorDeviceClass.POWER, native_unit_of_measurement=UnitOfPower.WATT, value_fn=lambda r: r.result.pv_surplus_correction if r.result else None),
+    XT500SensorDescription(key="full_charge_confirmation", translation_key="full_charge_confirmation", icon="mdi:battery-check-outline", device_class=SensorDeviceClass.ENUM, options=("idle", "holding", "waiting_taper", "confirmed", "timeout"), value_fn=lambda r: r.full_charge_confirmation_state),
     XT500SensorDescription(
         key="cycle_state",
         translation_key="cycle_state",
@@ -86,6 +88,7 @@ SENSORS = (
             "due_waiting",
             "manual_active",
             "automatic_active",
+            "confirming_full",
             "paused",
         ),
         value_fn=lambda r: r.cycle_state,
@@ -136,6 +139,33 @@ class XT500Sensor(XT500Entity, SensorEntity):
                     "next_attempt": self.runtime.next_recovery_attempt,
                     "last_success": self.runtime.last_recovery_success,
                     "error": self.runtime.control_error_message,
+                }
+            )
+        elif self.key == "full_charge_confirmation":
+            attrs.update(
+                {
+                    "started_at": self.runtime.settings[
+                        "full_charge_confirmation_started"
+                    ],
+                    "taper_started_at": self.runtime.settings[
+                        "full_charge_taper_started"
+                    ],
+                    "actual_charge_power_w": self.runtime.battery_charge_power,
+                    "minimum_hold_minutes": self.runtime.settings[
+                        "full_charge_min_hold_minutes"
+                    ],
+                    "taper_threshold_w": self.runtime.settings[
+                        "full_charge_taper_power"
+                    ],
+                    "taper_minutes": self.runtime.settings[
+                        "full_charge_taper_minutes"
+                    ],
+                    "timeout_minutes": self.runtime.settings[
+                        "full_charge_timeout_minutes"
+                    ],
+                    "top_off_power_w": self.runtime.settings[
+                        "full_charge_top_off_power"
+                    ],
                 }
             )
         return attrs

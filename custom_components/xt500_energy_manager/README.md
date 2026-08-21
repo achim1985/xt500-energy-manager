@@ -1,4 +1,4 @@
-# XT500 Energy Manager 1.9.3
+# XT500 Energy Manager 1.10.3
 
 Production-ready Home Assistant controller for SunEnergyXT XT500 and XT500 Pro
 systems. The integration directly controls the grid-port setpoint, inverter
@@ -20,6 +20,12 @@ ceiling, and system charge limit.
 - In PV-surplus mode, low PV clamps both setpoints to zero immediately. Output
   is released only after PV stayed above the restart threshold for the
   configured delay.
+- **Preferred battery charging power in PV-surplus mode** is a measured net
+  battery-flow target used only by PV-surplus control. It reduces XT500 output
+  by every measured watt of battery discharge plus the missing charge reserve,
+  holds the output inside the charge band to avoid oscillation, and does not
+  request fixed grid charging. The grid-export deadband does not apply to
+  battery discharge.
 - The integration does not discover, disable, or enable unrelated automations.
   Any existing automation that writes the same device setpoints must be disabled
   before this controller is enabled.
@@ -48,7 +54,9 @@ ceiling, and system charge limit.
 
 - **Grid charging:** requests the configured charging power from the grid.
 - **PV surplus:** uses available DC and AC PV surplus without intentional grid
-  import.
+  import. Measured battery discharge and public-grid export close the feedback
+  loop around zero; the larger error reduces both GS and IS, with a configurable
+  deadband to avoid oscillation.
 - **PV priority:** prioritizes battery charging from DC and AC PV and prevents
   intentional battery discharge while the target remains active.
 - **PV and grid:** treats the configured power as total battery charging power;
@@ -103,7 +111,7 @@ management hash prevents locally modified copies from being overwritten.
 ## Generated dashboard
 
 Register
-`/xt500_energy_manager/xt500-energy-dashboard-strategy.js?v=1.9.3` once as a
+`/xt500_energy_manager/xt500-energy-dashboard-strategy.js?v=1.10.3` once as a
 JavaScript module under Settings → Dashboards → Resources. Then add the
 **XT500 Energiemanager** community dashboard.
 
@@ -116,6 +124,12 @@ daily PV production (`PD`), grid charging (`GD1`), grid export (`GD2`), and
 off-grid output (`LD`) sensors on the selected device. The compact
 **Energie heute** block displays those kWh values directly without creating
 helper sensors. Missing optional daily sensors simply hide their tile.
+
+SunEnergyXT 1.1.3 polling intervals from 3 to 60 seconds are detected from the
+original config entry and included in communication and recovery timeouts. The
+new optional `SI1` and `SA1` device hysteresis entities are discovered
+automatically. Both device defaults are 5%; restore them to 5% after temporary
+custom tests.
 
 The graphical strategy editor can add individual views from other
 storage-mode Home Assistant dashboards as native top-level tabs. The source

@@ -19,6 +19,8 @@ from .const import (
     CONF_BATTERY_INPUT_POWER_ENTITY,
     CONF_BATTERY_OUTPUT_POWER_ENTITY,
     CONF_BATTERY_POWER_ENTITY,
+    CONF_CHARGE_SOC_HYSTERESIS_ENTITY,
+    CONF_DISCHARGE_SOC_HYSTERESIS_ENTITY,
     CONF_GRID_CHARGE_DAILY_ENERGY_ENTITY,
     CONF_GRID_EXPORT_DAILY_ENERGY_ENTITY,
     CONF_GRID_PORT_POWER_ENTITY,
@@ -48,6 +50,8 @@ _LOGGER = logging.getLogger(__name__)
 
 _OPTIONAL_DISCOVERED_KEYS = (
     CONF_BATTERY_POWER_ENTITY,
+    CONF_DISCHARGE_SOC_HYSTERESIS_ENTITY,
+    CONF_CHARGE_SOC_HYSTERESIS_ENTITY,
     CONF_PV_DAILY_ENERGY_ENTITY,
     CONF_GRID_CHARGE_DAILY_ENERGY_ENTITY,
     CONF_GRID_EXPORT_DAILY_ENERGY_ENTITY,
@@ -193,6 +197,8 @@ async def async_migrate_entry(
             CONF_INVERTER_SETPOINT_ENTITY,
             CONF_MAX_CHARGE_SOC_ENTITY,
             CONF_MIN_DISCHARGE_SOC_ENTITY,
+            CONF_DISCHARGE_SOC_HYSTERESIS_ENTITY,
+            CONF_CHARGE_SOC_HYSTERESIS_ENTITY,
             CONF_LOAD_DISCHARGE_LIMIT_ENTITY,
             CONF_BATTERY_INPUT_POWER_ENTITY,
             CONF_BATTERY_OUTPUT_POWER_ENTITY,
@@ -243,6 +249,17 @@ async def async_migrate_entry(
                     CONF_BATTERY_POWER_ENTITY
                 ]
         hass.config_entries.async_update_entry(entry, data=data, version=5)
+    if entry.version < 6:
+        result = _detect_configured_xt500_entities(hass, data)
+        if result is not None:
+            detected, _missing, ambiguous = result
+            for key in (
+                CONF_DISCHARGE_SOC_HYSTERESIS_ENTITY,
+                CONF_CHARGE_SOC_HYSTERESIS_ENTITY,
+            ):
+                if key in detected and key not in ambiguous:
+                    data[key] = detected[key]
+        hass.config_entries.async_update_entry(entry, data=data, version=6)
     return True
 
 

@@ -43,6 +43,64 @@ class ControllerTest(unittest.TestCase):
         values.update(changes)
         return controller.ControlInput(**values)
 
+    def test_full_charge_waits_for_hold_and_continuous_taper(self):
+        start = datetime(2026, 8, 21, 12, tzinfo=UTC)
+        first = controller.update_full_charge_confirmation(
+            now=start, soc=100, target_soc=100, battery_charge_power=200,
+            started_at=None, taper_started_at=None, minimum_hold_minutes=10,
+            taper_power_w=30, taper_minutes=5, timeout_minutes=60,
+        )
+        self.assertEqual(first.state, "holding")
+        tapered = controller.update_full_charge_confirmation(
+            now=start + timedelta(minutes=8), soc=100, target_soc=100,
+            battery_charge_power=20, started_at=first.started_at,
+            taper_started_at=first.taper_started_at, minimum_hold_minutes=10,
+            taper_power_w=30, taper_minutes=5, timeout_minutes=60,
+        )
+        confirmed = controller.update_full_charge_confirmation(
+            now=start + timedelta(minutes=13), soc=100, target_soc=100,
+            battery_charge_power=10, started_at=tapered.started_at,
+            taper_started_at=tapered.taper_started_at, minimum_hold_minutes=10,
+            taper_power_w=30, taper_minutes=5, timeout_minutes=60,
+        )
+        self.assertTrue(confirmed.complete)
+        self.assertEqual(confirmed.state, "confirmed")
+
+    def test_full_charge_taper_must_be_continuous_and_measured(self):
+        start = datetime(2026, 8, 21, 12, tzinfo=UTC)
+        decision = controller.update_full_charge_confirmation(
+            now=start + timedelta(minutes=12), soc=100, target_soc=100,
+            battery_charge_power=None, started_at=start,
+            taper_started_at=start + timedelta(minutes=6), minimum_hold_minutes=10,
+            taper_power_w=30, taper_minutes=5, timeout_minutes=60,
+        )
+        self.assertEqual(decision.state, "waiting_taper")
+        self.assertIsNone(decision.taper_started_at)
+        self.assertFalse(decision.complete)
+
+    def test_full_charge_confirmation_times_out_safely(self):
+        start = datetime(2026, 8, 21, 12, tzinfo=UTC)
+        decision = controller.update_full_charge_confirmation(
+            now=start + timedelta(minutes=60), soc=100, target_soc=100,
+            battery_charge_power=500, started_at=start, taper_started_at=None,
+            minimum_hold_minutes=10, taper_power_w=30, taper_minutes=5,
+            timeout_minutes=60,
+        )
+        self.assertTrue(decision.complete)
+        self.assertTrue(decision.timed_out)
+        self.assertEqual(decision.state, "timeout")
+
+    def test_full_charge_confirmation_resets_below_target(self):
+        start = datetime(2026, 8, 21, 12, tzinfo=UTC)
+        decision = controller.update_full_charge_confirmation(
+            now=start + timedelta(minutes=3), soc=99, target_soc=100,
+            battery_charge_power=0, started_at=start, taper_started_at=start,
+            minimum_hold_minutes=10, taper_power_w=30, taper_minutes=5,
+            timeout_minutes=60,
+        )
+        self.assertEqual(decision.state, "idle")
+        self.assertIsNone(decision.started_at)
+
     def test_ac_pv_sign_is_normalized_without_turning_consumption_into_pv(self):
         self.assertEqual(
             controller.normalize_pv_production(-600, production_negative=True),
@@ -918,6 +976,187 @@ class ControllerTest(unittest.TestCase):
         )
         self.assertEqual(result.recommended_grid_setpoint, 100)
         self.assertEqual(result.recommended_inverter_setpoint, 100)
+
+    def test_pv_surplus_reduces_output_until_battery_discharge_is_near_zero(self):
+        result = controller.calculate_control(
+            self.input(
+                pv_power=500,
+                grid_power=50,
+                grid_port_power=200,
+                current_grid_setpoint=150,
+                current_inverter_setpoint=150,
+                battery_discharge_power=120,
+            ),
+            controller.ControlSettings(
+                base_mode="pv_surplus",
+                meter_export_positive=True,
+                pv_release_allowed=True,
+                pv_surplus_deadband=20,
+            ),
+        )
+
+        self.assertEqual(result.pv_surplus_correction, 170)
+        self.assertEqual(result.recommended_grid_setpoint, 0)
+        self.assertEqual(result.recommended_inverter_setpoint, 0)
+        self.assertEqual(result.battery_discharge_power, 120)
+
+    def test_pv_surplus_prefers_measured_battery_charge_reserve(self):
+        result = controller.calculate_control(
+            self.input(
+                pv_power=500,
+                grid_power=0,
+                grid_port_power=200,
+                current_grid_setpoint=200,
+                current_inverter_setpoint=200,
+                battery_charge_power=0,
+                battery_discharge_power=0,
+            ),
+            controller.ControlSettings(
+                base_mode="pv_surplus",
+                meter_export_positive=True,
+                pv_release_allowed=True,
+                pv_surplus_charge_reserve=50,
+            ),
+        )
+
+        self.assertEqual(result.pv_surplus_correction, 50)
+        self.assertEqual(result.recommended_grid_setpoint, 150)
+        self.assertEqual(result.recommended_inverter_setpoint, 150)
+
+    def test_pv_surplus_charge_reserve_stays_active_during_brief_grid_import(self):
+        result = controller.calculate_control(
+            self.input(
+                pv_power=500,
+                grid_power=-100,
+                grid_port_power=100,
+                current_grid_setpoint=200,
+                current_inverter_setpoint=200,
+                battery_charge_power=0,
+                battery_discharge_power=0,
+            ),
+            controller.ControlSettings(
+                base_mode="pv_surplus",
+                meter_export_positive=True,
+                pv_release_allowed=True,
+                pv_surplus_charge_reserve=50,
+            ),
+        )
+
+        self.assertEqual(result.pv_surplus_correction, 50)
+        self.assertEqual(result.recommended_grid_setpoint, 150)
+        self.assertEqual(result.recommended_inverter_setpoint, 150)
+
+    def test_pv_surplus_holds_output_inside_preferred_charge_band(self):
+        result = controller.calculate_control(
+            self.input(
+                pv_power=500,
+                grid_power=-50,
+                grid_port_power=300,
+                current_grid_setpoint=120,
+                current_inverter_setpoint=120,
+                battery_charge_power=60,
+                battery_discharge_power=0,
+            ),
+            controller.ControlSettings(
+                base_mode="pv_surplus",
+                meter_export_positive=True,
+                pv_release_allowed=True,
+                pv_surplus_deadband=20,
+                pv_surplus_charge_reserve=50,
+            ),
+        )
+
+        self.assertEqual(result.pv_surplus_correction, 0)
+        self.assertEqual(result.recommended_grid_setpoint, 120)
+        self.assertEqual(result.recommended_inverter_setpoint, 120)
+
+    def test_pv_surplus_does_not_double_count_export_and_battery_discharge(self):
+        result = controller.calculate_control(
+            self.input(
+                pv_power=500,
+                grid_power=120,
+                grid_port_power=300,
+                current_grid_setpoint=180,
+                current_inverter_setpoint=180,
+                battery_discharge_power=120,
+            ),
+            controller.ControlSettings(
+                base_mode="pv_surplus",
+                meter_export_positive=True,
+                pv_release_allowed=True,
+                pv_surplus_deadband=20,
+            ),
+        )
+
+        self.assertEqual(result.pv_surplus_correction, 170)
+        self.assertEqual(result.recommended_grid_setpoint, 10)
+        self.assertEqual(result.recommended_inverter_setpoint, 10)
+
+    def test_pv_surplus_continues_reducing_from_current_setpoints(self):
+        result = controller.calculate_control(
+            self.input(
+                pv_power=500,
+                grid_power=10,
+                grid_port_power=160,
+                current_grid_setpoint=50,
+                current_inverter_setpoint=50,
+                battery_discharge_power=60,
+            ),
+            controller.ControlSettings(
+                base_mode="pv_surplus",
+                meter_export_positive=True,
+                pv_release_allowed=True,
+                pv_surplus_deadband=20,
+            ),
+        )
+
+        self.assertEqual(result.pv_surplus_correction, 110)
+        self.assertEqual(result.recommended_grid_setpoint, 0)
+        self.assertEqual(result.recommended_inverter_setpoint, 0)
+
+    def test_pv_surplus_never_increases_output_while_battery_is_discharging(self):
+        for current in (0, 50, 200, 800):
+            with self.subTest(current=current):
+                result = controller.calculate_control(
+                    self.input(
+                        pv_power=1200,
+                        grid_power=-100,
+                        grid_port_power=500,
+                        current_grid_setpoint=current,
+                        current_inverter_setpoint=current,
+                        battery_discharge_power=100,
+                    ),
+                    controller.ControlSettings(
+                        base_mode="pv_surplus",
+                        coupling_mode="dc",
+                        meter_export_positive=True,
+                        pv_release_allowed=True,
+                        pv_surplus_deadband=20,
+                    ),
+                )
+
+                self.assertLessEqual(result.recommended_grid_setpoint, current)
+                self.assertLessEqual(result.recommended_inverter_setpoint, current)
+
+    def test_pv_surplus_corrects_battery_discharge_inside_grid_deadband(self):
+        result = controller.calculate_control(
+            self.input(
+                pv_power=500,
+                grid_power=15,
+                grid_port_power=200,
+                battery_discharge_power=10,
+            ),
+            controller.ControlSettings(
+                base_mode="pv_surplus",
+                meter_export_positive=True,
+                pv_release_allowed=True,
+                pv_surplus_deadband=20,
+            ),
+        )
+
+        self.assertEqual(result.pv_surplus_correction, 60)
+        self.assertEqual(result.recommended_grid_setpoint, 0)
+        self.assertEqual(result.recommended_inverter_setpoint, 0)
 
     def test_pv_surplus_control_still_stops_below_release_threshold(self):
         result = controller.calculate_control(
