@@ -142,6 +142,7 @@ const createLayoutHass = () => {
     "pv_start_power",
     "pv_start_delay",
     "base_mode",
+    "full_battery_pv_export",
     "coupling_mode",
     "show_advanced",
   ]) {
@@ -460,6 +461,16 @@ test("zeigt Entladesperre und einmalige Freigabe eindeutig", async () => {
     ).length,
     1,
   );
+});
+
+test("zeigt den Vollakku-Einspeiseschalter in den Betriebseinstellungen", async () => {
+  const result = await Strategy.generate({}, createLayoutHass());
+  const settings = result.views.find((view) => view.path === "einstellungen");
+  const section = settings.sections.find(
+    (item) => item.cards[0].heading === "Betriebsart und Netzziel",
+  );
+  assert.ok(section);
+  assert.ok(JSON.stringify(section).includes("PV-Überschuss bei vollem Akku einspeisen"));
 });
 
 test("blendet AC-PV-Werte bei reiner XT500-PV-Auswahl aus", async () => {

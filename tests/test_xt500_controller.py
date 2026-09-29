@@ -43,6 +43,83 @@ class ControllerTest(unittest.TestCase):
         values.update(changes)
         return controller.ControlInput(**values)
 
+    def test_full_battery_pv_hold_releases_on_charge_or_below_band(self):
+        decide = controller.update_full_battery_pv_hold
+        self.assertFalse(decide(current_hold=False, soc=99, charge_limit=100,
+                                enabled=True, charge_active=False))
+        self.assertTrue(decide(current_hold=False, soc=100, charge_limit=100,
+                               enabled=True, charge_active=False))
+        self.assertTrue(decide(current_hold=True, soc=99.5, charge_limit=100,
+                               enabled=True, charge_active=False))
+        self.assertFalse(decide(current_hold=True, soc=98.9, charge_limit=100,
+                                enabled=True, charge_active=False))
+        self.assertFalse(decide(current_hold=True, soc=100, charge_limit=100,
+                                enabled=False, charge_active=False))
+        self.assertFalse(decide(current_hold=True, soc=100, charge_limit=100,
+                                enabled=True, charge_active=True))
+        self.assertTrue(decide(current_hold=False, soc=80, charge_limit=80,
+                               enabled=True, charge_active=False))
+
+    def test_full_battery_pv_export_opens_only_when_enabled_and_held(self):
+        data = self.input(soc=100, pv_power=1500, grid_power=0,
+                          grid_port_power=400, load_port_power=200,
+                          current_grid_setpoint=400,
+                          current_inverter_setpoint=600,
+                          battery_charge_power=0, battery_discharge_power=0)
+        normal = controller.calculate_control(data, controller.ControlSettings(
+            base_mode="pv_surplus", grid_limit=800, inverter_limit=2400,
+            full_battery_pv_hold=True, pv_surplus_charge_reserve=0,
+        ))
+        bypass = controller.calculate_control(data, controller.ControlSettings(
+            base_mode="pv_surplus", grid_limit=800, inverter_limit=2400,
+            full_battery_pv_export=True, full_battery_pv_hold=True,
+            pv_surplus_charge_reserve=0,
+        ))
+        self.assertFalse(normal.full_battery_pv_bypass_active)
+        self.assertEqual(normal.recommended_grid_setpoint, 400)
+        self.assertTrue(bypass.full_battery_pv_bypass_active)
+        self.assertEqual(bypass.recommended_grid_setpoint, 0)
+        self.assertEqual(bypass.recommended_inverter_setpoint, 1400)
+        self.assertEqual(bypass.status, "full_battery_pv_bypass")
+
+    def test_full_battery_pv_export_needs_dc_pv_and_no_charge_request(self):
+        data = self.input(soc=100, pv_power=900)
+        base = dict(full_battery_pv_export=True, full_battery_pv_hold=True)
+        for settings in (
+            controller.ControlSettings(**base, charge_active=True),
+            controller.ControlSettings(**base, coupling_mode="ac"),
+            controller.ControlSettings(**base, pv_release_allowed=False),
+        ):
+            self.assertFalse(controller.calculate_control(
+                data, settings).full_battery_pv_bypass_active)
+        self.assertFalse(controller.calculate_control(
+            self.input(soc=100, pv_power=0),
+            controller.ControlSettings(**base),
+        ).full_battery_pv_bypass_active)
+
+    def test_full_battery_bypass_reduces_measured_battery_discharge(self):
+        result = controller.calculate_control(
+            self.input(soc=100, pv_power=1000, grid_power=0,
+                       grid_port_power=200, current_inverter_setpoint=1000,
+                       battery_discharge_power=100),
+            controller.ControlSettings(full_battery_pv_export=True,
+                                       full_battery_pv_hold=True,
+                                       grid_limit=800, inverter_limit=2400),
+        )
+        self.assertEqual(result.recommended_grid_setpoint, 0)
+        self.assertEqual(result.recommended_inverter_setpoint, 900)
+
+    def test_full_battery_bypass_never_recommends_more_than_dc_pv(self):
+        result = controller.calculate_control(
+            self.input(soc=100, pv_power=500, grid_power=0,
+                       grid_port_power=200, load_port_power=100),
+            controller.ControlSettings(full_battery_pv_export=True,
+                                       full_battery_pv_hold=True,
+                                       grid_limit=800, inverter_limit=2400),
+        )
+        self.assertTrue(result.full_battery_pv_bypass_active)
+        self.assertEqual(result.recommended_inverter_setpoint, 500)
+
     def test_full_charge_waits_for_hold_and_continuous_taper(self):
         start = datetime(2026, 8, 21, 12, tzinfo=UTC)
         first = controller.update_full_charge_confirmation(
@@ -1333,6 +1410,20 @@ class ControllerTest(unittest.TestCase):
 
     def test_transient_write_retry_stops_after_two_retries(self):
         self.assertIsNone(controller.write_retry_delay_seconds(6, 3))
+
+    def test_transient_readback_wait_covers_three_polling_cycles(self):
+        self.assertEqual(
+            controller.transient_readback_wait_seconds(5, 3),
+            9,
+        )
+        self.assertEqual(
+            controller.transient_readback_wait_seconds(12, 3),
+            12,
+        )
+
+    def test_short_communication_pause_stays_hidden(self):
+        self.assertFalse(controller.communication_pause_is_visible(29.9, 30))
+        self.assertTrue(controller.communication_pause_is_visible(30, 30))
 
     def test_low_pv_stops_release_immediately(self):
         decision = controller.update_pv_release(

@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Final
 
 DOMAIN: Final = "xt500_energy_manager"
-VERSION: Final = "1.10.3"
+VERSION: Final = "1.10.5"
 PLATFORMS: Final = (
     "sensor",
     "binary_sensor",
@@ -106,6 +106,7 @@ SETTING_PV_START_POWER: Final = "pv_start_power"
 SETTING_PV_START_DELAY: Final = "pv_start_delay"
 SETTING_PV_SURPLUS_DEADBAND: Final = "pv_surplus_deadband"
 SETTING_PV_SURPLUS_CHARGE_RESERVE: Final = "pv_surplus_charge_reserve"
+SETTING_FULL_BATTERY_PV_EXPORT: Final = "full_battery_pv_export"
 SETTING_SHOW_ADVANCED: Final = "show_advanced"
 SETTING_MANUAL_MODE: Final = "manual_mode"
 SETTING_AUTO_MODE: Final = "automatic_mode"
@@ -156,6 +157,7 @@ DEFAULT_SETTINGS: Final = {
     SETTING_PV_START_DELAY: 30.0,
     SETTING_PV_SURPLUS_DEADBAND: 20.0,
     SETTING_PV_SURPLUS_CHARGE_RESERVE: 50.0,
+    SETTING_FULL_BATTERY_PV_EXPORT: False,
     SETTING_SHOW_ADVANCED: False,
     SETTING_MANUAL_ACTIVE: False,
     SETTING_TARIFF_ACTIVE: False,

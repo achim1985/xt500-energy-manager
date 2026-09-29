@@ -1,5 +1,29 @@
 # Änderungsprotokoll
 
+## 1.10.5 – 2026-09-29
+
+- Optionaler, standardmäßig ausgeschalteter PV-Bypass nach Erreichen der
+  System-Ladegrenze: `GS = 0 W`, `IS` bis zur erlaubten Wechselrichterleistung.
+  Die eingestellte Hausnetzgrenze wird zusätzlich über die IS-Obergrenze
+  berücksichtigt.
+- Eine neue Ladeanforderung, fehlende DC-PV-Freigabe, Ausschalten der Option
+  oder ein SOC unterhalb des 1-%-Haltebandes beendet den Bypass. Gemessene
+  Akkuentladung senkt die IS-Obergrenze. Status, Diagnose und Anleitungen zeigen
+  den neuen Zustand; bestehende Modi bleiben bei ausgeschalteter Option gleich.
+
+## 1.10.4 – 2026-08-22
+
+- Vorübergehend fehlende Sollwert-Rückmeldungen werden nach einem Schreibbefehl
+  im Sekundentakt bis zu drei Geräte-Abfragezyklen lang erneut geprüft. Sobald
+  die Rückmeldung wieder vorliegt, arbeitet die Regelung unmittelbar weiter.
+- Die Schreibfreigabe wird bei ungültigen Daten weiterhin sofort entzogen.
+  Kommunikationspausen erscheinen im Status und als Warnung jedoch erst nach
+  30 Sekunden; die unveränderte harte Sicherheitsabschaltung greift nach
+  90 Sekunden.
+- Die Anzeige **Produktivregelung betriebsbereit** bleibt bei kurzen, zuvor aus
+  einem stabilen Betrieb entstandenen Pausen ruhig. Die exakte interne
+  Schreibfreigabe steht als standardmäßig deaktivierte Diagnoseentität bereit.
+
 ## 1.10.3 – 2026-08-21
 
 - Die Einstellung heißt im Dashboard nun eindeutig **Bevorzugte

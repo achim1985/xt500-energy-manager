@@ -1,4 +1,4 @@
-# XT500 Energy Manager 1.10.3
+# XT500 Energy Manager 1.10.5
 
 Production-ready Home Assistant controller for SunEnergyXT XT500 and XT500 Pro
 systems. The integration directly controls the grid-port setpoint, inverter
@@ -12,6 +12,10 @@ ceiling, and system charge limit.
   setpoint changes.
 - After a control write, fresh public-meter and XT500 grid-port feedback is
   required before another correction.
+- A temporarily unavailable setpoint readback is checked once per second for
+  up to three device polling cycles. Writes remain blocked during the gap;
+  short self-healing pauses become visible only after 30 seconds, while the
+  90-second hard safety stop remains unchanged.
 - Invalid input data stops writes. A write error latches the controller in a
   stopped state. Optional automatic recovery waits for stable fresh feedback,
   probes the unchanged inverter setpoint, and requires new measurements before
@@ -26,6 +30,12 @@ ceiling, and system charge limit.
   holds the output inside the charge band to avoid oscillation, and does not
   request fixed grid charging. The grid-export deadband does not apply to
   battery discharge.
+- **Export PV surplus when battery is full** is off by default. Once the
+  device charge limit is reached, and while no charge request is active, direct
+  XT500 PV may feed the grid after local loads. The controller commands GS=0
+  and raises IS within the configured grid-output allowance, inverter limit,
+  and device limits. A 1% SOC hold band prevents rapid switching. Measured
+  battery discharge reduces IS; invalid required inputs still stop writes.
 - The integration does not discover, disable, or enable unrelated automations.
   Any existing automation that writes the same device setpoints must be disabled
   before this controller is enabled.
@@ -66,6 +76,14 @@ The coupling selector offers hybrid (recommended), XT500-PV-only, and external
 AC-PV-only control. The public grid meter remains authoritative. An optional
 signed AC PV production sensor improves display and diagnostics but never
 authorizes charging by itself.
+
+The full-battery export switch is in **Operating mode and grid target** in the
+generated dashboard. It applies to direct XT500 DC PV in normal operation and
+the PV-surplus base mode. Manual, cycle, and tariff charging take precedence;
+AC-only coupling cannot activate the XT500 bypass. The active status reads
+**Battery full – PV export**. Actual export depends on PV, local consumption,
+and the configured and device limits. The separate 100% cycle-charge
+confirmation does not determine this bypass.
 
 Manual charging overrides an automatic due state. Both return to the selected
 base mode after completion.
@@ -111,7 +129,7 @@ management hash prevents locally modified copies from being overwritten.
 ## Generated dashboard
 
 Register
-`/xt500_energy_manager/xt500-energy-dashboard-strategy.js?v=1.10.3` once as a
+`/xt500_energy_manager/xt500-energy-dashboard-strategy.js?v=1.10.5` once as a
 JavaScript module under Settings → Dashboards → Resources. Then add the
 **XT500 Energiemanager** community dashboard.
 

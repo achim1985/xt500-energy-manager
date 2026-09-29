@@ -152,6 +152,7 @@
           "minimum_soc_hold": "Entladung wegen Mindest-SOC gesperrt",
           "normal": "Normalbetrieb",
           "pv_surplus": "PV-Überschuss",
+          "full_battery_pv_bypass": "Akku voll – PV-Einspeisung",
           "manual_grid_charge": "Manuell – Netzladung",
           "manual_pv_surplus": "Manuell – PV-Überschuss",
           "manual_pv_priority": "Manuell – PV-Vorrang",
@@ -267,7 +268,8 @@
       "cycle_charge_active": { "name": "Zyklusladung aktiv" },
       "charge_request": { "name": "Ladeanforderung aktiv" },
       "tariff_request": { "name": "Tarif-Ladeanforderung aktiv" },
-      "control_ready": { "name": "Produktivregelung bereit" },
+      "control_ready": { "name": "Produktivregelung betriebsbereit" },
+      "write_ready": { "name": "Schreibvorgänge aktuell freigegeben" },
       "discharge_hold": { "name": "Entladesperre aktiv" },
       "discharge_override_active": { "name": "Temporäre Entladefreigabe aktiv" },
       "pv_release_active": { "name": "DC-PV-Ausgabe freigegeben" },
@@ -280,6 +282,7 @@
       "manual_active": { "name": "Manuelle Zielladung starten" },
       "tariff_active": { "name": "Tarifladung anfordern" },
       "automatic_enabled": { "name": "Automatische Zyklusüberwachung" },
+      "full_battery_pv_export": { "name": "PV-Überschuss bei vollem Akku einspeisen" },
       "show_advanced": { "name": "Feinabstimmung anzeigen" }
     },
     "select": {

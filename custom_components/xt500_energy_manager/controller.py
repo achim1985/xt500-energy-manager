@@ -27,6 +27,34 @@ RECOVERY_DELAY_MULTIPLIERS = (1.0, 5.0, 15.0)
 WRITE_RETRY_DELAY_MULTIPLIERS = (1.0, 2.0)
 
 
+def transient_readback_wait_seconds(
+    feedback_settle_time: float,
+    source_polling_interval: float,
+) -> float:
+    """Return a safe grace period for a temporarily missing readback.
+
+    A successful service call may briefly make a polled SunEnergyXT number
+    unavailable while its coordinator refreshes.  Allowing three source
+    polling cycles avoids treating that refresh window as a connection loss.
+    The runtime probes every second and resumes as soon as a value returns.
+    """
+    return max(
+        float(feedback_settle_time),
+        float(source_polling_interval) * 3,
+        3.0,
+    )
+
+
+def communication_pause_is_visible(
+    elapsed_seconds: float,
+    display_delay_seconds: float,
+) -> bool:
+    """Return whether a transient write pause should be user-visible."""
+    return max(float(elapsed_seconds), 0.0) >= max(
+        float(display_delay_seconds), 0.0
+    )
+
+
 @dataclass(slots=True, frozen=True)
 class FullChargeConfirmationDecision:
     """Restart-safe progress of one observed 100 percent charge."""
@@ -441,6 +469,18 @@ def signed_battery_flows(battery_power: float) -> tuple[float, float]:
     return round(max(power, 0.0), 1), round(max(-power, 0.0), 1)
 
 
+def update_full_battery_pv_hold(
+    *, current_hold: bool, soc: float, charge_limit: float, enabled: bool,
+    charge_active: bool,
+) -> bool:
+    """Latch a reached device charge limit until SOC falls below a 1% band."""
+    if not enabled or charge_active:
+        return False
+    if soc >= charge_limit:
+        return True
+    return current_hold and soc >= charge_limit - 1.0
+
+
 def classify_actual_energy_source(
     *,
     net_charge_power: float | None,
@@ -515,6 +555,8 @@ class ControlSettings:
     ac_pv_release_allowed: bool = True
     pv_surplus_deadband: float = 20.0
     pv_surplus_charge_reserve: float = 50.0
+    full_battery_pv_export: bool = False
+    full_battery_pv_hold: bool = False
     coupling_mode: str = COUPLING_AUTO
 
 
@@ -542,6 +584,7 @@ class ControlResult:
     effective_public_grid_target: float
     battery_discharge_power: float | None
     pv_surplus_correction: float
+    full_battery_pv_bypass_active: bool
 
 
 @dataclass(slots=True, frozen=True)
@@ -628,6 +671,14 @@ def calculate_control(data: ControlInput, cfg: ControlSettings) -> ControlResult
         not charge_active and cfg.base_mode == BASE_PV_SURPLUS
     )
     grid_charge_only = charge_active and active_mode == MODE_GRID
+    full_battery_bypass = (
+        cfg.full_battery_pv_export
+        and cfg.full_battery_pv_hold
+        and not cfg.charge_active
+        and dc_enabled
+        and cfg.pv_release_allowed
+        and dc_pv_power > 0
+    )
 
     load_grid_target = (
         min(max(cfg.target_grid_power - estimated_home_load, 0.0), positive_load)
@@ -742,7 +793,7 @@ def calculate_control(data: ControlInput, cfg: ControlSettings) -> ControlResult
         else None
     )
     pv_surplus_correction = 0.0
-    if pv_direct:
+    if pv_direct and not full_battery_bypass:
         deadband = max(float(cfg.pv_surplus_deadband), 0.0)
         # Battery discharge is never part of the public-grid deadband. In
         # PV-surplus mode every measured watt of discharge must reduce the
@@ -803,32 +854,45 @@ def calculate_control(data: ControlInput, cfg: ControlSettings) -> ControlResult
             and (battery_charge is not None or battery_discharge is not None)
             and (battery_charge or 0.0) <= charge_reserve + deadband
         ):
-            # Once the preferred charge band has been reached, hold the current
-            # output instead of immediately jumping back to the feed-forward
-            # target. Output may rise again only with a clear charging margin;
-            # this hysteresis prevents a charge/discharge sawtooth.
+            # Hold the output inside the preferred charging band.
             grid_target = min(
                 grid_target,
                 clamp(data.current_grid_setpoint, min_grid, max_grid),
             )
             inverter_target = min(
                 inverter_target,
-                clamp(
-                    data.current_inverter_setpoint,
-                    0.0,
-                    cfg.inverter_limit,
-                ),
+                clamp(data.current_inverter_setpoint, 0.0, cfg.inverter_limit),
             )
             if grid_target >= 0 and inverter_target >= 0:
                 common_output_target = min(grid_target, inverter_target)
                 grid_target = common_output_target
                 inverter_target = common_output_target
 
+    if full_battery_bypass:
+        # The original blueprint's PV-follow bypass uses GS=0 and opens IS.
+        # Bound IS by the configured grid-output allowance plus the measured
+        # local loads, so a lower manager limit remains effective.
+        grid_target = 0.0
+        inverter_target = min(
+            cfg.inverter_limit,
+            dc_pv_power,
+            max(positive_load + max(estimated_home_load, 0.0) + cfg.grid_limit, 0.0),
+        )
+        if battery_discharge is not None and battery_discharge > 0:
+            # Reduce a measured battery contribution instead of exporting it.
+            inverter_target = min(
+                inverter_target,
+                dc_pv_power,
+                max(data.current_inverter_setpoint - battery_discharge, 0.0),
+            )
+
     pv_available_for_charge = (
         (cfg.pv_release_allowed and dc_pv_power > 0)
         or (cfg.ac_pv_release_allowed and available_ac_surplus > 0)
     )
-    if target_reached:
+    if full_battery_bypass:
+        status = "full_battery_pv_bypass"
+    elif target_reached:
         status = "target_reached"
     elif charge_active:
         status = f"{cfg.charge_source}_{active_mode}"
@@ -908,4 +972,5 @@ def calculate_control(data: ControlInput, cfg: ControlSettings) -> ControlResult
             else None
         ),
         pv_surplus_correction=round(pv_surplus_correction, 1),
+        full_battery_pv_bypass_active=full_battery_bypass,
     )

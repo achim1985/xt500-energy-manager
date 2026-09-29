@@ -14,11 +14,14 @@ async def async_get_config_entry_diagnostics(_hass: HomeAssistant, entry: XT500C
     return {
         "control_mode": "production" if runtime.regulation_enabled else "disabled",
         "control_ready": runtime.control_ready,
+        "control_operational": runtime.control_operational,
         "control_error": runtime.control_error_message,
         "communication_pause": {
             "active": runtime.communication_pause_active,
             "since": runtime.communication_pause_since,
             "message": runtime.communication_pause_message,
+            "visible": runtime.communication_pause_visible,
+            "visible_after_seconds": 30,
             "resume_after_stable_seconds": 15,
             "hard_stop_after_seconds": runtime.communication_failure_seconds,
         },
@@ -34,6 +37,7 @@ async def async_get_config_entry_diagnostics(_hass: HomeAssistant, entry: XT500C
         },
         "transient_write_handling": {
             "maximum_attempts_per_value": 3,
+            "readback_grace_polling_cycles": 3,
             "timeouts_since_start": runtime.transient_write_timeouts,
             "last_timeout": runtime.last_transient_write_error,
             "last_recovery": runtime.last_transient_write_recovery,
@@ -63,6 +67,14 @@ async def async_get_config_entry_diagnostics(_hass: HomeAssistant, entry: XT500C
             "taper_minutes": runtime.settings["full_charge_taper_minutes"],
             "timeout_minutes": runtime.settings["full_charge_timeout_minutes"],
             "top_off_power_w": runtime.settings["full_charge_top_off_power"],
+        },
+        "full_battery_pv_export": {
+            "enabled": runtime.settings["full_battery_pv_export"],
+            "hold": runtime._full_battery_pv_hold,
+            "active": (
+                runtime.result.full_battery_pv_bypass_active
+                if runtime.result else False
+            ),
         },
         "tariff_request": {
             "active": runtime.tariff_request_active,

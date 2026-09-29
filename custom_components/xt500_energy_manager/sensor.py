@@ -123,6 +123,7 @@ class XT500Sensor(XT500Entity, SensorEntity):
                     "last_transient_write_error": self.runtime.last_transient_write_error,
                     "last_transient_write_recovery": self.runtime.last_transient_write_recovery,
                     "communication_pause": self.runtime.communication_pause_active,
+                    "communication_pause_visible": self.runtime.communication_pause_visible,
                     "communication_pause_since": self.runtime.communication_pause_since,
                     "communication_pause_message": self.runtime.communication_pause_message,
                     "current_input_errors": self.runtime.invalid_inputs,

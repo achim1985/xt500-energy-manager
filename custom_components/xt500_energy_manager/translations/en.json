@@ -152,6 +152,7 @@
           "minimum_soc_hold": "Discharge blocked by minimum SOC",
           "normal": "Normal operation",
           "pv_surplus": "PV surplus",
+          "full_battery_pv_bypass": "Battery full – PV export",
           "manual_grid_charge": "Manual - grid charging",
           "manual_pv_surplus": "Manual - PV surplus",
           "manual_pv_priority": "Manual - PV priority",
@@ -267,7 +268,8 @@
       "cycle_charge_active": { "name": "Cycle charging active" },
       "charge_request": { "name": "Charge request active" },
       "tariff_request": { "name": "Tariff charge request active" },
-      "control_ready": { "name": "Production control ready" },
+      "control_ready": { "name": "Production control operational" },
+      "write_ready": { "name": "Writes currently permitted" },
       "discharge_hold": { "name": "Discharge lock active" },
       "discharge_override_active": { "name": "Temporary discharge release active" },
       "pv_release_active": { "name": "DC PV output released" },
@@ -280,6 +282,7 @@
       "manual_active": { "name": "Start manual target charging" },
       "tariff_active": { "name": "Request tariff charging" },
       "automatic_enabled": { "name": "Automatic cycle monitoring" },
+      "full_battery_pv_export": { "name": "Export PV surplus when battery is full" },
       "show_advanced": { "name": "Show fine tuning" }
     },
     "select": {

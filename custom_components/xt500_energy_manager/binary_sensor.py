@@ -6,6 +6,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 from homeassistant.components.binary_sensor import BinarySensorEntity, BinarySensorEntityDescription
+from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
@@ -25,7 +26,15 @@ BINARY_SENSORS = (
     XT500BinaryDescription(key="cycle_charge_active", translation_key="cycle_charge_active", icon="mdi:battery-sync", value_fn=lambda r: r.cycle_charge_active),
     XT500BinaryDescription(key="charge_request", translation_key="charge_request", icon="mdi:battery-arrow-up", value_fn=lambda r: r.charge_request_active),
     XT500BinaryDescription(key="tariff_request", translation_key="tariff_request", icon="mdi:currency-eur", value_fn=lambda r: r.tariff_request_active),
-    XT500BinaryDescription(key="control_ready", translation_key="control_ready", icon="mdi:shield-check", value_fn=lambda r: r.control_ready),
+    XT500BinaryDescription(key="control_ready", translation_key="control_ready", icon="mdi:shield-check", value_fn=lambda r: r.control_operational),
+    XT500BinaryDescription(
+        key="write_ready",
+        translation_key="write_ready",
+        icon="mdi:database-arrow-right-outline",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        value_fn=lambda r: r.control_ready,
+    ),
     XT500BinaryDescription(key="discharge_hold", translation_key="discharge_hold", icon="mdi:battery-lock", value_fn=lambda r: r.discharge_hold_active),
     XT500BinaryDescription(key="discharge_override_active", translation_key="discharge_override_active", icon="mdi:battery-unlock", value_fn=lambda r: r.discharge_override_active),
     XT500BinaryDescription(key="pv_release_active", translation_key="pv_release_active", icon="mdi:solar-power", value_fn=lambda r: r.pv_release_active),

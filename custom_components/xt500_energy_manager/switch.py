@@ -9,6 +9,7 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from . import XT500ConfigEntry
 from .const import (
     SETTING_AUTO_ENABLED,
+    SETTING_FULL_BATTERY_PV_EXPORT,
     SETTING_AUTOMATIC_RECOVERY_ENABLED,
     SETTING_MANUAL_ACTIVE,
     SETTING_REGULATION_ENABLED,
@@ -24,6 +25,7 @@ SWITCHES = (
     SwitchEntityDescription(key=SETTING_MANUAL_ACTIVE, translation_key="manual_active", icon="mdi:battery-arrow-up"),
     SwitchEntityDescription(key=SETTING_TARIFF_ACTIVE, translation_key="tariff_active", icon="mdi:currency-eur"),
     SwitchEntityDescription(key=SETTING_AUTO_ENABLED, translation_key="automatic_enabled", icon="mdi:battery-sync"),
+    SwitchEntityDescription(key=SETTING_FULL_BATTERY_PV_EXPORT, translation_key="full_battery_pv_export", icon="mdi:transmission-tower-export"),
     SwitchEntityDescription(key=SETTING_SHOW_ADVANCED, translation_key="show_advanced", icon="mdi:tune-vertical"),
 )
 

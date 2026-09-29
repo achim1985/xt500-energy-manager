@@ -78,6 +78,7 @@ from .const import (
     SETTING_FULL_CHARGE_TAPER_STARTED,
     SETTING_FULL_CHARGE_TIMEOUT_MINUTES,
     SETTING_FULL_CHARGE_TOP_OFF_POWER,
+    SETTING_FULL_BATTERY_PV_EXPORT,
     SETTING_LAST_FULL,
     SETTING_MANUAL_ACTIVE,
     SETTING_MANUAL_MODE,
@@ -122,10 +123,13 @@ from .controller import (
     RECOVERY_DELAY_MULTIPLIERS,
     reconcile_normal_charge_limit,
     recovery_delay_seconds,
+    communication_pause_is_visible,
     select_adaptive_control_profile,
     select_charge_limit,
     select_charge_request,
+    transient_readback_wait_seconds,
     update_full_charge_confirmation,
+    update_full_battery_pv_hold,
     update_pv_release,
     update_discharge_hold,
     WRITE_RETRY_DELAY_MULTIPLIERS,
@@ -136,6 +140,7 @@ _LOGGER = logging.getLogger(__name__)
 _STARTUP_STABILITY_SECONDS = 5.0
 _COMMUNICATION_STABILITY_SECONDS = 15.0
 _COMMUNICATION_FAILURE_SECONDS = 90.0
+_COMMUNICATION_DISPLAY_DELAY_SECONDS = 30.0
 _RECOVERY_FEEDBACK_TIMEOUT_SECONDS = 30.0
 _WRITE_MAX_ATTEMPTS = len(WRITE_RETRY_DELAY_MULTIPLIERS) + 1
 _DEFAULT_SOURCE_POLLING_INTERVAL = 3.0
@@ -183,6 +188,8 @@ class XT500Runtime:
         self._communication_pause_started_monotonic: float | None = None
         self._communication_stable_since_monotonic: float | None = None
         self._communication_pause_task: asyncio.Task | None = None
+        self._communication_pause_warning_logged = False
+        self._last_stable_display_status: str | None = None
         self._control_error_at: datetime | None = None
         self._recovery_attempts = 0
         self._recovery_status = "ready"
@@ -190,6 +197,7 @@ class XT500Runtime:
         self._next_recovery_attempt: str | None = None
         self._recovery_task: asyncio.Task | None = None
         self._full_soc_latched = False
+        self._full_battery_pv_hold = False
         self._low_soc_hold: bool | None = None
         self._discharge_override_session_active = False
         self._discharge_override_restore_task: asyncio.Task | None = None
@@ -548,7 +556,7 @@ class XT500Runtime:
                         or self._communication_pause_active
                     )
                 ):
-                    _LOGGER.warning(
+                    _LOGGER.debug(
                         "XT500 input data invalid: %s",
                         "; ".join(
                             f"{issue['input']} ({issue['entity_id'] or 'nicht eingerichtet'}): "
@@ -707,6 +715,13 @@ class XT500Runtime:
             high=charge_limit_high,
             step=charge_limit_step,
         )
+        self._full_battery_pv_hold = update_full_battery_pv_hold(
+            current_hold=self._full_battery_pv_hold,
+            soc=values[CONF_SOC_ENTITY],
+            charge_limit=self.desired_charge_limit,
+            enabled=bool(self.settings[SETTING_FULL_BATTERY_PV_EXPORT]),
+            charge_active=charge_request.active,
+        )
 
         device_minimum_soc = values[CONF_MIN_DISCHARGE_SOC_ENTITY]
         override_active = self.discharge_override_active
@@ -806,6 +821,10 @@ class XT500Runtime:
                 pv_surplus_charge_reserve=float(
                     self.settings[SETTING_PV_SURPLUS_CHARGE_RESERVE]
                 ),
+                full_battery_pv_export=bool(
+                    self.settings[SETTING_FULL_BATTERY_PV_EXPORT]
+                ),
+                full_battery_pv_hold=self._full_battery_pv_hold,
                 coupling_mode=self.settings[SETTING_COUPLING_MODE],
             ),
         )
@@ -821,6 +840,8 @@ class XT500Runtime:
                 available_ac_surplus=self.result.available_ac_surplus,
             ),
         )
+        if not self._communication_pause_active:
+            self._last_stable_display_status = self.result.status
         if self.control_ready:
             self._request_control_apply()
         elif self._write_blocked:
@@ -1291,12 +1312,43 @@ class XT500Runtime:
         )
 
     @property
+    def control_operational(self) -> bool:
+        """Return stable user-facing readiness across short communication pauses.
+
+        Short communication pauses still stop writes immediately through
+        ``control_ready``.  Only an already running controller keeps its public
+        readiness state during that pause; startup and hard faults remain off.
+        """
+        return self.control_ready or (
+            self._communication_pause_active
+            and self._last_stable_display_status is not None
+            and self.regulation_enabled
+            and self._ha_started
+            and not self._write_blocked
+            and not self._shutdown_in_progress
+        )
+
+    @property
+    def communication_pause_visible(self) -> bool:
+        """Return whether the current transient pause outlived its grace time."""
+        return (
+            self._communication_pause_active
+            and self._communication_pause_started_monotonic is not None
+            and communication_pause_is_visible(
+                monotonic() - self._communication_pause_started_monotonic,
+                _COMMUNICATION_DISPLAY_DELAY_SECONDS,
+            )
+        )
+
+    @property
     def display_status(self) -> str:
         """Return the user-facing production state."""
         if not self.regulation_enabled:
             return "disabled"
         if self._communication_pause_active:
-            return "communication_pause"
+            if self.communication_pause_visible:
+                return "communication_pause"
+            return self._last_stable_display_status or "starting"
         if not self.data_valid or self.result is None:
             return "invalid_data"
         if self._write_blocked:
@@ -1681,7 +1733,7 @@ class XT500Runtime:
         except asyncio.CancelledError:
             raise
         except TransientCommunicationError as err:
-            _LOGGER.warning(
+            _LOGGER.debug(
                 "XT500 communication interrupted; production writes paused: %s",
                 self._error_detail(err),
             )
@@ -1746,6 +1798,7 @@ class XT500Runtime:
             self._communication_pause_at = datetime.now(UTC)
             self._communication_pause_started_monotonic = monotonic()
             self._communication_stable_since_monotonic = None
+            self._communication_pause_warning_logged = False
         self.communication_pause_message = self._error_detail(err)
         self._control_apply_requested = False
         self._data_valid_since_monotonic = None
@@ -1775,6 +1828,7 @@ class XT500Runtime:
         self._communication_pause_at = None
         self._communication_pause_started_monotonic = None
         self._communication_stable_since_monotonic = None
+        self._communication_pause_warning_logged = False
         self.communication_pause_message = None
 
     async def _async_monitor_communication_pause(self) -> None:
@@ -1787,6 +1841,25 @@ class XT500Runtime:
                 and not self._write_blocked
             ):
                 now = monotonic()
+                pause_elapsed = (
+                    now - self._communication_pause_started_monotonic
+                    if self._communication_pause_started_monotonic is not None
+                    else 0.0
+                )
+                if (
+                    not self._communication_pause_warning_logged
+                    and communication_pause_is_visible(
+                        pause_elapsed,
+                        _COMMUNICATION_DISPLAY_DELAY_SECONDS,
+                    )
+                ):
+                    self._communication_pause_warning_logged = True
+                    _LOGGER.warning(
+                        "XT500 communication pause persists for %.0f seconds: %s",
+                        pause_elapsed,
+                        self.communication_pause_message or "unknown cause",
+                    )
+                    self._notify()
                 feedback_fresh = (
                     self._communication_pause_at is not None
                     and feedback_samples_are_fresh(
@@ -2097,7 +2170,7 @@ class XT500Runtime:
                         f"Zeitüberschreitung beim Schreiben von {target:g} "
                         f"auf {entity_id} nach {_WRITE_MAX_ATTEMPTS} Versuchen"
                     ) from err
-                _LOGGER.warning(
+                _LOGGER.info(
                     "Temporary XT500 write timeout for %s target %s "
                     "(attempt %s/%s); waiting %.1f seconds for readback",
                     entity_id,
@@ -2120,12 +2193,42 @@ class XT500Runtime:
                 continue
             except HomeAssistantError as err:
                 if self._float_state(entity_id) is None:
+                    readback_wait = transient_readback_wait_seconds(
+                        float(self.settings[SETTING_FEEDBACK_SETTLE_TIME]),
+                        self.source_polling_interval,
+                    )
+                    if await self._async_wait_for_entity_target(
+                        entity_id,
+                        target,
+                        readback_wait,
+                    ):
+                        self.last_transient_write_recovery = (
+                            f"{dt_util.now().isoformat()} · {entity_id} · "
+                            "Zielwert nach vorübergehendem Dienstfehler zurückgelesen"
+                        )
+                        self._notify()
+                        return
+                if self._float_state(entity_id) is None:
                     raise TransientCommunicationError(
                         f"Sollwert vorübergehend nicht lesbar: {entity_id}"
                     ) from err
                 raise
 
             if self._float_state(entity_id) is None:
+                readback_wait = transient_readback_wait_seconds(
+                    float(self.settings[SETTING_FEEDBACK_SETTLE_TIME]),
+                    self.source_polling_interval,
+                )
+                if await self._async_wait_for_entity_readable(
+                    entity_id,
+                    readback_wait,
+                ):
+                    self.last_transient_write_recovery = (
+                        f"{dt_util.now().isoformat()} · {entity_id} · "
+                        "Sollwert nach kurzer Aktualisierung wieder lesbar"
+                    )
+                    self._notify()
+                    return
                 raise TransientCommunicationError(
                     f"Sollwert nach dem Schreiben nicht lesbar: {entity_id}"
                 )
@@ -2147,6 +2250,21 @@ class XT500Runtime:
         deadline = monotonic() + max(timeout, 0.0)
         while True:
             if self._entity_target_matches(entity_id, target):
+                return True
+            remaining = deadline - monotonic()
+            if remaining <= 0:
+                return False
+            await asyncio.sleep(min(1.0, remaining))
+
+    async def _async_wait_for_entity_readable(
+        self,
+        entity_id: str,
+        timeout: float,
+    ) -> bool:
+        """Wait for a temporarily unavailable coordinator value to return."""
+        deadline = monotonic() + max(timeout, 0.0)
+        while True:
+            if self._float_state(entity_id) is not None:
                 return True
             remaining = deadline - monotonic()
             if remaining <= 0:
