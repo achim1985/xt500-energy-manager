@@ -1,4 +1,4 @@
-# XT500 Energy Manager 1.10.7
+# XT500 Energy Manager 1.11.0
 
 Production-ready Home Assistant controller for SunEnergyXT XT500 and XT500 Pro
 systems. The integration directly controls the grid-port setpoint, inverter
@@ -149,7 +149,7 @@ management hash prevents locally modified copies from being overwritten.
 ## Generated dashboard
 
 Register
-`/xt500_energy_manager/xt500-energy-dashboard-strategy.js?v=1.10.7` once as a
+`/xt500_energy_manager/xt500-energy-dashboard-strategy.js?v=1.11.0` once as a
 JavaScript module under Settings → Dashboards → Resources. Then add the
 **XT500 Energiemanager** community dashboard.
 
@@ -193,3 +193,7 @@ local installation permits another value. This output setting does not limit
 the negative grid-charging setpoint. Grid charging follows the configured
 charging power and the source entity's real device range; XT500 Pro systems can
 charge at up to 2400 W.
+
+## Optional external net grid measurement
+
+Select **External grid power sensor** in setup/options to create net/import/export power and persistent import/export energy sensors. Use the net active power across all phases at the house connection, not the XT500 grid-port power. Select **Grid import energy** and **Grid export energy** in the HA Energy dashboard. Sign inversion is optional; clearing the source disables measurement.

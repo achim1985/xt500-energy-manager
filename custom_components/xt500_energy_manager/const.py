@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Final
 
 DOMAIN: Final = "xt500_energy_manager"
-VERSION: Final = "1.10.7"
+VERSION: Final = "1.11.0"
 PLATFORMS: Final = (
     "sensor",
     "binary_sensor",
@@ -19,6 +19,8 @@ PLATFORMS: Final = (
 CONF_SOC_ENTITY: Final = "soc_entity"
 CONF_PV_POWER_ENTITY: Final = "pv_power_entity"
 CONF_AC_PV_POWER_ENTITY: Final = "ac_pv_power_entity"
+CONF_EXTERNAL_GRID_POWER_ENTITY: Final = "external_grid_power_entity"
+CONF_EXTERNAL_GRID_INVERT: Final = "external_grid_invert"
 CONF_GRID_POWER_ENTITY: Final = "grid_power_entity"
 CONF_GRID_PORT_POWER_ENTITY: Final = "grid_port_power_entity"
 CONF_LOAD_PORT_POWER_ENTITY: Final = "load_port_power_entity"

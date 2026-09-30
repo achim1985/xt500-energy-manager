@@ -42,6 +42,15 @@ async def async_get_config_entry_diagnostics(_hass: HomeAssistant, entry: XT500C
             "last_timeout": runtime.last_transient_write_error,
             "last_recovery": runtime.last_transient_write_recovery,
         },
+        "external_grid_meter": (
+            {
+                "source_entity": runtime.grid_meter.source,
+                "source_unit": runtime.grid_meter.unit,
+                "invert_sign": runtime.grid_meter.invert,
+                "power_w": runtime.grid_meter.energy.power,
+                **runtime.grid_meter.energy.snapshot(),
+            } if runtime.grid_meter is not None else None
+        ),
         "configured_entities": dict(entry.data),
         "sunenergyxt_polling_interval_seconds": runtime.source_polling_interval,
         "settings": dict(runtime.settings),

@@ -19,6 +19,8 @@ from .const import (
     CONF_BATTERY_POWER_ENTITY,
     CONF_CHARGE_SOC_HYSTERESIS_ENTITY,
     CONF_DISCHARGE_SOC_HYSTERESIS_ENTITY,
+    CONF_EXTERNAL_GRID_POWER_ENTITY,
+    CONF_EXTERNAL_GRID_INVERT,
     CONF_GRID_PORT_POWER_ENTITY,
     CONF_GRID_POWER_ENTITY,
     CONF_GRID_SETPOINT_ENTITY,
@@ -46,6 +48,19 @@ def _entity_selector(domain: str, *, multiple: bool = False) -> selector.EntityS
     )
 
 
+def _external_grid_schema(values: dict[str, Any]) -> dict:
+    """An omitted optional source disables metering, including in options."""
+    return {
+        vol.Optional(CONF_EXTERNAL_GRID_POWER_ENTITY): selector.EntitySelector(
+            selector.EntitySelectorConfig(domain="sensor", device_class="power")
+        ),
+        vol.Required(
+            CONF_EXTERNAL_GRID_INVERT,
+            default=values.get(CONF_EXTERNAL_GRID_INVERT, False),
+        ): selector.BooleanSelector(),
+    }
+
+
 def _manual_schema(defaults: dict[str, Any] | None = None) -> vol.Schema:
     values = defaults or {}
 
@@ -61,6 +76,7 @@ def _manual_schema(defaults: dict[str, Any] | None = None) -> vol.Schema:
 
     return vol.Schema(
         {
+            **_external_grid_schema(values),
             required(CONF_SOC_ENTITY): _entity_selector("sensor"),
             required(CONF_PV_POWER_ENTITY): _entity_selector("sensor"),
             optional(CONF_AC_PV_POWER_ENTITY): _entity_selector("sensor"),
@@ -101,6 +117,7 @@ def _automatic_schema(defaults: dict[str, Any] | None = None) -> vol.Schema:
     values = defaults or {}
     ac_pv_marker = vol.Optional(CONF_AC_PV_POWER_ENTITY)
     schema: dict[vol.Marker, Any] = {
+        **_external_grid_schema(values),
         vol.Required(CONF_XT500_DEVICE): selector.DeviceSelector(
             selector.DeviceSelectorConfig(integration="sunenergyxt")
         ),
@@ -172,10 +189,13 @@ def _detect_device_data(
 
     data = {
         **detected,
+        CONF_EXTERNAL_GRID_INVERT: user_input.get(CONF_EXTERNAL_GRID_INVERT, False),
         CONF_GRID_POWER_ENTITY: grid_entity,
         CONF_METER_SIGN: user_input[CONF_METER_SIGN],
         CONF_AC_PV_SIGN: user_input[CONF_AC_PV_SIGN],
     }
+    if external_grid_entity := user_input.get(CONF_EXTERNAL_GRID_POWER_ENTITY):
+        data[CONF_EXTERNAL_GRID_POWER_ENTITY] = external_grid_entity
     if ac_pv_entity := user_input.get(CONF_AC_PV_POWER_ENTITY):
         data[CONF_AC_PV_POWER_ENTITY] = ac_pv_entity
     return data, None

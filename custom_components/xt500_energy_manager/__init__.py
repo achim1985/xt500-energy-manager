@@ -23,6 +23,7 @@ from .const import (
     CONF_DISCHARGE_SOC_HYSTERESIS_ENTITY,
     CONF_GRID_CHARGE_DAILY_ENERGY_ENTITY,
     CONF_GRID_EXPORT_DAILY_ENERGY_ENTITY,
+    CONF_EXTERNAL_GRID_POWER_ENTITY,
     CONF_GRID_PORT_POWER_ENTITY,
     CONF_GRID_POWER_ENTITY,
     CONF_GRID_SETPOINT_ENTITY,
@@ -43,6 +44,7 @@ from .const import (
 )
 from .entity_mapping import detect_xt500_entities
 from .runtime import XT500Runtime
+from .grid_meter import ExternalGridMeter
 
 type XT500ConfigEntry = ConfigEntry[XT500Runtime]
 
@@ -171,11 +173,22 @@ async def async_setup_entry(hass: HomeAssistant, entry: XT500ConfigEntry) -> boo
     runtime = XT500Runtime(hass, entry)
     entry.runtime_data = runtime
     await runtime.async_start()
+    runtime.grid_meter = ExternalGridMeter(hass, entry) if entry.data.get(
+        CONF_EXTERNAL_GRID_POWER_ENTITY
+    ) else None
+    if runtime.grid_meter is not None:
+        await runtime.grid_meter.async_start()
     entry.async_on_unload(
         hass.async_add_shutdown_job(
             HassJob(runtime.async_stop, name="Stop XT500 Energy Manager")
         )
     )
+    if runtime.grid_meter is not None:
+        entry.async_on_unload(
+            hass.async_add_shutdown_job(
+                HassJob(runtime.grid_meter.async_stop, name="Stop XT500 grid meter")
+            )
+        )
     entry.async_on_unload(entry.add_update_listener(_async_reload_entry))
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
@@ -272,5 +285,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: XT500ConfigEntry) -> bo
     """Unload an XT500 energy controller."""
     if not await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
         return False
+    if entry.runtime_data.grid_meter is not None:
+        await entry.runtime_data.grid_meter.async_stop()
     await entry.runtime_data.async_stop()
     return True

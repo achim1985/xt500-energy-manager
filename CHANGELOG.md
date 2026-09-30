@@ -1,5 +1,12 @@
 # Änderungsprotokoll
 
+## 1.11.0 – 2026-09-30
+
+- Optionale externe saldierte Netzmessung mit Power-Entity-Selector und Vorzeicheninvertierung in Einrichtung und Optionen.
+- Drei Leistungssensoren und zwei persistente kWh-Zähler für das Energie-Dashboard; ereignisbasierte linke Integration mit lokalem Minutencheckpoint und Datenlückenschutz.
+- Bestehende Regelung, Quellzuordnungen und Unique IDs bleiben erhalten.
+- Tests für Berechnung, Wiederherstellung, Unterbrechungen, Einheiten, UI-Schema und Energie-Metadaten ergänzt.
+
 ## 1.10.7 – 2026-09-30
 
 - Vollakku-PV-Bypass nur freigeben, wenn die verfügbare DC-PV den Verbrauch

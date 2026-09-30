@@ -18,14 +18,18 @@
           "grid_power_entity": "Total power at the public grid connection",
           "meter_sign": "Public meter sign convention",
           "ac_pv_power_entity": "External AC PV production (optional)",
-          "ac_pv_sign": "AC PV sign convention"
+          "ac_pv_sign": "AC PV sign convention",
+          "external_grid_power_entity": "External grid power sensor",
+          "external_grid_invert": "Invert grid power sensor sign"
         },
         "data_description": {
           "xt500_device": "The device must come from the previously installed SunEnergyXT 500 Series integration.",
           "grid_power_entity": "Total active power of the home, for example from a Shelly Pro 3EM. Do not select one phase or an XT500 port value.",
           "meter_sign": "Use a current reading to verify which sign your meter reports during grid import.",
           "ac_pv_power_entity": "Optional power sensor of an AC-coupled inverter. Control remains operational without it by using the public meter.",
-          "ac_pv_sign": "Select whether AC PV production is reported as positive or negative."
+          "ac_pv_sign": "Select whether AC PV production is reported as positive or negative.",
+          "external_grid_power_entity": "Optional net power across all phases (W or kW). Clear the selection to disable metering. Independent of controller inputs.",
+          "external_grid_invert": "Default: positive means import, negative means export."
         }
       },
       "manual": {
@@ -49,7 +53,13 @@
           "battery_input_power_entity": "Total input power (legacy integration only)",
           "battery_output_power_entity": "Total output power (legacy integration only)",
           "meter_sign": "Public meter sign convention",
-          "ac_pv_sign": "AC PV sign convention"
+          "ac_pv_sign": "AC PV sign convention",
+          "external_grid_power_entity": "External grid power sensor",
+          "external_grid_invert": "Invert grid power sensor sign"
+        },
+        "data_description": {
+          "external_grid_power_entity": "Optional net power across all phases (W or kW). Clear the selection to disable metering. Independent of controller inputs.",
+          "external_grid_invert": "Default: positive means import, negative means export."
         }
       }
     },
@@ -94,14 +104,18 @@
           "grid_power_entity": "Total power at the public grid connection",
           "meter_sign": "Public meter sign convention",
           "ac_pv_power_entity": "External AC PV production (optional)",
-          "ac_pv_sign": "AC PV sign convention"
+          "ac_pv_sign": "AC PV sign convention",
+          "external_grid_power_entity": "External grid power sensor",
+          "external_grid_invert": "Invert grid power sensor sign"
         },
         "data_description": {
           "xt500_device": "The device must come from the previously installed SunEnergyXT 500 Series integration.",
           "grid_power_entity": "Total active power of the home, for example from a Shelly Pro 3EM. Do not select one phase or an XT500 port value.",
           "meter_sign": "Use a current reading to verify which sign your meter reports during grid import.",
           "ac_pv_power_entity": "Optional power sensor of an AC-coupled inverter. Its failure does not stop control.",
-          "ac_pv_sign": "Select whether AC PV production is reported as positive or negative."
+          "ac_pv_sign": "Select whether AC PV production is reported as positive or negative.",
+          "external_grid_power_entity": "Optional net power across all phases (W or kW). Clear the selection to disable metering. Independent of controller inputs.",
+          "external_grid_invert": "Default: positive means import, negative means export."
         }
       },
       "manual": {
@@ -125,7 +139,13 @@
           "battery_input_power_entity": "Total input power (legacy integration only)",
           "battery_output_power_entity": "Total output power (legacy integration only)",
           "meter_sign": "Public meter sign convention",
-          "ac_pv_sign": "AC PV sign convention"
+          "ac_pv_sign": "AC PV sign convention",
+          "external_grid_power_entity": "External grid power sensor",
+          "external_grid_invert": "Invert grid power sensor sign"
+        },
+        "data_description": {
+          "external_grid_power_entity": "Optional net power across all phases (W or kW). Clear the selection to disable metering. Independent of controller inputs.",
+          "external_grid_invert": "Default: positive means import, negative means export."
         }
       }
     },
@@ -187,13 +207,7 @@
       },
       "active_mode": {
         "name": "Active charging mode",
-        "state": {
-          "normal": "Normal operation",
-          "grid_charge": "Grid charging",
-          "pv_surplus": "PV surplus",
-          "pv_priority": "PV priority",
-          "pv_and_grid": "PV and grid"
-        }
+        "state": { "normal": "Normal operation", "grid_charge": "Grid charging", "pv_surplus": "PV surplus", "pv_priority": "PV priority", "pv_and_grid": "PV and grid" }
       },
       "selected_mode": {
         "name": "Selected charging mode",
@@ -254,7 +268,22 @@
         }
       },
       "days_since_full": { "name": "Days in current cycle" },
-      "next_cycle_at": { "name": "Next cycle charge" }
+      "next_cycle_at": { "name": "Next cycle charge" },
+      "grid_power_net": {
+        "name": "Net grid power"
+      },
+      "grid_import_power": {
+        "name": "Grid import power"
+      },
+      "grid_export_power": {
+        "name": "Grid export power"
+      },
+      "grid_import_energy": {
+        "name": "Grid import energy"
+      },
+      "grid_export_energy": {
+        "name": "Grid export energy"
+      }
     },
     "binary_sensor": {
       "data_valid": {

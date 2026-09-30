@@ -6,8 +6,8 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
-from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, SensorEntityDescription
-from homeassistant.const import PERCENTAGE, UnitOfPower
+from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, SensorEntityDescription, SensorStateClass
+from homeassistant.const import PERCENTAGE, UnitOfEnergy, UnitOfPower
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
@@ -174,3 +174,59 @@ class XT500Sensor(XT500Entity, SensorEntity):
 
 async def async_setup_entry(_hass: HomeAssistant, entry: XT500ConfigEntry, async_add_entities: AddConfigEntryEntitiesCallback) -> None:
     async_add_entities(XT500Sensor(entry.runtime_data, description) for description in SENSORS)
+    if entry.runtime_data.grid_meter is not None:
+        async_add_entities(
+            XT500GridSensor(entry.runtime_data, key)
+            for key in ("grid_power_net", "grid_import_power", "grid_export_power",
+                        "grid_import_energy", "grid_export_energy")
+        )
+
+
+class XT500GridSensor(XT500Entity, SensorEntity):
+    """Optional external measurement; independent of controller availability."""
+
+    _attr_should_poll = False
+
+    def __init__(self, runtime: XT500Runtime, key: str) -> None:
+        super().__init__(runtime, key)
+        self.meter = runtime.grid_meter
+        self._attr_translation_key = key
+        energy = key.endswith("energy")
+        self._attr_device_class = SensorDeviceClass.ENERGY if energy else SensorDeviceClass.POWER
+        self._attr_native_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR if energy else UnitOfPower.WATT
+        self._attr_state_class = SensorStateClass.TOTAL_INCREASING if energy else SensorStateClass.MEASUREMENT
+        self._attr_suggested_display_precision = 6 if energy else 1
+
+    async def async_added_to_hass(self) -> None:
+        self.async_on_remove(self.meter.async_add_listener(self.async_write_ha_state))
+
+    @property
+    def available(self) -> bool:
+        return self.key.endswith("energy") or self.meter.energy.power is not None
+
+    @property
+    def native_value(self) -> float | None:
+        data = self.meter.energy
+        if self.key == "grid_import_energy":
+            return data.import_energy
+        if self.key == "grid_export_energy":
+            return data.export_energy
+        if data.power is None:
+            return None
+        if self.key == "grid_import_power":
+            return max(data.power, 0.0)
+        if self.key == "grid_export_power":
+            return max(-data.power, 0.0)
+        return data.power
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        return {
+            "source_entity": self.meter.source,
+            "source_unit": self.meter.unit,
+            "source_available": self.meter.energy.power is not None,
+            "invert_sign": self.meter.invert,
+            "integration_method": "left",
+            "xt500_key": self.key,
+            "xt500_manager_id": self.runtime.entry.entry_id,
+        }

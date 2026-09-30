@@ -8,7 +8,7 @@ from dataclasses import replace
 from datetime import UTC, datetime, time, timedelta
 import logging
 from time import monotonic
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EVENT_HOMEASSISTANT_STARTED
@@ -136,6 +136,9 @@ from .controller import (
     write_retry_delay_seconds,
 )
 
+if TYPE_CHECKING:
+    from .grid_meter import ExternalGridMeter
+
 _LOGGER = logging.getLogger(__name__)
 _STARTUP_STABILITY_SECONDS = 5.0
 _COMMUNICATION_STABILITY_SECONDS = 15.0
@@ -156,6 +159,7 @@ class XT500Runtime:
     """Own and apply one XT500 controller configuration."""
 
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
+        self.grid_meter: ExternalGridMeter | None = None
         self.hass = hass
         self.entry = entry
         self.settings: dict[str, Any] = dict(DEFAULT_SETTINGS)

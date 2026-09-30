@@ -18,14 +18,18 @@
           "grid_power_entity": "Gesamtleistung am öffentlichen Netzanschlusspunkt",
           "meter_sign": "Vorzeichen des öffentlichen Zählers",
           "ac_pv_power_entity": "Externe AC-PV-Erzeugung (optional)",
-          "ac_pv_sign": "Vorzeichen der externen AC-PV-Erzeugung"
+          "ac_pv_sign": "Vorzeichen der externen AC-PV-Erzeugung",
+          "external_grid_power_entity": "Externer Netzleistungssensor",
+          "external_grid_invert": "Vorzeichen des Netzleistungssensors invertieren"
         },
         "data_description": {
           "xt500_device": "Das Gerät muss aus der zuvor installierten SunEnergyXT 500 Series Integration stammen.",
           "grid_power_entity": "Gesamt-Wirkleistung des Hauses, zum Beispiel vom Shelly Pro 3EM. Keine einzelne Phase und keine XT500-Anschlussleistung.",
           "meter_sign": "Prüfe an einem aktuellen Messwert, welches Vorzeichen dein Zähler bei Netzbezug verwendet.",
           "ac_pv_power_entity": "Gesamte Erzeugungsleistung eines externen AC-PV-Wechselrichters. Dieser Wert bedeutet noch keine Akkuladung. Der tatsächlich nutzbare Überschuss wird separat am öffentlichen Netzanschluss ermittelt.",
-          "ac_pv_sign": "Wähle, ob der AC-PV-Sensor Erzeugung positiv oder negativ ausgibt."
+          "ac_pv_sign": "Wähle, ob der AC-PV-Sensor Erzeugung positiv oder negativ ausgibt.",
+          "external_grid_power_entity": "Optionale, über alle Phasen saldierte Netzleistung (W oder kW). Auswahl löschen zum Deaktivieren. Unabhängig von den Regelungseingängen.",
+          "external_grid_invert": "Standard: positive Werte bedeuten Netzbezug, negative Werte Netzeinspeisung."
         }
       },
       "manual": {
@@ -49,7 +53,13 @@
           "battery_input_power_entity": "Gesamteingangsleistung (nur ältere Integration)",
           "battery_output_power_entity": "Gesamtausgangsleistung (nur ältere Integration)",
           "meter_sign": "Vorzeichen des öffentlichen Zählers",
-          "ac_pv_sign": "Vorzeichen der externen AC-PV-Erzeugung"
+          "ac_pv_sign": "Vorzeichen der externen AC-PV-Erzeugung",
+          "external_grid_power_entity": "Externer Netzleistungssensor",
+          "external_grid_invert": "Vorzeichen des Netzleistungssensors invertieren"
+        },
+        "data_description": {
+          "external_grid_power_entity": "Optionale, über alle Phasen saldierte Netzleistung (W oder kW). Auswahl löschen zum Deaktivieren. Unabhängig von den Regelungseingängen.",
+          "external_grid_invert": "Standard: positive Werte bedeuten Netzbezug, negative Werte Netzeinspeisung."
         }
       }
     },
@@ -94,14 +104,18 @@
           "grid_power_entity": "Gesamtleistung am öffentlichen Netzanschlusspunkt",
           "meter_sign": "Vorzeichen des öffentlichen Zählers",
           "ac_pv_power_entity": "Externe AC-PV-Erzeugung (optional)",
-          "ac_pv_sign": "Vorzeichen der externen AC-PV-Erzeugung"
+          "ac_pv_sign": "Vorzeichen der externen AC-PV-Erzeugung",
+          "external_grid_power_entity": "Externer Netzleistungssensor",
+          "external_grid_invert": "Vorzeichen des Netzleistungssensors invertieren"
         },
         "data_description": {
           "xt500_device": "Das Gerät muss aus der zuvor installierten SunEnergyXT 500 Series Integration stammen.",
           "grid_power_entity": "Gesamt-Wirkleistung des Hauses, zum Beispiel vom Shelly Pro 3EM. Keine einzelne Phase und keine XT500-Anschlussleistung.",
           "meter_sign": "Prüfe an einem aktuellen Messwert, welches Vorzeichen dein Zähler bei Netzbezug verwendet.",
           "ac_pv_power_entity": "Gesamte Erzeugungsleistung eines externen AC-PV-Wechselrichters. Dieser Wert bedeutet noch keine Akkuladung. Ein Ausfall stoppt die Regelung nicht.",
-          "ac_pv_sign": "Wähle, ob der AC-PV-Sensor Erzeugung positiv oder negativ ausgibt."
+          "ac_pv_sign": "Wähle, ob der AC-PV-Sensor Erzeugung positiv oder negativ ausgibt.",
+          "external_grid_power_entity": "Optionale, über alle Phasen saldierte Netzleistung (W oder kW). Auswahl löschen zum Deaktivieren. Unabhängig von den Regelungseingängen.",
+          "external_grid_invert": "Standard: positive Werte bedeuten Netzbezug, negative Werte Netzeinspeisung."
         }
       },
       "manual": {
@@ -125,7 +139,13 @@
           "battery_input_power_entity": "Gesamteingangsleistung (nur ältere Integration)",
           "battery_output_power_entity": "Gesamtausgangsleistung (nur ältere Integration)",
           "meter_sign": "Vorzeichen des öffentlichen Zählers",
-          "ac_pv_sign": "Vorzeichen der externen AC-PV-Erzeugung"
+          "ac_pv_sign": "Vorzeichen der externen AC-PV-Erzeugung",
+          "external_grid_power_entity": "Externer Netzleistungssensor",
+          "external_grid_invert": "Vorzeichen des Netzleistungssensors invertieren"
+        },
+        "data_description": {
+          "external_grid_power_entity": "Optionale, über alle Phasen saldierte Netzleistung (W oder kW). Auswahl löschen zum Deaktivieren. Unabhängig von den Regelungseingängen.",
+          "external_grid_invert": "Standard: positive Werte bedeuten Netzbezug, negative Werte Netzeinspeisung."
         }
       }
     },
@@ -187,13 +207,7 @@
       },
       "active_mode": {
         "name": "Aktiver Lademodus",
-        "state": {
-          "normal": "Normalbetrieb",
-          "grid_charge": "Netzladung",
-          "pv_surplus": "PV-Überschuss",
-          "pv_priority": "PV-Vorrang",
-          "pv_and_grid": "PV + Netz"
-        }
+        "state": { "normal": "Normalbetrieb", "grid_charge": "Netzladung", "pv_surplus": "PV-Überschuss", "pv_priority": "PV-Vorrang", "pv_and_grid": "PV + Netz" }
       },
       "selected_mode": {
         "name": "Ausgewählter Lademodus",
@@ -254,7 +268,22 @@
         }
       },
       "days_since_full": { "name": "Tage im aktuellen Zyklus" },
-      "next_cycle_at": { "name": "Nächste Zyklusladung" }
+      "next_cycle_at": { "name": "Nächste Zyklusladung" },
+      "grid_power_net": {
+        "name": "Netzleistung saldiert"
+      },
+      "grid_import_power": {
+        "name": "Netzbezug Leistung"
+      },
+      "grid_export_power": {
+        "name": "Netzeinspeisung Leistung"
+      },
+      "grid_import_energy": {
+        "name": "Netzbezug Energie"
+      },
+      "grid_export_energy": {
+        "name": "Netzeinspeisung Energie"
+      }
     },
     "binary_sensor": {
       "data_valid": {
