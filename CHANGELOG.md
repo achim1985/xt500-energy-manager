@@ -1,5 +1,34 @@
 # Änderungsprotokoll
 
+## 1.10.7 – 2026-09-30
+
+- Vollakku-PV-Bypass nur freigeben, wenn die verfügbare DC-PV den Verbrauch
+  decken kann. Bei fehlender PV-Leistung kehrt der gewählte Grundmodus zurück;
+  im Normalbetrieb kann der Akku den Hausverbrauch wieder unterstützen.
+- Tatsächliche XT500-Ausgabe, öffentlicher Netzbezug und Akkuunterstützung
+  berücksichtigen Versorgungslücken und Umwandlungsverluste. Eine Rückmeldung
+  mit 30 W Toleranz verhindert erneutes Aktivieren bei fortbestehendem Defizit.
+- Den Live-Vergleich vor, während und nach dem 1.10.6-Test dokumentiert und
+  die beobachtete Versorgungslücke durch Regressionstests reproduziert.
+  Anleitungen und Dashboard-Hilfe beschreiben die Freigabebedingungen.
+- Direkt über SunEnergyXT sowie mit Energiemanager 1.10.7 am Gerät geprüft:
+  PV-Ausgabe ohne gemessene Akkuentladung, tatsächliche öffentliche Einspeisung
+  und Rückwechsel zur normalen Akkuunterstützung bei fehlender PV beobachtet.
+  Messungen und Grenzen des Kurztests sind in `docs/testing/` dokumentiert.
+
+## 1.10.6 – 2026-09-30
+
+- Fehler beim Aktivieren des Vollakku-PV-Bypasses behoben: Der neue Status
+  war nicht als erlaubter Zustand des Home-Assistant-Sensors registriert.
+  Dadurch konnte eine Anzeigeaktualisierung die Schreibschleife stoppen.
+- Fehler einzelner Anzeigeaktualisierungen werden protokolliert und getrennt
+  von Geräte-Schreibfehlern behandelt; andere Entitäten werden weiter aktualisiert.
+- Die Wechselrichter-Obergrenze im Bypass wird innerhalb der konfigurierten
+  Leistungsgrenzen geöffnet, statt durch eine möglicherweise schon abgeregelte
+  PV-Messung begrenzt zu werden. Die Rückregelung bei gemessener Akkuentladung
+  bleibt erhalten. Regler-/Sensor-Vertrag und Fehlerisolation sind durch
+  zusätzliche Regressionstests abgesichert.
+
 ## 1.10.5 – 2026-09-29
 
 - Optionaler, standardmäßig ausgeschalteter PV-Bypass nach Erreichen der

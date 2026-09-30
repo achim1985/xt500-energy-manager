@@ -689,6 +689,35 @@ def calculate_control(data: ControlInput, cfg: ControlSettings) -> ControlResult
     if load_backfeed <= 0:
         raw_grid_target += load_grid_target
     desired_load_output = max(positive_load - load_grid_target, 0.0)
+    # As in the original blueprint, GS=0 is only a candidate when PV can
+    # supply the required grid-port output after the local load port.
+    bypass_grid_available = min(
+        max(dc_pv_power - positive_load, 0.0) + load_backfeed,
+        cfg.grid_limit,
+    )
+    bypass_required_grid = max(raw_grid_target, 0.0)
+    bypass_feedback_tolerance = 30.0
+    bypass_feedback_missing = (
+        bypass_required_grid > bypass_feedback_tolerance
+        and grid_port < bypass_required_grid - bypass_feedback_tolerance
+        and normalized_grid < cfg.target_grid_power - bypass_feedback_tolerance
+    )
+    # Restored battery support can hide the grid shortfall after leaving
+    # bypass. Do not immediately re-enter while the battery covers a deficit;
+    # battery contribution already covered by public export is handled by the
+    # inverter-ceiling correction below.
+    bypass_battery_shortfall = (
+        data.battery_discharge_power is not None
+        and max(float(data.battery_discharge_power), 0.0)
+        - max(normalized_grid - cfg.target_grid_power, 0.0)
+        > bypass_feedback_tolerance
+    )
+    full_battery_bypass = (
+        full_battery_bypass
+        and bypass_required_grid <= bypass_grid_available
+        and not bypass_feedback_missing
+        and not bypass_battery_shortfall
+    )
     # Compensate the observed difference between the XT500 command and its
     # actual grid-port output. This keeps the topology feed-forward target while
     # closing the loop around conversion losses, device lag, and derating.
@@ -872,10 +901,11 @@ def calculate_control(data: ControlInput, cfg: ControlSettings) -> ControlResult
         # The original blueprint's PV-follow bypass uses GS=0 and opens IS.
         # Bound IS by the configured grid-output allowance plus the measured
         # local loads, so a lower manager limit remains effective.
+        # IS is only a ceiling: measured DC PV may already be curtailed by the
+        # previous ceiling and cannot be used as the available-PV upper bound.
         grid_target = 0.0
         inverter_target = min(
             cfg.inverter_limit,
-            dc_pv_power,
             max(positive_load + max(estimated_home_load, 0.0) + cfg.grid_limit, 0.0),
         )
         if battery_discharge is not None and battery_discharge > 0:

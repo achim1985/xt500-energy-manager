@@ -23,7 +23,7 @@ class XT500SensorDescription(SensorEntityDescription):
 
 STATUS_OPTIONS = (
     "disabled", "invalid_data", "communication_pause", "starting",
-    "control_error", "target_reached",
+    "control_error", "target_reached", "full_battery_pv_bypass",
     "minimum_soc_hold", "normal", "pv_surplus", "manual_grid_charge",
     "manual_pv_surplus", "manual_pv_priority", "manual_pv_and_grid",
     "automatic_grid_charge", "automatic_pv_surplus", "automatic_pv_priority",

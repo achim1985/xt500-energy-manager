@@ -1,4 +1,4 @@
-# XT500 Energy Manager 1.10.5
+# XT500 Energy Manager 1.10.7
 
 Production-ready Home Assistant controller for SunEnergyXT XT500 and XT500 Pro
 systems. The integration directly controls the grid-port setpoint, inverter
@@ -85,6 +85,26 @@ AC-only coupling cannot activate the XT500 bypass. The active status reads
 and the configured and device limits. The separate 100% cycle-charge
 confirmation does not determine this bypass.
 
+Bypass requires enough DC PV to cover consumption after the load port.
+Measured XT500 output, public-grid power, and battery discharge check that
+condition with a 30 W feedback tolerance. If PV cannot cover consumption, the
+selected base mode resumes. Normal operation can supply the deficit from the
+battery subject to its existing discharge limits; the PV-surplus base mode
+retains its existing discharge policy. This also accounts for conversion
+losses and prevents repeated entry while the battery supplies a deficit.
+
+IS is an output ceiling, not a demand to discharge the battery. The bypass
+opens that ceiling within the configured limits even if the current PV
+measurement is already curtailed. Local consumption and conversion losses
+must be considered when comparing DC PV input with public-grid export.
+
+For a brief test, temporarily lower the system charge limit to a permitted
+value no higher than the current SOC. The device normally permits only
+70–100%. Record the original limit, finish active charge requests, observe
+grid and battery power while DC PV exceeds consumption with a reserve for
+losses, and restore the original limit afterwards. Version 1.10.6 fixes the missing Home Assistant enum option
+for the bypass status and isolates entity-update errors from device writes.
+
 Manual charging overrides an automatic due state. Both return to the selected
 base mode after completion.
 
@@ -129,7 +149,7 @@ management hash prevents locally modified copies from being overwritten.
 ## Generated dashboard
 
 Register
-`/xt500_energy_manager/xt500-energy-dashboard-strategy.js?v=1.10.5` once as a
+`/xt500_energy_manager/xt500-energy-dashboard-strategy.js?v=1.10.7` once as a
 JavaScript module under Settings → Dashboards → Resources. Then add the
 **XT500 Energiemanager** community dashboard.
 

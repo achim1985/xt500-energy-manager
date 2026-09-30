@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import ast
 import importlib.util
 from datetime import UTC, datetime, time, timedelta
 from pathlib import Path
 import sys
-from types import ModuleType
+from types import ModuleType, SimpleNamespace
 import unittest
+from unittest.mock import Mock
 
 ROOT = Path(__file__).parents[1]
 PACKAGE = "custom_components.xt500_energy_manager"
@@ -42,6 +44,62 @@ class ControllerTest(unittest.TestCase):
         }
         values.update(changes)
         return controller.ControlInput(**values)
+
+    def test_controller_statuses_are_supported_by_the_ha_sensor(self):
+        sensor_tree = ast.parse(
+            (ROOT / PACKAGE.replace(".", "/") / "sensor.py").read_text()
+        )
+        status_options = next(
+            ast.literal_eval(node.value)
+            for node in sensor_tree.body
+            if isinstance(node, ast.Assign)
+            and any(isinstance(target, ast.Name) and target.id == "STATUS_OPTIONS"
+                    for target in node.targets)
+        )
+        scenarios = [
+            (self.input(soc=100), controller.ControlSettings(
+                full_battery_pv_export=True, full_battery_pv_hold=True)),
+            (self.input(soc=10), controller.ControlSettings()),
+        ]
+        for mode in ("normal", "pv_surplus"):
+            scenarios.append((self.input(), controller.ControlSettings(base_mode=mode)))
+        for source in ("manual", "cycle_manual", "cycle_automatic", "tariff"):
+            for mode in ("grid_charge", "pv_surplus", "pv_priority", "pv_and_grid"):
+                if source == "tariff" and mode != "grid_charge":
+                    continue
+                scenarios.append((self.input(), controller.ControlSettings(
+                    charge_active=True, charge_source=source, charge_mode=mode)))
+        for data, settings in scenarios:
+            result = controller.calculate_control(data, settings)
+            with self.subTest(status=result.status):
+                self.assertIn(result.status, status_options)
+
+    def test_entity_listener_failure_does_not_interrupt_control_notifications(self):
+        runtime_tree = ast.parse(
+            (ROOT / PACKAGE.replace(".", "/") / "runtime.py").read_text()
+        )
+        runtime_class = next(node for node in runtime_tree.body
+                             if isinstance(node, ast.ClassDef)
+                             and node.name == "XT500Runtime")
+        notify = next(node for node in runtime_class.body
+                      if isinstance(node, ast.FunctionDef) and node.name == "_notify")
+        notify.decorator_list = []
+        logger = Mock()
+        namespace = {"_LOGGER": logger}
+        exec(compile(ast.Module(body=[notify], type_ignores=[]), "runtime.py", "exec"),
+             namespace)
+        failing_listener = Mock(side_effect=ValueError("invalid enum state"))
+        healthy_listener = Mock()
+        runtime = SimpleNamespace(
+            _listeners=[failing_listener, healthy_listener],
+            control_ready=True, control_error_message=None,
+        )
+        namespace["_notify"](runtime)
+        failing_listener.assert_called_once()
+        healthy_listener.assert_called_once()
+        logger.exception.assert_called_once()
+        self.assertTrue(runtime.control_ready)
+        self.assertIsNone(runtime.control_error_message)
 
     def test_full_battery_pv_hold_releases_on_charge_or_below_band(self):
         decide = controller.update_full_battery_pv_hold
@@ -99,8 +157,9 @@ class ControllerTest(unittest.TestCase):
 
     def test_full_battery_bypass_reduces_measured_battery_discharge(self):
         result = controller.calculate_control(
-            self.input(soc=100, pv_power=1000, grid_power=0,
-                       grid_port_power=200, current_inverter_setpoint=1000,
+            self.input(soc=100, pv_power=1000, grid_power=300,
+                       grid_port_power=700, load_port_power=100,
+                       current_inverter_setpoint=1000,
                        battery_discharge_power=100),
             controller.ControlSettings(full_battery_pv_export=True,
                                        full_battery_pv_hold=True,
@@ -109,7 +168,56 @@ class ControllerTest(unittest.TestCase):
         self.assertEqual(result.recommended_grid_setpoint, 0)
         self.assertEqual(result.recommended_inverter_setpoint, 900)
 
-    def test_full_battery_bypass_never_recommends_more_than_dc_pv(self):
+    def test_full_battery_bypass_preserves_base_mode_when_pv_cannot_supply_load(self):
+        # Reproduce the live test: 369 W DC PV, 313 W AC output and
+        # 183.5 W public-grid import despite the reached device charge limit.
+        data = self.input(soc=72, pv_power=369, grid_power=-183.5,
+                          grid_port_power=313, load_port_power=0,
+                          current_grid_setpoint=0, current_inverter_setpoint=1291,
+                          battery_charge_power=10, battery_discharge_power=0)
+        for mode in ("normal", "pv_surplus"):
+            settings = dict(base_mode=mode, grid_limit=800,
+                            full_battery_pv_hold=True)
+            normal = controller.calculate_control(
+                data, controller.ControlSettings(**settings))
+            enabled = controller.calculate_control(
+                data, controller.ControlSettings(**settings, full_battery_pv_export=True))
+            with self.subTest(mode=mode):
+                self.assertEqual(enabled, normal)
+                self.assertFalse(enabled.full_battery_pv_bypass_active)
+                if mode == "normal":
+                    self.assertGreater(enabled.recommended_grid_setpoint, 0)
+
+    def test_full_battery_bypass_exits_when_actual_pv_output_cannot_cover_load(self):
+        # DC input alone appears sufficient, but conversion/device losses
+        # leave an actual AC shortfall. The meter must override that estimate.
+        result = controller.calculate_control(
+            self.input(soc=100, pv_power=510, grid_power=-70,
+                       grid_port_power=430, load_port_power=0,
+                       current_grid_setpoint=0, current_inverter_setpoint=1300,
+                       battery_charge_power=0, battery_discharge_power=0),
+            controller.ControlSettings(full_battery_pv_export=True,
+                                       full_battery_pv_hold=True, grid_limit=800),
+        )
+        self.assertFalse(result.full_battery_pv_bypass_active)
+        self.assertEqual(result.status, "normal")
+        self.assertGreater(result.recommended_grid_setpoint, 0)
+
+    def test_full_battery_bypass_does_not_reenter_while_battery_supplies_load(self):
+        # After leaving bypass, restored battery support hides the grid
+        # shortfall. It must not cause immediate re-entry and repeated import.
+        result = controller.calculate_control(
+            self.input(soc=100, pv_power=505, grid_power=0,
+                       grid_port_power=500, load_port_power=0,
+                       current_grid_setpoint=500, current_inverter_setpoint=500,
+                       battery_charge_power=0, battery_discharge_power=60),
+            controller.ControlSettings(full_battery_pv_export=True,
+                                       full_battery_pv_hold=True, grid_limit=800),
+        )
+        self.assertFalse(result.full_battery_pv_bypass_active)
+        self.assertEqual(result.status, "normal")
+
+    def test_full_battery_bypass_opens_headroom_for_curtailed_dc_pv(self):
         result = controller.calculate_control(
             self.input(soc=100, pv_power=500, grid_power=0,
                        grid_port_power=200, load_port_power=100),
@@ -118,7 +226,9 @@ class ControllerTest(unittest.TestCase):
                                        grid_limit=800, inverter_limit=2400),
         )
         self.assertTrue(result.full_battery_pv_bypass_active)
-        self.assertEqual(result.recommended_inverter_setpoint, 500)
+        # IS is a ceiling, not an output request. Limiting it to measured,
+        # potentially curtailed PV would prevent discovering more PV power.
+        self.assertEqual(result.recommended_inverter_setpoint, 1100)
 
     def test_full_charge_waits_for_hold_and_continuous_taper(self):
         start = datetime(2026, 8, 21, 12, tzinfo=UTC)

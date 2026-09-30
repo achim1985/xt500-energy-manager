@@ -312,7 +312,7 @@ Neuladen auch im Energiemanager-Dashboard.
 5. Als URL exakt eintragen:
 
    ```text
-   /xt500_energy_manager/xt500-energy-dashboard-strategy.js?v=1.10.5
+   /xt500_energy_manager/xt500-energy-dashboard-strategy.js?v=1.10.7
    ```
 
 6. Als Ressourcentyp **JavaScript-Modul** auswählen.
@@ -484,13 +484,30 @@ erkannten AC-PV-Überschuss.
 Der Schalter **PV-Überschuss bei vollem Akku einspeisen** ist standardmäßig aus.
 Ist er eingeschaltet und der Speicher hat die aktuell wirksame
 SunEnergyXT-System-Ladegrenze erreicht, folgt der XT500 bei direkt
-angeschlossener PV der PV-Erzeugung: Der Energiemanager setzt den
+angeschlossener PV der PV-Erzeugung, sofern diese den Verbrauch decken kann:
+Der Energiemanager setzt den
 Netzanschluss-Sollwert (`GS`) auf 0 W und öffnet die Wechselrichter-Obergrenze
 (`IS`) bis zur erlaubten Leistung. Nach Versorgung von Haus und Lastanschluss
 kann der verbleibende PV-Überschuss ins öffentliche Netz fließen. Die
 eingestellte **Maximale Leistung ins Hausnetz**, die Wechselrichtergrenze und
 die Gerätegrenzen bleiben maßgeblich; „komplett“ bedeutet daher nur den
 technisch und eingestellten Grenzen entsprechenden Anteil.
+
+Reicht die PV-Leistung nicht für den Verbrauch, bleibt beziehungsweise wird
+wieder der gewählte Grundmodus aktiv. Im Normalbetrieb unterstützt der Akku
+den Hausverbrauch weiter, sofern Mindest-SOC und Entladefreigabe dies erlauben.
+Im PV-Überschuss-Grundmodus gilt weiterhin dessen bisherige Entladebegrenzung.
+Die Freigabe berücksichtigt die verfügbare DC-PV nach dem Lastanschluss sowie
+die tatsächliche XT500-Ausgabe und öffentliche Netzleistung. Bei mehr als
+30 W gemessener Versorgungslücke oder Akkuunterstützung ohne entsprechenden
+Netzüberschuss wird der Bypass nicht freigegeben. So führen auch
+Umwandlungsverluste nicht zu einer dauerhaften Versorgungslücke.
+
+`IS` ist eine Obergrenze, keine Anforderung, diese Leistung aus dem Akku
+abzugeben. Im Bypass wird sie deshalb nicht auf die aktuelle PV-Messung
+begrenzt: Diese Messung kann bereits durch eine vorherige Obergrenze
+abgeregelt sein. Hausverbrauch und Umwandlungsverluste sind bei einem Vergleich
+von DC-PV-Eingang und tatsächlicher Netzeinspeisung zu berücksichtigen.
 
 Der Bypass arbeitet im Normalbetrieb und im PV-Überschuss-Grundmodus, sofern
 **XT500-PV** in der PV-Berücksichtigung enthalten und die DC-PV-Ausgabe
@@ -509,6 +526,23 @@ angeschlossene DC-PV. Nach dem Einschalten bei vollem Speicher die tatsächliche
 Netzleistung und Batterieleistung prüfen. Die Anzeige **Akku voll –
 PV-Einspeisung** bestätigt den aktiven Regelpfad, nicht eine am Netz gemessene
 Einspeisemenge.
+
+Für einen kurzen Test kann die **System-Ladegrenze** vorübergehend auf einen
+erlaubten Wert höchstens in Höhe des aktuellen SOC gesetzt werden. Das Gerät
+erlaubt üblicherweise nur 70–100 %. Vorher die ursprüngliche Ladegrenze
+notieren, aktive Ladeaufträge beenden und DC-PV-Erzeugung oberhalb des Haus-
+und Lastverbrauchs mit Reserve für Umwandlungsverluste abwarten. Netz- und
+Batterieleistung beobachten und danach die ursprüngliche
+Ladegrenze wieder einstellen. Bei einem Statusfehler aus Version 1.10.5 den
+PV-Bypass ausschalten und auf mindestens 1.10.7 aktualisieren; der Fehler
+`full_battery_pv_bypass ... not in the list of options` ist dort behoben.
+
+Die Prüfung vom 30.09.2026 ist dokumentiert: [Vergleich der Versorgungslücke
+in 1.10.6](docs/testing/2026-09-30-full-battery-pv-bypass.md) und
+[Gerätetest sowie Einspeisung und Rückwechsel mit 1.10.7](docs/testing/2026-09-30-original-integration-pv-bypass.md).
+Die Messungen zeigen PV-Ausgabe ohne gemessene Akkuentladung und die Rückkehr
+zur Akkuunterstützung bei fehlender PV. Langfristige Stabilität über wechselnde
+Wetter- und Lastsituationen ist damit noch nicht nachgewiesen.
 
 ### PV-Überschuss
 
@@ -792,7 +826,7 @@ wird ein vermeintlich ausgeschalteter Regler mit alten Sollwerten vermieden.
   Eintrag neu laden oder Home Assistant neu starten. Die optionalen Sensoren
   werden bei jedem Laden der Integration erneut automatisch erkannt.
 - Im Strategy-Editor prüfen, ob der Block **Energie heute** ausgeblendet wurde.
-- Die Dashboard-Ressource auf `?v=1.10.5` setzen und Ressourcen beziehungsweise
+- Die Dashboard-Ressource auf `?v=1.10.7` setzen und Ressourcen beziehungsweise
   Browser vollständig neu laden.
 
 ### Eingangsdaten sind ungültig
@@ -832,7 +866,7 @@ Auch bei einem kurzen Netzbezug bleibt diese Rückführung aktiv, damit der
 Sollwert nicht wieder in die Akkuentladung zurückpendelt. Die Regelung senkt
 dabei ausschließlich die XT500-Ausgangsleistung.
 
-Version 1.10.5 baut auf dem für SunEnergyXT 1.1.3 vorbereiteten Stand auf. Rückmeldungen aus
+Version 1.10.7 baut auf dem für SunEnergyXT 1.1.3 vorbereiteten Stand auf. Rückmeldungen aus
 unterschiedlichen XT500- und XT500-Pro-Systemen, Firmwareständen,
 PV-Kopplungen und Stromzählern sind weiterhin willkommen.
 

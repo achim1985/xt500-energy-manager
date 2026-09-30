@@ -2591,4 +2591,9 @@ class XT500Runtime:
     @callback
     def _notify(self) -> None:
         for listener in tuple(self._listeners):
-            listener()
+            try:
+                listener()
+            except Exception:
+                # Entity publication must not turn a successful device write
+                # into a production-control failure or skip other entities.
+                _LOGGER.exception("XT500 entity update failed")
