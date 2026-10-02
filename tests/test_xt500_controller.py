@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import ast
+import asyncio
 import importlib.util
 from datetime import UTC, datetime, time, timedelta
 from pathlib import Path
 import sys
-from types import ModuleType, SimpleNamespace
+from types import ModuleType, SimpleNamespace, MethodType
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, AsyncMock
 
 ROOT = Path(__file__).parents[1]
 PACKAGE = "custom_components.xt500_energy_manager"
@@ -163,6 +164,7 @@ class ControllerTest(unittest.TestCase):
                        battery_discharge_power=100),
             controller.ControlSettings(full_battery_pv_export=True,
                                        full_battery_pv_hold=True,
+                                       full_battery_pv_bypass_active=True,
                                        grid_limit=800, inverter_limit=2400),
         )
         self.assertEqual(result.recommended_grid_setpoint, 0)
@@ -229,6 +231,83 @@ class ControllerTest(unittest.TestCase):
         # IS is a ceiling, not an output request. Limiting it to measured,
         # potentially curtailed PV would prevent discovering more PV power.
         self.assertEqual(result.recommended_inverter_setpoint, 1100)
+
+    def test_bypass_does_not_flap_when_normal_battery_export_hides_shortfall(self):
+        settings = controller.ControlSettings(
+            full_battery_pv_export=True, full_battery_pv_hold=True,
+            grid_limit=800, inverter_limit=2400, coupling_mode="dc")
+        state = controller.FullBatteryBypassState()
+        for now in range(0, 100, 5):
+            normal = now % 10 == 0
+            data = self.input(
+                soc=75, pv_power=500, load_port_power=0,
+                grid_power=20 if normal else -45,
+                grid_port_power=470 if normal else 405,
+                current_grid_setpoint=470 if normal else 0,
+                current_inverter_setpoint=470 if normal else 1250,
+                battery_charge_power=0 if normal else 10,
+                battery_discharge_power=45 if normal else 0)
+            result, state = controller.calculate_control_with_bypass_state(
+                data, settings, state=state, now=now)
+            self.assertEqual(result.status, "normal")
+            self.assertIsNone(state.eligible_since)
+
+    def test_bypass_requires_continuous_entry_and_retains_wider_exit_band(self):
+        settings = controller.ControlSettings(
+            full_battery_pv_export=True, full_battery_pv_hold=True, grid_limit=800)
+        data = self.input(soc=75, pv_power=700, grid_port_power=450,
+                          load_port_power=0, grid_power=0,
+                          battery_charge_power=10, battery_discharge_power=0)
+        state = controller.FullBatteryBypassState()
+        for now in (0, 5, 15, 29):
+            result, state = controller.calculate_control_with_bypass_state(
+                data, settings, state=state, now=now)
+            self.assertFalse(result.full_battery_pv_bypass_active)
+        # One staggered/unstable measurement resets the complete entry window.
+        unstable = self.input(soc=75, pv_power=700, grid_port_power=450,
+                              load_port_power=0, grid_power=-15,
+                              battery_discharge_power=0)
+        result, state = controller.calculate_control_with_bypass_state(
+            unstable, settings, state=state, now=29.5)
+        self.assertIsNone(state.eligible_since)
+        for now in (30, 40, 59):
+            result, state = controller.calculate_control_with_bypass_state(
+                data, settings, state=state, now=now)
+            self.assertFalse(result.full_battery_pv_bypass_active)
+        result, state = controller.calculate_control_with_bypass_state(
+            data, settings, state=state, now=60)
+        self.assertTrue(result.full_battery_pv_bypass_active)
+        # Same 15 W transient does not end established bypass (exit band 30 W).
+        result, state = controller.calculate_control_with_bypass_state(
+            unstable, settings, state=state, now=65)
+        self.assertTrue(result.full_battery_pv_bypass_active)
+        deficit = self.input(soc=75, pv_power=500, grid_port_power=405,
+                             load_port_power=0, grid_power=-45,
+                             battery_discharge_power=0)
+        result, state = controller.calculate_control_with_bypass_state(
+            deficit, settings, state=state, now=66)
+        self.assertFalse(result.full_battery_pv_bypass_active)
+        self.assertGreater(result.recommended_grid_setpoint, 0)
+        result, state = controller.calculate_control_with_bypass_state(
+            data, settings, state=state, now=67)
+        self.assertFalse(result.full_battery_pv_bypass_active)
+        self.assertEqual(state.eligible_since, 67)
+
+    def test_active_bypass_exits_immediately_for_charge_disable_soc_and_ac(self):
+        data = self.input(soc=75, pv_power=700, grid_port_power=450,
+                          load_port_power=0, grid_power=0,
+                          battery_discharge_power=0)
+        defaults = dict(full_battery_pv_export=True, full_battery_pv_hold=True)
+        for override in (dict(charge_active=True),
+                         dict(full_battery_pv_export=False),
+                         dict(full_battery_pv_hold=False),
+                         dict(coupling_mode="ac"), dict(pv_release_allowed=False)):
+            settings = controller.ControlSettings(**(defaults | override))
+            result, state = controller.calculate_control_with_bypass_state(
+                data, settings, state=controller.FullBatteryBypassState(active=True),
+                now=1)
+            self.assertFalse(result.full_battery_pv_bypass_active)
+            self.assertEqual(state, controller.FullBatteryBypassState())
 
     def test_full_charge_waits_for_hold_and_continuous_taper(self):
         start = datetime(2026, 8, 21, 12, tzinfo=UTC)
@@ -1645,6 +1724,57 @@ class ControllerTest(unittest.TestCase):
                 temporary_release=True,
             )
         )
+
+
+class BypassEntryTimerTest(unittest.IsolatedAsyncioTestCase):
+    def make_runtime(self):
+        tree = ast.parse((ROOT / PACKAGE.replace(".", "/") / "runtime.py").read_text())
+        cls = next(n for n in tree.body if isinstance(n, ast.ClassDef)
+                   and n.name == "XT500Runtime")
+        names = {"_schedule_full_battery_pv_entry",
+                 "_async_wait_for_full_battery_pv_entry", "_reset_pv_release_gates"}
+        methods = [n for n in cls.body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
+                   and n.name in names]
+        for method in methods:
+            method.decorator_list = []
+        sleep = AsyncMock()
+        namespace = {"asyncio": SimpleNamespace(sleep=sleep,
+                                               CancelledError=asyncio.CancelledError),
+                     "monotonic": lambda: 0.0,
+                     "FullBatteryBypassState": controller.FullBatteryBypassState,
+                     "FULL_BATTERY_PV_ENTRY_DELAY": controller.FULL_BATTERY_PV_ENTRY_DELAY}
+        exec(compile(ast.Module(body=methods, type_ignores=[]), "runtime.py", "exec"), namespace)
+        runtime = SimpleNamespace(
+            _full_battery_pv_transition=controller.FullBatteryBypassState(eligible_since=0),
+            _full_battery_pv_entry_task=None, async_calculate=Mock(),
+            _cancel_pv_release_timer=Mock(),
+            hass=SimpleNamespace(async_create_task=asyncio.create_task))
+        for name in names:
+            setattr(runtime, name, MethodType(namespace[name], runtime))
+        return runtime, sleep
+
+    async def test_unchanged_input_still_wakes_entry_after_delay(self):
+        runtime, sleep = self.make_runtime()
+        runtime._schedule_full_battery_pv_entry()
+        task = runtime._full_battery_pv_entry_task
+        runtime._schedule_full_battery_pv_entry()
+        self.assertIs(runtime._full_battery_pv_entry_task, task)
+        await task
+        sleep.assert_awaited_once_with(30.0)
+        runtime.async_calculate.assert_called_once()
+        self.assertIsNone(runtime._full_battery_pv_entry_task)
+
+    async def test_invalid_or_disabled_inputs_cancel_pending_entry(self):
+        runtime, sleep = self.make_runtime()
+        runtime._schedule_full_battery_pv_entry()
+        task = runtime._full_battery_pv_entry_task
+        runtime._reset_pv_release_gates()
+        await asyncio.gather(task, return_exceptions=True)
+        self.assertEqual(runtime._full_battery_pv_transition,
+                         controller.FullBatteryBypassState())
+        self.assertIsNone(runtime._full_battery_pv_entry_task)
+        runtime.async_calculate.assert_not_called()
+        sleep.assert_not_awaited()
 
 
 if __name__ == "__main__":

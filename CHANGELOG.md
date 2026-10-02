@@ -1,5 +1,20 @@
 # Änderungsprotokoll
 
+## 1.11.1 – 2026-10-02
+
+- Pendeln zwischen Normalbetrieb und Vollakku-PV-Bypass behoben: Beim Einstieg
+  wird öffentliche Einspeisung nicht mehr von der Akkuunterstützung abgezogen.
+  Batterieenergie am Netz durfte bisher eine erneute Freigabe vortäuschen.
+- Einstieg erst nach 30 Sekunden durchgehend erfüllter Leistungsfreigabe mit
+  maximal 10 W Akkuentladung und 10 W Netzbezug gegenüber dem Netzziel. Die
+  bisherige 30-W-Ausstiegstoleranz bleibt im aktiven Bypass erhalten.
+- Versorgungslücken und Ladeaufträge beenden den Bypass weiterhin sofort.
+  Die normale Regelung läuft während der erneuten Einstiegsprüfung weiter.
+- Timer funktioniert auch bei unveränderten Messwerten und wird bei fehlenden
+  Eingaben, ausgeschalteter Regelung und Entladen der Integration beendet.
+- Lokale Tests über mehrere Regelzyklen und aktualisierte Anleitungen. Keine
+  Übertragung auf ein laufendes System und keine erneute Geräteprüfung.
+
 ## 1.11.0 – 2026-09-30
 
 - Optionale externe saldierte Netzmessung mit Power-Entity-Selector und Vorzeicheninvertierung in Einrichtung und Optionen.

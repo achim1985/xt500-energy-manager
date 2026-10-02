@@ -7,7 +7,7 @@ the decision and setpoint-limiting logic independently testable.
 from __future__ import annotations
 
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, time, timedelta
 
 from .const import (
@@ -557,6 +557,7 @@ class ControlSettings:
     pv_surplus_charge_reserve: float = 50.0
     full_battery_pv_export: bool = False
     full_battery_pv_hold: bool = False
+    full_battery_pv_bypass_active: bool = False
     coupling_mode: str = COUPLING_AUTO
 
 
@@ -712,11 +713,20 @@ def calculate_control(data: ControlInput, cfg: ControlSettings) -> ControlResult
         - max(normalized_grid - cfg.target_grid_power, 0.0)
         > bypass_feedback_tolerance
     )
+    # Entry must prove supply without battery support. Public export may itself
+    # come from the battery and cannot be subtracted to prove PV sufficiency.
+    # Keep the wider existing 30 W exit tolerance once bypass is established.
+    bypass_entry_ready = cfg.full_battery_pv_bypass_active or (
+        normalized_grid >= cfg.target_grid_power - 10.0
+        and (data.battery_discharge_power is None
+             or max(float(data.battery_discharge_power), 0.0) <= 10.0)
+    )
     full_battery_bypass = (
         full_battery_bypass
         and bypass_required_grid <= bypass_grid_available
         and not bypass_feedback_missing
         and not bypass_battery_shortfall
+        and bypass_entry_ready
     )
     # Compensate the observed difference between the XT500 command and its
     # actual grid-port output. This keeps the topology feed-forward target while
@@ -1004,3 +1014,38 @@ def calculate_control(data: ControlInput, cfg: ControlSettings) -> ControlResult
         pv_surplus_correction=round(pv_surplus_correction, 1),
         full_battery_pv_bypass_active=full_battery_bypass,
     )
+
+
+FULL_BATTERY_PV_ENTRY_DELAY = 30.0
+
+
+@dataclass(slots=True, frozen=True)
+class FullBatteryBypassState:
+    """Transient power eligibility; independent from the full-SOC latch."""
+
+    active: bool = False
+    eligible_since: float | None = None
+
+
+def calculate_control_with_bypass_state(
+    data: ControlInput, cfg: ControlSettings, *,
+    state: FullBatteryBypassState, now: float,
+) -> tuple[ControlResult, FullBatteryBypassState]:
+    """Require stable entry, but immediately leave unsafe/disabled bypass.
+
+    A stricter entry band and a continuous 30-second qualification prevent
+    normal battery support and staggered sensor updates from retriggering it.
+    No exit is delayed, including charge requests and insufficient PV.
+    """
+    candidate = calculate_control(
+        data, replace(cfg, full_battery_pv_bypass_active=state.active)
+    )
+    if not candidate.full_battery_pv_bypass_active:
+        return candidate, FullBatteryBypassState()
+    if state.active:
+        return candidate, FullBatteryBypassState(active=True)
+    since = state.eligible_since if state.eligible_since is not None else now
+    if now - since >= FULL_BATTERY_PV_ENTRY_DELAY:
+        return candidate, FullBatteryBypassState(active=True)
+    base = calculate_control(data, replace(cfg, full_battery_pv_export=False))
+    return base, FullBatteryBypassState(eligible_since=since)

@@ -312,7 +312,7 @@ Neuladen auch im Energiemanager-Dashboard.
 5. Als URL exakt eintragen:
 
    ```text
-   /xt500_energy_manager/xt500-energy-dashboard-strategy.js?v=1.11.0
+   /xt500_energy_manager/xt500-energy-dashboard-strategy.js?v=1.11.1
    ```
 
 6. Als Ressourcentyp **JavaScript-Modul** auswählen.
@@ -502,6 +502,18 @@ die tatsächliche XT500-Ausgabe und öffentliche Netzleistung. Bei mehr als
 30 W gemessener Versorgungslücke oder Akkuunterstützung ohne entsprechenden
 Netzüberschuss wird der Bypass nicht freigegeben. So führen auch
 Umwandlungsverluste nicht zu einer dauerhaften Versorgungslücke.
+
+Vor dem Einstieg muss diese Freigabe **30 Sekunden durchgehend** erfüllt
+sein. Dabei sind höchstens 10 W gemessene Akkuentladung und höchstens 10 W
+Netzbezug gegenüber dem Netzziel erlaubt. Öffentliche Einspeisung wird beim
+Einstieg nicht von der Akkuentladung abgezogen, weil sie selbst aus dem Akku
+stammen kann. Im bereits aktiven Bypass bleibt die 30-W-Ausstiegstoleranz
+erhalten. Bei einer Versorgungslücke wird sofort zurückgeregelt; für den
+erneuten Einstieg beginnt die 30-Sekunden-Prüfung von vorn. Während der
+Prüfung arbeitet der gewählte Grundmodus weiter.
+
+Die Lade-SOC-Hysterese am Gerät und das 1-%-SOC-Halteband betreffen den
+Ladezustand. Sie ersetzen diese zusätzliche Prüfung der Leistungswerte nicht.
 
 `IS` ist eine Obergrenze, keine Anforderung, diese Leistung aus dem Akku
 abzugeben. Im Bypass wird sie deshalb nicht auf die aktuelle PV-Messung
@@ -826,7 +838,7 @@ wird ein vermeintlich ausgeschalteter Regler mit alten Sollwerten vermieden.
   Eintrag neu laden oder Home Assistant neu starten. Die optionalen Sensoren
   werden bei jedem Laden der Integration erneut automatisch erkannt.
 - Im Strategy-Editor prüfen, ob der Block **Energie heute** ausgeblendet wurde.
-- Die Dashboard-Ressource auf `?v=1.11.0` setzen und Ressourcen beziehungsweise
+- Die Dashboard-Ressource auf `?v=1.11.1` setzen und Ressourcen beziehungsweise
   Browser vollständig neu laden.
 
 ### Eingangsdaten sind ungültig
@@ -866,7 +878,7 @@ Auch bei einem kurzen Netzbezug bleibt diese Rückführung aktiv, damit der
 Sollwert nicht wieder in die Akkuentladung zurückpendelt. Die Regelung senkt
 dabei ausschließlich die XT500-Ausgangsleistung.
 
-Version 1.11.0 baut auf dem für SunEnergyXT 1.1.3 vorbereiteten Stand auf. Rückmeldungen aus
+Version 1.11.1 baut auf dem für SunEnergyXT 1.1.3 vorbereiteten Stand auf. Rückmeldungen aus
 unterschiedlichen XT500- und XT500-Pro-Systemen, Firmwareständen,
 PV-Kopplungen und Stromzählern sind weiterhin willkommen.
 

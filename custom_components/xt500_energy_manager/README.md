@@ -1,4 +1,4 @@
-# XT500 Energy Manager 1.11.0
+# XT500 Energy Manager 1.11.1
 
 Production-ready Home Assistant controller for SunEnergyXT XT500 and XT500 Pro
 systems. The integration directly controls the grid-port setpoint, inverter
@@ -93,6 +93,14 @@ battery subject to its existing discharge limits; the PV-surplus base mode
 retains its existing discharge policy. This also accounts for conversion
 losses and prevents repeated entry while the battery supplies a deficit.
 
+Entry requires 30 continuous seconds of eligibility, with at most 10 W
+battery discharge and 10 W public import relative to the grid target.
+Export is not deducted from battery discharge to prove entry eligibility:
+export may itself come from the battery. Established bypass retains the
+30 W exit tolerance and leaves immediately on a supply gap. Re-entry needs
+a new qualification period; the selected base mode runs while waiting.
+The device charge hysteresis and 1% SOC latch are independent of this power gate.
+
 IS is an output ceiling, not a demand to discharge the battery. The bypass
 opens that ceiling within the configured limits even if the current PV
 measurement is already curtailed. Local consumption and conversion losses
@@ -149,7 +157,7 @@ management hash prevents locally modified copies from being overwritten.
 ## Generated dashboard
 
 Register
-`/xt500_energy_manager/xt500-energy-dashboard-strategy.js?v=1.11.0` once as a
+`/xt500_energy_manager/xt500-energy-dashboard-strategy.js?v=1.11.1` once as a
 JavaScript module under Settings → Dashboards → Resources. Then add the
 **XT500 Energiemanager** community dashboard.
 

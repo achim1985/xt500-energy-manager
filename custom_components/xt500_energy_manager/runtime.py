@@ -108,7 +108,9 @@ from .controller import (
     ControlResult,
     ControlSettings,
     FullChargeConfirmationDecision,
-    calculate_control,
+    calculate_control_with_bypass_state,
+    FullBatteryBypassState,
+    FULL_BATTERY_PV_ENTRY_DELAY,
     classify_actual_energy_source,
     cycle_is_due,
     decode_signed_16,
@@ -202,6 +204,8 @@ class XT500Runtime:
         self._recovery_task: asyncio.Task | None = None
         self._full_soc_latched = False
         self._full_battery_pv_hold = False
+        self._full_battery_pv_transition = FullBatteryBypassState()
+        self._full_battery_pv_entry_task: asyncio.Task | None = None
         self._low_soc_hold: bool | None = None
         self._discharge_override_session_active = False
         self._discharge_override_restore_task: asyncio.Task | None = None
@@ -363,6 +367,7 @@ class XT500Runtime:
                 self._control_apply_task,
                 self._startup_ready_task,
                 self._pv_release_task,
+                self._full_battery_pv_entry_task,
                 self._ac_pv_release_task,
                 self._recovery_task,
                 self._communication_pause_task,
@@ -775,7 +780,7 @@ class XT500Runtime:
             )
         )
 
-        self.result = calculate_control(
+        self.result, self._full_battery_pv_transition = calculate_control_with_bypass_state(
             ControlInput(
                 soc=values[CONF_SOC_ENTITY],
                 pv_power=values[CONF_PV_POWER_ENTITY],
@@ -831,7 +836,10 @@ class XT500Runtime:
                 full_battery_pv_hold=self._full_battery_pv_hold,
                 coupling_mode=self.settings[SETTING_COUPLING_MODE],
             ),
+            state=self._full_battery_pv_transition,
+            now=monotonic(),
         )
+        self._schedule_full_battery_pv_entry()
         self.result = replace(
             self.result,
             active_energy_source=classify_actual_energy_source(
@@ -1462,8 +1470,34 @@ class XT500Runtime:
             self._pv_release_due_monotonic = None
 
     @callback
+    def _schedule_full_battery_pv_entry(self) -> None:
+        """Wake up even when measurements remain unchanged during entry."""
+        since = self._full_battery_pv_transition.eligible_since
+        if since is None:
+            if self._full_battery_pv_entry_task is not None:
+                self._full_battery_pv_entry_task.cancel()
+                self._full_battery_pv_entry_task = None
+            return
+        if self._full_battery_pv_entry_task is None:
+            self._full_battery_pv_entry_task = self.hass.async_create_task(
+                self._async_wait_for_full_battery_pv_entry(since)
+            )
+
+    async def _async_wait_for_full_battery_pv_entry(self, since: float) -> None:
+        try:
+            await asyncio.sleep(max(
+                since + FULL_BATTERY_PV_ENTRY_DELAY - monotonic(), 0.0
+            ))
+        except asyncio.CancelledError:
+            return
+        self._full_battery_pv_entry_task = None
+        self.async_calculate()
+
+    @callback
     def _reset_pv_release_gates(self) -> None:
-        """Cancel both independent gate timers and reset their state."""
+        """Cancel gate timers and reset transient PV eligibility."""
+        self._full_battery_pv_transition = FullBatteryBypassState()
+        self._schedule_full_battery_pv_entry()
         self._cancel_pv_release_timer("dc")
         self._cancel_pv_release_timer("ac")
         self._pv_release_active = False
