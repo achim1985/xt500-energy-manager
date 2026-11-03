@@ -1704,8 +1704,22 @@ class XT500Base extends HTMLElement {
   }
 
   _update() {
-    for (const fn of this._updaters) { try { fn(); } catch (e) { console.error('xt500-energy', e); } }
-    this._checkPending();
+    // HA scrollt außerhalb der Karte, teilweise hinter mehreren Shadow-Roots.
+    // Nur während des synchronen Updates sichern: keine späteren scrollTo-
+    // Aufrufe, die mit Touch-Scrollen oder dessen Nachlauf konkurrieren.
+    const positions = [];
+    for (let el = this; el; el = el.parentNode || el.host) {
+      if (typeof el.scrollTop === 'number') positions.push([el, el.scrollTop, el.scrollLeft]);
+    }
+    try {
+      for (const fn of this._updaters) { try { fn(); } catch (e) { console.error('xt500-energy', e); } }
+      this._checkPending();
+    } finally {
+      for (const [el, top, left] of positions) {
+        if (el.scrollTop !== top) el.scrollTop = top;
+        if (el.scrollLeft !== left) el.scrollLeft = left;
+      }
+    }
     const fc = this._cache.fc;
     if (this._c && fc && Date.now() - fc.at > 30 * 60e3 && !this._cache.fcBusy) loadForecast(this._c).then(() => this._update());
   }
@@ -1970,7 +1984,8 @@ ha-icon { --mdc-icon-size: 20px; display: inline-flex; }
 h1, h2, h3, p { margin: 0; }
 [hidden] { display: none !important; }
 
-.app { container-type: inline-size; max-width: 1280px; margin: 0 auto; padding: 16px 16px 40px; position: relative; }
+/* Ersetzte Live-Texte dürfen nicht als Scroll-Anker dienen. */
+.app { overflow-anchor: none; container-type: inline-size; max-width: 1280px; margin: 0 auto; padding: 16px 16px 40px; position: relative; }
 .top { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
 .brand { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; }
 .logo { width: 42px; height: 42px; border-radius: 13px; display: grid; place-items: center; color: var(--energy); flex: none;
