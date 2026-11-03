@@ -4,8 +4,9 @@ Home-Assistant-Integration für SunEnergyXT XT500 und XT500 Pro: Nulleinspeisung
 PV-Überschussregelung mit DC-/AC-PV-Unterstützung, manuelle Zielladung,
 automatische und manuelle Zyklusladung sowie Tarifladung. Dazu kommen
 Leistungsbegrenzungen, eine optionale Entladereserve für Stromausfälle,
-Überwachung und Fehlerbehebung sowie ein bei der Ersteinrichtung automatisch
-angelegtes Dashboard mit Bedienung, Energieübersicht und Verlauf.
+Überwachung und Fehlerbehebung sowie eine eigene Bedienoberfläche mit
+Energiefluss, Verlauf, PV-Prognose und Kompaktkarte, die bei der
+Ersteinrichtung automatisch als Dashboard angelegt wird.
 Optional lassen sich externe Netzleistungsmessung und Bezugs-/Einspeiseenergie
 nutzen. Voraussetzung ist die eingerichtete originale SunEnergyXT-Integration.
 
@@ -36,6 +37,8 @@ nutzen. Voraussetzung ist die eingerichtete originale SunEnergyXT-Integration.
 - [2. XT500 Energy Manager installieren](#2-xt500-energy-manager-installieren)
 - [3. Integration einrichten](#3-integration-einrichten)
 - [4. Dashboard einrichten](#4-dashboard-einrichten)
+- [PV-Prognose](#pv-prognose)
+- [Bisheriges Dashboard](#bisheriges-dashboard-klassische-strategie)
 - [Entladereserve](#optionale-entladereserve)
 - [Bedienung und Lademodi](#bedienung-und-lademodi)
 - [Dynamischer Stromtarif](#dynamischer-stromtarif)
@@ -50,12 +53,17 @@ nutzen. Voraussetzung ist die eingerichtete originale SunEnergyXT-Integration.
 - die eingerichtete Originalintegration **SunEnergyXT 500 Series**
 - ein Leistungssensor am öffentlichen Netzanschlusspunkt, zum Beispiel von
   einem Shelly Pro 3EM
-- für die komfortable Dashboard-Erstellung über den Community-Dialog:
+- optional für die PV-Prognose: ein Prognose-Dienst (zum Beispiel
+  Forecast.Solar oder Solcast), der im Energie-Dashboard bei der PV-Anlage
+  eingetragen ist
+- nur für das bisherige Dashboard über den Community-Dialog:
   Home Assistant 2026.5 oder neuer
 
 Der bisherige Stand wurde mit Home Assistant 2026.7 und der SunEnergyXT-Integration
 1.1.3 getestet. Entladereserve und automatische Dashboard-Einrichtung sind neue,
 lokal geprüfte Erweiterungen; ihre Prüfung im laufenden HA und am Gerät steht aus.
+Die neue Oberfläche (1.12.0) lief bei der Entwicklung mit Home Assistant 2026.10
+an einem XT500 mit echten Daten.
 
 ## 1. SunEnergyXT 500 Series installieren
 
@@ -168,6 +176,7 @@ direkt auf `SI1`; `SA1` erscheint zusätzlich als Lade-Hysterese im Dashboard.
            ├── manifest.json
            ├── config_flow.py
            ├── frontend
+           │   ├── xt500-energy-ui.js
            │   └── xt500-energy-dashboard-strategy.js
            └── ...
    ```
@@ -270,14 +279,183 @@ Gespeicherte Schalterstellungen bestehender Installationen bleiben erhalten.
 
 ## 4. Dashboard einrichten
 
+![Übersicht der Oberfläche mit Ladestand-Ring, Zustand in Klartext, Prognose, Energiefluss und Betriebsbereitschaft](docs/images/ui-uebersicht.jpg)
+
+Ab Version 1.12.0 bringt die Integration eine eigene Oberfläche mit. Sie lädt
+sich selbst; eine Lovelace-Ressource muss dafür **nicht** eingetragen werden.
+Alles, was sie anzeigt, kommt aus der Integration und aus Home Assistant
+selbst. Feste Entitäts-IDs gibt es nicht, deshalb funktioniert sie bei jeder
+Anlage ohne Anpassung.
+
 ### Automatische Einrichtung bei Erstinstallation
 
 Im Einrichtungsdialog ist **Dashboard automatisch erstellen** bereits aktiviert.
-Das Dashboard **XT500 Energiemanager** erscheint in der Seitenleiste; Ressource
-und Strategie werden automatisch eingerichtet. Bestehende XT500-Dashboards
-und eigene Anpassungen bleiben erhalten. Bewusst gelöschte Dashboards werden
-nicht bei jedem Neustart neu angelegt. Die folgenden manuellen Schritte sind
-nur bei ausgeschalteter Automatik oder YAML-Ressourcen erforderlich.
+Das Dashboard **XT500 Energiemanager** erscheint danach in der Seitenleiste.
+Bestehende XT500-Dashboards und eigene Anpassungen bleiben erhalten. Bewusst
+gelöschte Dashboards werden nicht bei jedem Neustart neu angelegt.
+
+### Manuell einrichten oder bestehendes Dashboard umstellen
+
+1. **Einstellungen → Dashboards → Dashboard hinzufügen** öffnen und ein leeres
+   Dashboard anlegen, zum Beispiel mit dem Titel `XT500 Energiemanager` und der
+   URL `xt500-energiemanager`. Wer das bisherige XT500-Dashboard umstellen
+   möchte, öffnet stattdessen dieses.
+2. Oben rechts auf den Stift **Dashboard bearbeiten** klicken, das
+   Drei-Punkte-Menü öffnen und **Rohkonfigurationseditor** wählen.
+3. Den gesamten Inhalt ersetzen durch:
+
+   ```yaml
+   strategy:
+     type: custom:xt500-energy
+   ```
+
+4. Speichern. Das Dashboard zeigt sofort die neue Oberfläche.
+
+Zurück zur bisherigen Oberfläche geht es jederzeit mit
+`type: custom:xt500-energy-manager`, siehe
+[Bisheriges Dashboard](#bisheriges-dashboard-klassische-strategie).
+
+Optionen lassen sich direkt unter `strategy:` ergänzen:
+
+| Option | Bedeutung |
+|---|---|
+| `manager_id` | bei mehreren XT500 fest einen auswählen (sonst Auswahlfeld oben rechts) |
+| `read_only_for_non_admins` | `false` erlaubt auch Nicht-Admins Änderungen (Standard: nur Anzeige) |
+| `capacity_kwh` | Akkukapazität fest vorgeben (sonst aus dem Energie-Dashboard oder dem Verlauf) |
+
+### Die vier Bereiche
+
+**Übersicht** – Oben steht in einem Satz, was der Speicher gerade tut, zum
+Beispiel „Akku versorgt das Haus mit 27 W“. Darüber zeigt der Ring den
+Ladestand mit den Markierungen für Ladegrenze, Reserve und Entladegrenze.
+Daneben laufen die Leistungsflüsse zwischen PV, Akku, Netz und Haus animiert.
+Die Leiste darunter fasst Messwerte, Regelung, Verbindung und
+Wiederherstellung als Ampel zusammen. Findet der Einrichtungs-Check ein
+Problem, erscheint ganz oben ein Hinweis.
+
+![Vorrang-Treppe „Wer steuert gerade?“, Zyklusladung mit Sonnen-Hinweis und Tageswerte mit PV-Prognose](docs/images/ui-uebersicht-vorrang.jpg)
+
+- **Wer steuert gerade?** zeigt die Vorrangliste der Integration als Treppe:
+  manuelle Zielladung vor Zyklusladung vor Tarifladung vor Grundbetrieb. Die
+  markierte Stufe steuert gerade. So wird sichtbar, warum ein gewählter Modus
+  nicht aktiv ist.
+- **Zyklusladung** zeigt die Tage seit der letzten Vollladung und den nächsten
+  Start. Mit PV-Prognose kommt ein Hinweis dazu, ob die Sonne für die nächste
+  Vollladung voraussichtlich reicht.
+- **Heute** zeigt die Tageswerte des XT500 und, falls eingerichtet, die
+  PV-Prognose für den Rest des Tages und für morgen.
+
+**Steuern** – Alle Einstellungen für den Alltag. Auswahlen erscheinen als Karten
+mit kurzer Erklärung, Zahlenwerte als Schieberegler. Hinter dem **(?)** steht
+jeweils eine ausführliche Erklärung. Riskante Aktionen wie das Ausschalten des
+Energiemanagers oder ein Zyklusstart fragen vorher nach. Nach jeder Änderung
+zeigt ein kleiner Kreisel, dass auf die Bestätigung von Home Assistant gewartet
+wird; kommt sie nicht innerhalb von zehn Sekunden, erscheint
+„Nicht übernommen“.
+
+**Verlauf** – Ladezustand und Leistungen der letzten 6, 24 oder 48 Stunden,
+eine Zeitleiste „Was ist passiert?“ aus dem Logbuch, die Energie der letzten
+7 Tage, 30 Tage oder 12 Monate sowie die letzten Vollladungen.
+
+![Verlauf mit Ladezustand, Leistungen und Zeitleiste der Ereignisse](docs/images/ui-verlauf.jpg)
+
+![Energie der letzten sieben Tage und Liste der Vollladungen](docs/images/ui-energie.jpg)
+
+**Technik** – Einrichtungs-Check, Regelung live (Regelstufe, Regelabweichung,
+Abstand), die Sollwerte „berechnet“ gegen „am Gerät“, Diagnose und die
+Feinabstimmung in aufklappbaren Gruppen.
+
+![Technik mit Einrichtungs-Check, Regelung live, Sollwerten und Feinabstimmung](docs/images/ui-technik.jpg)
+
+Der Einrichtungs-Check meldet unter anderem fehlende oder nicht verfügbare
+Sensoren, ein zu langsames Abfrageintervall, eine Kommunikationspause oder
+eine ausgeschaltete Wiederherstellung. **Integration öffnen** führt direkt zum
+Eintrag unter **Einstellungen → Geräte & Dienste**.
+
+### PV-Prognose
+
+![Prognose mit gemessener und vorhergesagter PV-Leistung sowie vorausgerechnetem Ladezustand](docs/images/ui-prognose.jpg)
+
+Sind im **Energie-Dashboard** von Home Assistant bei der PV-Anlage
+Prognose-Dienste eingetragen (zum Beispiel Forecast.Solar oder Solcast), nutzt
+die Oberfläche sie automatisch:
+
+- **Verlauf → Prognose:** PV-Leistung heute und morgen, gemessen als Linie und
+  vorhergesagt gestrichelt, sowie ein vorausgerechneter Ladezustand bis
+  morgen Abend.
+- **Übersicht:** ein Satz wie „Prognose: Reserve ≈ heute 20:07 · morgen
+  höchstens ≈ 69 %“ und die erwartete PV-Energie.
+- **Zyklusladung:** ob die Sonne für die nächste Vollladung reicht oder ob
+  „PV + Netz“ sicherer wäre.
+
+Die Vorausrechnung ist eine grobe Schätzung aus PV-Prognose, dem typischen
+Hausverbrauch der letzten 48 Stunden und den eingestellten Grenzen. Liefern
+mehrere Dienste Werte für dieselbe Anlage, wird gemittelt. Ohne Prognose im
+Energie-Dashboard bleiben diese Teile ausgeblendet.
+
+Die **Akkukapazität** für Restzeiten und Prognose kommt aus dem
+Energie-Dashboard (Speicher-Eintrag mit Kapazität). Fehlt sie dort, lernt die
+Oberfläche sie aus dem Verlauf; mit `capacity_kwh` lässt sie sich fest
+vorgeben.
+
+### Am Handy
+
+<img src="docs/images/ui-handy.jpg" alt="Übersicht auf einem Smartphone" width="320">
+
+Auf schmalen Bildschirmen stehen die Karten untereinander; die Reiter zeigen
+Symbol und Beschriftung übereinander und bleiben beim Scrollen oben.
+
+### Kompaktkarte für andere Dashboards
+
+![Kompaktkarte mit Ladestand, Zustand, Prognose und Kennzahlen in zwei Breiten](docs/images/ui-kompaktkarte.jpg)
+
+Für das eigene Haupt-Dashboard gibt es eine kleine Karte. Beim Bearbeiten eines
+Dashboards unter **Karte hinzufügen** nach **XT500 Energiemanager (kompakt)**
+suchen. Im Karteneditor lassen sich der Speicher, ein Ziel beim Antippen
+(zum Beispiel `/xt500-energiemanager`) und die Kennzahlen einstellen. Die
+Karte übernimmt Hintergrund und Schrift des aktiven Home-Assistant-Themes.
+
+Die große Oberfläche gibt es auch als einzelne Karte
+(`custom:xt500-energy-card`), etwa für eine Panel-Ansicht in einem eigenen
+Dashboard.
+
+### Optionale Entladereserve
+
+![Akku-Grenzen: Balken mit Entladegrenze 18 %, Reserve 30 % und aktuellem Ladestand, darunter die Regler](docs/images/ui-akku-grenzen.jpg)
+
+**Beispiel im Bild:** Der Balken zeigt alle Grenzen auf einen Blick: rot
+schraffiert bis zur Entladegrenze (18 %), gelb die Reserve (30 %), grün der
+aktuelle Ladestand. Darunter liegen die Regler. Der voreingestellte
+Reservewert einer neuen Installation beträgt 40 %.
+
+Unter **Steuern → Akku-Grenzen** die Option **Reserve für Stromausfall behalten**
+einschalten und die **Reserve für Stromausfall** einstellen, zum Beispiel 40 %.
+Ob die Reserve gerade die Entladung verhindert, steht in der Übersicht im
+Zustandssatz („Akku hält die Notstrom-Reserve“).
+Die zusätzliche Sperre verwendet die originale Entlade-Hysterese, sofern `SI1`
+zugeordnet ist; bei älteren Geräten gilt die vorhandene Entlade-Hysterese des
+Energiemanagers. Beispiel: bei 3
+Prozentpunkten wird Entladen ab 43 % wieder möglich. Der angezeigte
+Wiederfreigabewert ist auf 100 % begrenzt. Die Gerätesperre muss ebenfalls
+freigegeben sein. Reserve und Gerätewerte werden getrennt gespeichert;
+Ladegrenze und Geräte-Hysterese werden durch diese Funktion nicht verändert.
+Eine höhere Reserve startet keine zusätzliche Netzladung. Die einmalige
+Entladefreigabe ist bei aktiver Reserve gesperrt.
+
+Die Reserve betrifft den Netzbetrieb bei funktionierender HA-Regelung.
+Insel-/Lastausgang und dessen eigene Entladegrenze bleiben unverändert.
+HA-Ausfall oder Kommunikationsverlust kann das Halten der Reserve verhindern;
+die Funktion garantiert weder Notstromversorgung noch einen exakten physikalischen
+Stopp an der Prozentgrenze. Nach Neustart bleibt die Reserve im Hystereseband
+vorsorglich gesperrt.
+
+### Bisheriges Dashboard (klassische Strategie)
+
+Die bisherige Oberfläche aus Standardkarten bleibt erhalten und wird weiter
+mitgeliefert. Vorhandene Dashboards mit `custom:xt500-energy-manager` werden
+beim Update nicht umgestellt. Sie bietet zusätzlich die Energieseiten von Home
+Assistant (Energie, Verbraucher, Live) und das Einbinden von Ansichten anderer
+Dashboards. Für sie muss die JavaScript-Ressource eingetragen sein.
 
 Die Strategie erzeugt in der ausführlichen Standarddarstellung sechs Hauptansichten:
 
@@ -301,7 +479,7 @@ Live-Seite zeigt aktuelle Leistungsdaten unabhängig vom gewählten Zeitraum.
 Im Strategy-Editor lassen sie sich alternativ zu einer kompakten Seite
 zusammenfassen oder vollständig ausblenden.
 
-### Einstellungsansicht nicht übersehen
+#### Einstellungsansicht nicht übersehen
 
 ![Speicherübersicht mit Speicherstand, aktuellen Leistungsflüssen, Tagesenergie und Regelungsstatus](docs/images/dashboard-speicher.jpg)
 
@@ -340,36 +518,7 @@ Reiter in die obere Leiste aufnehmen. Die Quellansicht bleibt dabei die
 führende Konfiguration: Änderungen an ihr erscheinen nach einem vollständigen
 Neuladen auch im Energiemanager-Dashboard.
 
-### Optionale Entladereserve
-
-![Reserve-Bedienung: ausgeschalteter Reserve-Schalter, 30 Prozent Reserve, Wiederfreigabe bei 33 Prozent und inaktive Sperre](docs/images/dashboard-reserve.jpg)
-
-**Beispiel im Bild:** Eingestellt sind 30 % Reserve und 33 % Wiederfreigabe
-(30 % plus 3 Prozentpunkte Entlade-Hysterese). Der graue Schalter ist **aus**;
-die zusätzliche Reserve wird erst nach Einschalten gehalten. **Entladen für
-Reserve gesperrt** zeigt, ob die Reserve aktuell die Entladung verhindert.
-Der voreingestellte Reservewert einer neuen Installation beträgt 40 %.
-
-Unter **Batteriegrenzen und Schutz** die Option **Reserve für Stromausfall behalten**
-aktivieren und **Reserve im Netzbetrieb** einstellen, zum Beispiel 40 %.
-Die zusätzliche Sperre verwendet die originale Entlade-Hysterese, sofern `SI1`
-zugeordnet ist; bei älteren Geräten gilt die vorhandene Entlade-Hysterese des
-Energiemanagers. Beispiel: bei 3
-Prozentpunkten wird Entladen ab 43 % wieder möglich. Der angezeigte
-Wiederfreigabewert ist auf 100 % begrenzt. Die Gerätesperre muss ebenfalls
-freigegeben sein. Reserve und Gerätewerte werden getrennt gespeichert;
-Ladegrenze und Geräte-Hysterese werden durch diese Funktion nicht verändert.
-Eine höhere Reserve startet keine zusätzliche Netzladung. Die einmalige
-Entladefreigabe ist bei aktiver Reserve gesperrt.
-
-Die Reserve betrifft den Netzbetrieb bei funktionierender HA-Regelung.
-Insel-/Lastausgang und dessen eigene Entladegrenze bleiben unverändert.
-HA-Ausfall oder Kommunikationsverlust kann das Halten der Reserve verhindern;
-die Funktion garantiert weder Notstromversorgung noch einen exakten physikalischen
-Stopp an der Prozentgrenze. Nach Neustart bleibt die Reserve im Hystereseband
-vorsorglich gesperrt.
-
-### Manuell, Schritt 1: JavaScript-Ressource registrieren
+#### Manuell, Schritt 1: JavaScript-Ressource registrieren
 
 1. **Einstellungen → Dashboards** öffnen.
 2. Oben rechts das Drei-Punkte-Menü öffnen.
@@ -386,7 +535,7 @@ vorsorglich gesperrt.
 8. Im Drei-Punkte-Menü **Ressourcen neu laden** wählen. Falls dieser Eintrag
    nicht angeboten wird, Home Assistant im Browser vollständig neu laden.
 
-### Schritt 2A: Dashboard über „Community-Dashboards“ erstellen
+#### Schritt 2A: Dashboard über „Community-Dashboards“ erstellen
 
 Dieser Weg steht ab Home Assistant 2026.5 zur Verfügung.
 
@@ -406,7 +555,7 @@ Dieser Weg steht ab Home Assistant 2026.5 zur Verfügung.
    **Verlauf**, **Verbraucher**, **Live** und **Einstellungen** werden automatisch
    erzeugt.
 
-### Schritt 2B: Manuelle Erstellung über die Rohkonfiguration
+#### Schritt 2B: Manuelle Erstellung über die Rohkonfiguration
 
 Dieser Weg funktioniert auch, wenn das Community-Dashboard nicht im
 Auswahldialog erscheint.
@@ -435,7 +584,7 @@ Die Karten und Ansichten dürfen bei einem Strategie-Dashboard nicht zusätzlich
 manuell in die Rohkonfiguration kopiert werden. Sie werden bei jedem Öffnen aus
 den vorhandenen XT500-Energy-Manager-Entitäten erzeugt.
 
-### Blöcke anordnen und ausblenden
+#### Blöcke anordnen und ausblenden
 
 1. Unter **Einstellungen → Dashboards** beim
    **XT500 Energiemanager** die Dashboard-Einstellungen öffnen.
@@ -456,7 +605,7 @@ auf bis zu drei Spalten. Speicherstand, Regelungsstatus, Sollwerte,
 Zyklusladung, Leistungsflüsse, **Energie heute** und Schnellsteuerung bleiben
 dabei eigenständige Blöcke.
 
-### Energieseiten auswählen
+#### Energieseiten auswählen
 
 1. Unter **Einstellungen → Dashboards** beim
    **XT500 Energiemanager** die Dashboard-Einstellungen öffnen.
@@ -477,7 +626,7 @@ sind unter **Energie** eingerichtete Netz-, PV-, Speicher- oder
 Verbraucherquellen einschließlich der jeweiligen Leistungssensoren. Fehlende
 Quellen erzeugt der Energiemanager nicht künstlich.
 
-### Ansichten anderer Dashboards ergänzen
+#### Ansichten anderer Dashboards ergänzen
 
 1. Das XT500-Energiemanager-Dashboard öffnen.
 2. Oben rechts **Dashboard bearbeiten** auswählen.
@@ -513,51 +662,44 @@ der ursprünglichen Ansicht wirksam.
 
 ### Schnellsteuerung im Alltag
 
-![Schnellsteuerung mit Regelung, Zielladung, Automatik und Zyklusstart](docs/images/dashboard-schnellsteuerung.jpg)
+![Steuern: Energiemanager-Schalter, Grundbetrieb und PV-Berücksichtigung](docs/images/ui-grundbetrieb.jpg)
 
-Die vier Bedienelemente auf der **Speicher**-Seite haben unterschiedliche Aufgaben:
+Ganz oben unter **Steuern** schaltet der Schalter **Energiemanager** die
+gesamte Regelung ein oder aus. Beim Ausschalten fragt die Oberfläche nach.
+Darunter liegen Grundbetrieb, PV-Berücksichtigung und die PV-Einspeisung bei
+vollem Akku. Weiter unten folgen **Zielladung**, **Tarifladung**,
+**Akku-Grenzen**, **Zyklusladung** sowie **Netz & Wechselrichter**.
 
-- **Regelung:** schaltet die gesamte Steuerung des Energiemanagers ein oder aus.
-- **Zielladung:** startet oder beendet die manuelle Ladung mit den zuvor unter
-  **Laden und Zyklus** eingestellten Werten.
-- **Automatik:** schaltet die Zyklusüberwachung ein oder aus. **Ein** bedeutet
-  nicht, dass gerade geladen wird.
-- **Zyklusstart:** startet die Zyklusladung sofort mit ihrem eigenen Lademodus
-  und Vollladeziel. Die Angabe darüber zeigt den letzten Tastendruck.
-
-**Für den ersten Start:** Zuerst Einstellungen und Lademodi prüfen, dann
-**Regelung** einschalten. Für den normalen Alltagsbetrieb muss **Zielladung**
-nicht eingeschaltet werden. Einen Zyklusstart brauchst du nur, wenn du die
+**Für den ersten Start:** Zuerst Einstellungen und Lademodi prüfen, dann den
+**Energiemanager** einschalten. Für den normalen Alltagsbetrieb muss keine
+Zielladung gestartet werden. Einen Zyklusstart brauchst du nur, wenn du die
 Zyklusladung sofort auslösen möchtest.
 
-![Betriebsbereitschaft: Produktivregelung ein, Fehlerwiederherstellung bereit und Eingangsdaten gültig](docs/images/dashboard-betriebsbereitschaft.jpg)
-
-Unter **Regelungsstatus** prüfst du **Produktivregelung**,
-**Fehlerwiederherstellung** und **Eingangsdaten**. Die Kombination im Bild zeigt
-eine betriebsbereite Regelung. Trotzdem kann eine SOC-Grenze die Entladung
-verhindern; dafür ist zusätzlich die Zeile **Status** maßgeblich.
+Ob alles betriebsbereit ist, zeigt die Ampel-Leiste in der **Übersicht**:
+Messwerte gültig, Regelung bereit, Verbindung stabil, Wiederherstellung
+bereit. Trotzdem kann eine SOC-Grenze die Entladung verhindern; das steht dann
+im Zustandssatz oben in der Übersicht.
 
 ### Grundmodus auswählen
 
-![Geöffnete Grundmodus-Auswahl mit Normalbetrieb und PV-Überschuss](docs/images/dashboard-grundmodus.jpg)
-
-Öffne **Einstellungen → Betriebsart und Netzziel → Grundmodus**. Hier wählst
-du zwischen **Normalbetrieb** und **PV-Überschuss** für Zeiten ohne Zielladung.
+Unter **Steuern → Grundbetrieb (ohne Ladeauftrag)** wählst du zwischen
+**Normalbetrieb** und **PV-Überschuss** für Zeiten ohne Zielladung (siehe Bild
+oben).
 Die reine Auswahl eines Grundmodus startet keine manuelle Ladung. Die
 Unterschiede stehen in den folgenden Abschnitten.
 
 ### Manuelle Zielladung vorbereiten und starten
 
-![Lademodus-Auswahl der manuellen Zielladung mit Netzladung, PV-Überschuss, PV-Vorrang und PV plus Netz](docs/images/dashboard-lademodi.jpg)
+![Zielladung mit den vier Lademodi, Ladeziel, Ladeleistung und Startknopf](docs/images/ui-zielladung.jpg)
 
-1. **Einstellungen → Laden und Zyklus** öffnen.
-2. Unter **Manuelle Zielladung** den **Lademodus** auswählen. Anders als beim
-   Grundmodus stehen hier vier Ladearten zur Verfügung.
-3. **Ladeziel** und eine zum Speicher passende **Gewünschte Ladeleistung**
-   einstellen. Die Bedeutung der Leistung hängt vom gewählten Lademodus ab;
-   die folgenden Abschnitte erklären das jeweilige Verhalten.
-4. Erst danach **Zielladung starten** einschalten. Zum Beenden den Schalter
-   ausschalten; nach Zielerreichung wird die manuelle Zielladung automatisch beendet.
+1. **Steuern → Zielladung** öffnen.
+2. Einen der vier **Lademodi** antippen. Jede Karte erklärt kurz, woher die
+   Energie kommt.
+3. **Ladeziel** und eine zum Speicher passende **Ladeleistung** einstellen.
+   Die Bedeutung der Leistung hängt vom gewählten Lademodus ab; die folgenden
+   Abschnitte erklären das jeweilige Verhalten.
+4. Erst danach **Auf … % laden** antippen. Derselbe Knopf beendet die Ladung
+   wieder; nach Zielerreichung endet die manuelle Zielladung automatisch.
 
 ### Normalbetrieb
 
@@ -722,13 +864,12 @@ Netzbezug. AC-PV wird dabei nicht doppelt abgezogen.
 
 ### Status: ausgewählt, aktiv und tatsächlich genutzt
 
-![Statusanzeige mit ausgewähltem und aktivem Lademodus, PV-Berücksichtigung und tatsächlicher Ladequelle](docs/images/dashboard-ladestatus.jpg)
-
-**So erkennst du, ob wirklich geladen wird:** Vergleiche **Aktiver Vorgang**,
-**Zustand des Lademodus** und **Tatsächliche Ladequelle** mit der gemessenen
-Leistung **Akku lädt**. Im Bild ist Normalbetrieb ausgewählt, die Entladung
-gesperrt und **Keine Ladung** als Ladequelle angezeigt. Ein gewählter Modus
-allein belegt noch keinen Energiefluss.
+**So erkennst du, ob wirklich geladen wird:** Der Satz oben in der
+**Übersicht** nennt die gemessene Ladeleistung und die Quelle, zum Beispiel
+„Akku lädt mit 930 W aus PV“. Die Chips darunter zeigen aktiven Vorgang,
+aktiven Lademodus und Ladequelle, die Treppe **Wer steuert gerade?** die
+Vorrangstufe. Ein gewählter Modus allein belegt noch keinen Energiefluss.
+Die einzelnen Sensoren stehen weiterhin als Entitäten zur Verfügung:
 
 - **Aktiver Vorgang** zeigt, wer die Sollwerte exklusiv besitzt: Normalbetrieb,
   manuelle Zielladung, manuelle oder automatische Zyklusladung oder Tarifladung.
@@ -822,14 +963,12 @@ berücksichtigt keine PV-Prognose.
 
 ### Zyklusladung
 
-![Laden-Unterseite mit manueller Zielladung links und automatischer Zyklusüberwachung rechts](docs/images/dashboard-laden.jpg)
-
-**Zwei getrennte Funktionen:** Links wählst du Lademodus und Ladeziel für
-die manuelle Zielladung und startest sie mit **Zielladung starten**. Rechts
-stellst du Prüfzeit, Lademodus, Vollladeziel und Intervall der Zyklusladung ein.
-Im Bild ist nur die automatische Überwachung eingeschaltet; eine manuelle
-Zielladung läuft nicht. Die gezeigten Leistungs- und Zielwerte sind Beispiele
-und müssen zu deinem Speicher passen.
+**Zwei getrennte Funktionen:** Die manuelle Zielladung liegt unter
+**Steuern → Zielladung**. Prüfzeit, Lademodus, Vollladeziel und Intervall der
+Zyklusladung stehen unter **Steuern → Zyklusladung**. Fortschritt, nächster
+Termin und – mit PV-Prognose – der Hinweis, ob die Sonne reicht, erscheinen
+zusätzlich in der Übersicht (siehe Bild bei
+[Die vier Bereiche](#die-vier-bereiche)).
 
 Die Zyklusladung verwendet ihren eigenen **Lademodus** und ihr eigenes
 **Vollladeziel**:
@@ -920,10 +1059,10 @@ wird ein vermeintlich ausgeschalteter Regler mit alten Sollwerten vermieden.
 1. **Regelung aktiv** ausschalten.
 2. Das von HACS angebotene Update installieren.
 3. Home Assistant neu starten.
-4. Bei einer manuell registrierten Ressource mit `?v=…` den Versionszusatz
-   aktualisieren oder entfernen. Automatisch registrierte Ressourcen benötigen
-   keine manuelle Versionsänderung.
-5. **Ressourcen neu laden** oder den Browser vollständig neu laden.
+4. Den Browser beziehungsweise die App einmal vollständig neu laden. Die
+   neue Oberfläche bringt ihre Version selbst mit und braucht keine Ressource.
+5. Nur für das bisherige Dashboard: Bei einer manuell registrierten Ressource
+   mit `?v=…` den Versionszusatz aktualisieren oder entfernen.
 6. Dashboard, Eingangsdaten und Produktivregelung prüfen.
 7. Regelung wieder aktivieren.
 
@@ -933,8 +1072,8 @@ wird ein vermeintlich ausgeschalteter Regler mit alten Sollwerten vermieden.
 2. Das neue GitHub-Release als ZIP herunterladen.
 3. Den vorhandenen Ordner
    `/config/custom_components/xt500_energy_manager` durch den neuen ersetzen.
-4. Bei einer manuell registrierten Ressource mit `?v=…` den Versionszusatz
-   aktualisieren oder entfernen.
+4. Nur für das bisherige Dashboard: Bei einer manuell registrierten
+   Ressource mit `?v=…` den Versionszusatz aktualisieren oder entfernen.
 5. Home Assistant neu starten.
 6. Dashboard und Eingangsdaten prüfen.
 7. Regelung wieder aktivieren.
@@ -945,7 +1084,7 @@ wird ein vermeintlich ausgeschalteter Regler mit alten Sollwerten vermieden.
 
 - Prüfen, ob **Dashboard automatisch erstellen** bei der Einrichtung aktiviert war.
 - Unter **Benachrichtigungen** nach **XT500 Dashboard** suchen; dort steht der
-  konkrete Fehler, beispielsweise manuell verwaltete YAML-Ressourcen.
+  konkrete Fehler.
 - Nach Behebung des Fehlers den Integrationseintrag neu laden.
 - Ein bewusst gelöschtes Dashboard über die manuellen Schritte erneut anlegen.
   Bereits eingerichtete Integrationen werden beim Update nicht automatisch umgestellt.
@@ -971,7 +1110,11 @@ wird ein vermeintlich ausgeschalteter Regler mit alten Sollwerten vermieden.
 
 ### Dashboard meldet „Timeout waiting for strategy element“
 
-- Prüfen, ob die Ressource als **JavaScript-Modul** eingetragen ist.
+- Bei `custom:xt500-energy`: Home Assistant nach dem Update neu gestartet?
+  Danach Browser oder App vollständig neu laden; in der App hilft
+  **Einstellungen → Companion App → Frontend-Cache zurücksetzen**.
+- Bei `custom:xt500-energy-manager` (bisheriges Dashboard): prüfen, ob die
+  Ressource als **JavaScript-Modul** eingetragen ist.
 - Die Ressourcen-URL mit der Anleitung vergleichen.
 - **Ressourcen neu laden** oder einen vollständigen Browser-Neustart
   durchführen.
@@ -980,8 +1123,16 @@ wird ein vermeintlich ausgeschalteter Regler mit alten Sollwerten vermieden.
 
 - Prüfen, ob die Integration vollständig eingerichtet ist.
 - Prüfen, ob ihre Entitäten verfügbar sind.
-- Die Rohkonfiguration muss exakt den Eintrag
-  `custom:xt500-energy-manager` enthalten.
+- Die Rohkonfiguration muss exakt `custom:xt500-energy` (neue Oberfläche)
+  oder `custom:xt500-energy-manager` (bisheriges Dashboard) enthalten.
+
+### Prognose oder Restzeit fehlt
+
+- Im **Energie-Dashboard** bei der PV-Anlage einen Prognose-Dienst eintragen.
+  Liefert ein eingetragener Dienst keine Werte, wird er ignoriert.
+- Für Restzeiten braucht die Oberfläche die Akkukapazität: im Energie-Dashboard
+  beim Speicher eintragen oder mit `capacity_kwh` vorgeben. Ohne beides lernt
+  sie die Kapazität nach einigen Lade- oder Entladevorgängen aus dem Verlauf.
 
 ### Der Block „Energie heute“ fehlt oder ist unvollständig
 
@@ -991,7 +1142,8 @@ wird ein vermeintlich ausgeschalteter Regler mit alten Sollwerten vermieden.
 - Unter **Einstellungen → Geräte & Dienste → XT500 Energy Manager** den
   Eintrag neu laden oder Home Assistant neu starten. Die optionalen Sensoren
   werden bei jedem Laden der Integration erneut automatisch erkannt.
-- Im Strategy-Editor prüfen, ob der Block **Energie heute** ausgeblendet wurde.
+- Beim bisherigen Dashboard im Strategy-Editor prüfen, ob der Block
+  **Energie heute** ausgeblendet wurde.
 - Ressourcen beziehungsweise Browser vollständig neu laden. Bei alten
   manuellen URLs einen veralteten `?v=…`-Zusatz aktualisieren oder entfernen.
 
@@ -1033,7 +1185,9 @@ Sollwert nicht wieder in die Akkuentladung zurückpendelt. Die Regelung senkt
 dabei ausschließlich die XT500-Ausgangsleistung.
 
 Version 1.11.3 ergänzt eine optionale Entladereserve und die automatische
-Dashboard-Erstellung bei der Ersteinrichtung. Sie baut auf dem für SunEnergyXT
+Dashboard-Erstellung bei der Ersteinrichtung. Version 1.12.0 bringt die neue
+Bedienoberfläche mit Verlauf, PV-Prognose und Kompaktkarte; sie wurde am
+eigenen System mit echten Daten geprüft. Beide bauen auf dem für SunEnergyXT
 1.1.3 vorbereiteten Stand auf. Rückmeldungen aus
 unterschiedlichen XT500- und XT500-Pro-Systemen, Firmwareständen,
 PV-Kopplungen und Stromzählern sind weiterhin willkommen.

@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 import logging
 
+from homeassistant.components.frontend import add_extra_js_url
 from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EVENT_HOMEASSISTANT_STARTED
@@ -41,6 +42,8 @@ from .const import (
     FRONTEND_URL,
     PLATFORMS,
     PV_PRODUCTION_POSITIVE,
+    UI_URL,
+    VERSION,
 )
 from .entity_mapping import detect_xt500_entities
 from .runtime import XT500Runtime
@@ -161,10 +164,18 @@ async def async_setup(hass: HomeAssistant, _config: dict) -> bool:
                     ),
                 )
 
-    frontend_path = Path(__file__).parent / "frontend" / "xt500-energy-dashboard-strategy.js"
+    frontend_dir = Path(__file__).parent / "frontend"
     await hass.http.async_register_static_paths(
-        [StaticPathConfig(FRONTEND_URL, str(frontend_path), False)]
+        [
+            StaticPathConfig(
+                FRONTEND_URL, str(frontend_dir / "xt500-energy-dashboard-strategy.js"), False
+            ),
+            StaticPathConfig(UI_URL, str(frontend_dir / "xt500-energy-ui.js"), False),
+        ]
     )
+    # Karten und Strategie der neuen Oberfläche stehen damit in jedem Dashboard
+    # bereit; die Versionsangabe sorgt nach Updates für frisches JavaScript.
+    add_extra_js_url(hass, f"{UI_URL}?v={VERSION}")
     return True
 
 

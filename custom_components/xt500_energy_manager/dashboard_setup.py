@@ -4,17 +4,19 @@ from __future__ import annotations
 import asyncio
 import inspect
 import logging
-from urllib.parse import urlsplit
 
 from homeassistant.components import persistent_notification
 from homeassistant.components.lovelace.const import LOVELACE_DATA, ConfigNotFound
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.storage import Store
 
-from .const import CONF_AUTO_DASHBOARD, DOMAIN, FRONTEND_URL
+from .const import CONF_AUTO_DASHBOARD, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
-STRATEGY = "custom:xt500-energy-manager"
+# The new interface is loaded globally by the integration, so it needs no
+# Lovelace resource. Dashboards of the classic strategy count as existing.
+STRATEGY = "custom:xt500-energy"
+KNOWN_STRATEGIES = (STRATEGY, "custom:xt500-energy-manager", "xt500-energy-manager")
 PATH = "xt500-energiemanager"
 
 
@@ -46,25 +48,12 @@ async def async_ensure_dashboard(hass, entry):
             if saved.get("completed"):
                 return
             data = hass.data[LOVELACE_DATA]
-            resources = data.resources
-            if not resources.loaded:
-                await resources.async_load()
-                resources.loaded = True
-            resource = next((r for r in resources.async_items()
-                             if urlsplit(r["url"]).path == FRONTEND_URL), None)
-            if resource is None:
-                if not hasattr(resources, "async_create_item"):
-                    raise HomeAssistantError("Bei YAML-Ressourcen bitte die XT500-JavaScript-Ressource manuell eintragen.")
-                await resources.async_create_item({"res_type": "module", "url": FRONTEND_URL})
-                await resources.store.async_save({"items": resources.async_items()})
-            elif resource.get("type", resource.get("res_type")) != "module":
-                raise HomeAssistantError("Die vorhandene XT500-Ressource muss ein JavaScript-Modul sein.")
             for path, dashboard in list(data.dashboards.items()):
                 try:
                     config = await dashboard.async_load(False)
                 except ConfigNotFound:
                     continue
-                if config.get("strategy", {}).get("type") in (STRATEGY, "xt500-energy-manager"):
+                if config.get("strategy", {}).get("type") in KNOWN_STRATEGIES:
                     await store.async_save({"completed": True, "path": path})
                     persistent_notification.async_dismiss(hass, f"{DOMAIN}_dashboard_setup")
                     return
@@ -90,7 +79,7 @@ async def async_ensure_dashboard(hass, entry):
                 await store.async_save({"completed": True, "path": path})
                 persistent_notification.async_dismiss(hass, f"{DOMAIN}_dashboard_setup")
                 return
-            await dashboard.async_save({"strategy": {"type": STRATEGY, "dashboard_path": path}})
+            await dashboard.async_save({"strategy": {"type": STRATEGY}})
             await store.async_save({"completed": True, "path": path})
             persistent_notification.async_dismiss(hass, f"{DOMAIN}_dashboard_setup")
         except Exception as err:
