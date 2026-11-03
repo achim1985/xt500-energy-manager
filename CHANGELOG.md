@@ -1,6 +1,6 @@
 # Änderungsprotokoll
 
-## Noch nicht veröffentlicht
+## 1.12.1 – 2026-11-03
 
 - Scrollposition bei Live-Updates der neuen Oberfläche stabilisiert, auch bei
   verschachtelten Home-Assistant-Scrollbereichen. Werte bleiben live; manuelles

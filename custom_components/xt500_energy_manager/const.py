@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Final
 
 DOMAIN: Final = "xt500_energy_manager"
-VERSION: Final = "1.12.0"
+VERSION: Final = "1.12.1"
 PLATFORMS: Final = (
     "sensor",
     "binary_sensor",
