@@ -161,17 +161,40 @@ management hash prevents locally modified copies from being overwritten.
    writes those same number entities, then enable
    the energy manager.
 
-## Generated dashboard
+## Dashboard
 
-First-time setup enables **Create dashboard automatically** by default. It
-registers the JavaScript module and creates the sidebar dashboard. Existing
-entries retain their manual workflow. With YAML-managed resources or opt-out,
-register `/xt500_energy_manager/xt500-energy-dashboard-strategy.js` as a
-JavaScript module, then add the **XT500 Energiemanager** community dashboard.
+Since 1.12.0 the integration ships its own interface. It is loaded globally via
+`/xt500_energy_manager/xt500-energy-ui.js`; no Lovelace resource is required.
+First-time setup creates the sidebar dashboard **XT500 Energiemanager** with the
+strategy `custom:xt500-energy`. Existing dashboards are never changed. To switch
+a dashboard manually, set its raw configuration to:
 
-The generated dashboard uses only built-in Home Assistant cards. It includes
+```yaml
+strategy:
+  type: custom:xt500-energy
+```
+
+Optional keys: `manager_id`, `read_only_for_non_admins` (default `true`) and
+`capacity_kwh`. The interface has four tabs (overview, control, history,
+technical) and finds every entity through the integration's `xt500_key` and
+`source_*` attributes. It shows the state in plain words, an animated energy
+flow, the priority ladder, a setup check, logbook timeline, long-term energy
+statistics and, if the HA energy dashboard has a PV forecast, a PV and
+state-of-charge forecast. Battery capacity comes from the energy dashboard,
+`capacity_kwh` or is learned from history. Texts follow the user's language
+(German or English); entity states use the integration's translations.
+
+Two cards are available in the card picker: `custom:xt500-energy-card` (the
+full interface) and `custom:xt500-energy-mini-card` (compact card with editor
+for any dashboard).
+
+### Classic dashboard
+
+The previous strategy `custom:xt500-energy-manager` is still shipped. Register
+`/xt500_energy_manager/xt500-energy-dashboard-strategy.js` as a JavaScript
+module to use it. It uses only built-in Home Assistant cards and includes
 status, power flows, manual and automatic charging, normal-operation limits,
-adaptive tuning, and a collapsible operating guide.
+adaptive tuning, a collapsible operating guide and the HA energy pages.
 
 With SunEnergyXT 1.1.2 or newer, the integration also discovers the original
 daily PV production (`PD`), grid charging (`GD1`), grid export (`GD2`), and

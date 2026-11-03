@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Final
 
 DOMAIN: Final = "xt500_energy_manager"
-VERSION: Final = "1.11.3"
+VERSION: Final = "1.12.0"
 PLATFORMS: Final = (
     "sensor",
     "binary_sensor",
@@ -206,3 +206,5 @@ DEFAULT_SETTINGS: Final = {
 }
 
 FRONTEND_URL: Final = "/xt500_energy_manager/xt500-energy-dashboard-strategy.js"
+# Neue Oberfläche: wird global geladen und braucht keine Lovelace-Ressource
+UI_URL: Final = "/xt500_energy_manager/xt500-energy-ui.js"

@@ -1,7 +1,7 @@
 {
   "domain": "xt500_energy_manager",
   "name": "XT500 Energy Manager",
-  "version": "1.11.3",
+  "version": "1.12.0",
   "documentation": "https://github.com/achim1985/xt500-energy-manager",
   "issue_tracker": "https://github.com/achim1985/xt500-energy-manager/issues",
   "codeowners": [
@@ -12,6 +12,7 @@
   "iot_class": "local_push",
   "requirements": [],
   "dependencies": [
+    "frontend",
     "lovelace"
   ]
 }

@@ -36,3 +36,9 @@ jobs:
 
       - name: Dashboard-Strategie testen
         run: node --test tests/test_dashboard_strategy.mjs
+
+      - name: Oberfläche prüfen
+        run: node --check custom_components/xt500_energy_manager/frontend/xt500-energy-ui.js
+
+      - name: Oberfläche testen
+        run: node --test tests/test_energy_ui.mjs

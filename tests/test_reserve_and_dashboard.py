@@ -118,25 +118,28 @@ class DashboardTest(unittest.IsolatedAsyncioTestCase):
         exec(compile(tree,'dashboard_setup.py','exec'),self.ns)
     async def run_setup(self):await self.ns['async_ensure_dashboard'](self.hass,self.entry)
     async def test_first_install(self):
-        await self.run_setup();self.assertEqual(len(self.resources.items),1)
+        await self.run_setup();self.assertEqual(self.resources.items,[])
         self.assertTrue(self.collection.items[0]['show_in_sidebar'])
-        self.assertEqual(self.hass.data['lovelace'].dashboards['xt500-energiemanager'].config,{'strategy':{'type':'custom:xt500-energy-manager','dashboard_path':'xt500-energiemanager'}})
+        self.assertEqual(self.hass.data['lovelace'].dashboards['xt500-energiemanager'].config,{'strategy':{'type':'custom:xt500-energy'}})
         self.notify.assert_not_called()
     async def test_deliberate_delete(self):
         await self.run_setup();self.hass.data['lovelace'].dashboards.clear();await self.run_setup()
         self.assertEqual(len(self.collection.items),1);self.assertFalse(self.hass.data['lovelace'].dashboards)
     async def test_existing_custom_dashboard(self):
-        d=Dashboard({'strategy':{'type':'custom:xt500-energy-manager'},'custom':True});self.hass.data['lovelace'].dashboards['custom']=d
-        await self.run_setup();self.assertEqual(d.saves,0);self.assertEqual(self.collection.items,[])
+        for kind in ('custom:xt500-energy-manager','custom:xt500-energy'):
+            self.hass.saved.clear()
+            d=Dashboard({'strategy':{'type':kind},'custom':True});self.hass.data['lovelace'].dashboards={'custom':d}
+            await self.run_setup();self.assertEqual(d.saves,0);self.assertEqual(self.collection.items,[])
     async def test_collision(self):
         d=Dashboard({'views':[{'title':'Private'}]});self.hass.data['lovelace'].dashboards['xt500-energiemanager']=d
         await self.run_setup();self.assertEqual(d.saves,0);self.assertIn('xt500-energiemanager-2',self.hass.data['lovelace'].dashboards)
     async def test_legacy_and_opt_out(self):
         for data in ({},{'auto_dashboard':False}):self.entry.data=data;await self.run_setup()
         self.assertEqual(self.resources.items,[]);self.assertEqual(self.collection.items,[])
-    async def test_versioned_resource(self):
-        self.resources.items=[{'url':const.FRONTEND_URL+'?v=old','type':'module'}]
-        await self.run_setup();self.assertEqual(len(self.resources.items),1)
+    async def test_existing_resources_untouched(self):
+        self.resources.items=[{'url':const.FRONTEND_URL+'?v=old','type':'css'}]
+        await self.run_setup();self.assertEqual(self.resources.items,[{'url':const.FRONTEND_URL+'?v=old','type':'css'}])
+        self.assertIn('xt500-energiemanager',self.hass.data['lovelace'].dashboards);self.notify.assert_not_called()
     async def test_unsupported_ha(self):
         self.hass.data['websocket_api']={}
         with self.assertLogs(self.ns['_LOGGER'],level='ERROR'):await self.run_setup()
@@ -152,15 +155,9 @@ class DashboardTest(unittest.IsolatedAsyncioTestCase):
         d=self.hass.data['lovelace'].dashboards['xt500-energiemanager'];d.async_save=AsyncMock()
         await self.run_setup();self.assertEqual(len(self.collection.items),1);d.async_save.assert_awaited_once()
 
-    async def test_yaml_resources_fail_visibly_without_dashboard_write(self):
+    async def test_yaml_resources_need_no_resource(self):
         self.hass.data['lovelace'].resources=S(loaded=True,async_items=lambda:[])
-        with self.assertLogs(self.ns['_LOGGER'],level='ERROR'):await self.run_setup()
-        self.notify.assert_called_once();self.assertEqual(self.collection.items,[])
-    async def test_wrong_resource_type_is_preserved_and_reported(self):
-        self.resources.items=[{'url':const.FRONTEND_URL,'type':'css'}]
-        with self.assertLogs(self.ns['_LOGGER'],level='ERROR'):await self.run_setup()
-        self.notify.assert_called_once();self.assertEqual(self.collection.items,[])
-        self.assertEqual(self.resources.items[0]['type'],'css')
+        await self.run_setup();self.notify.assert_not_called();self.assertEqual(len(self.collection.items),1)
     async def test_customized_pending_dashboard_is_preserved(self):
         self.hass.saved['xt500_energy_manager.dashboard_setup']={'pending_path':'xt500-energiemanager'}
         d=Dashboard({'views':[{'title':'User change'}]})

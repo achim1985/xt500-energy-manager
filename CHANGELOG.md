@@ -1,5 +1,33 @@
 # Änderungsprotokoll
 
+## 1.12.0 – 2026-11-03
+
+- Neue Bedienoberfläche als Dashboard-Strategie `custom:xt500-energy` mit den
+  Bereichen Übersicht, Steuern, Verlauf und Technik. Sie wird von der
+  Integration global geladen und braucht keine Lovelace-Ressource.
+- Übersicht mit Ladestand-Ring, Zustand in Klartext, animiertem Energiefluss,
+  Betriebsbereitschaft, Vorrang-Treppe „Wer steuert gerade?“, Zyklusladung und
+  Tageswerten.
+- Steuern mit erklärten Auswahlkarten, Akku-Grenzen als Balken, Info-Knöpfen,
+  Rückfragen vor riskanten Aktionen und Rückmeldung, ob eine Änderung
+  übernommen wurde.
+- Verlauf mit Ladezustand und Leistungen, Ereignis-Zeitleiste aus dem Logbuch,
+  Energie für 7 Tage, 30 Tage und 12 Monate sowie Liste der Vollladungen.
+- PV-Prognose und vorausgerechneter Ladezustand aus dem Energie-Dashboard von
+  Home Assistant, inklusive Hinweis, ob die Sonne für die nächste Zyklusladung
+  reicht. Akkukapazität aus dem Energie-Dashboard, der Kartenkonfiguration oder
+  aus dem Verlauf gelernt.
+- Technik mit Einrichtungs-Check, Regelung live, Sollwerten „berechnet“ gegen
+  „am Gerät“, Diagnose und Feinabstimmung.
+- Kompaktkarte `custom:xt500-energy-mini-card` mit Editor für beliebige
+  Dashboards; große Oberfläche auch als Karte `custom:xt500-energy-card`.
+- Deutsch und Englisch, Zustände über die Übersetzungen der Integration;
+  Nicht-Admins standardmäßig nur Anzeige; mehrere XT500 über eine Auswahl.
+- Die automatische Einrichtung legt bei Erstinstallation das neue Dashboard an
+  und braucht keine Ressource mehr. Bestehende Dashboards, auch mit der
+  bisherigen Strategie `custom:xt500-energy-manager`, bleiben unverändert.
+- Dokumentation mit neuen Screenshots; Tests für Oberfläche und Einrichtung.
+
 ## 1.11.2 – 2026-10-12
 
 - Gespeichertes Normal-Ladelimit gegen Geräte-Rückmeldungen während Schreibfehlern,
