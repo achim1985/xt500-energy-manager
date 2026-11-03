@@ -58,3 +58,29 @@ test("Version der Oberfläche passt zur Integration", () => {
   const match = source.match(/const VERSION = '([^']+)'/);
   assert.equal(match?.[1], manifest.version);
 });
+
+test("Live-Updates erhalten Scrollposition über Shadow-DOM-Grenzen", () => {
+  const { registry } = load();
+  const card = new (registry.get("xt500-energy-card"))();
+  const page = { scrollTop: 900, scrollLeft: 0, parentNode: null };
+  const panel = { scrollTop: 480, scrollLeft: 5, parentNode: page };
+  card.parentNode = { host: panel };
+  let updates = 0;
+  card._updaters = [() => {
+    updates++;
+    // Layoutänderung oberhalb des sichtbaren Bereichs.
+    panel.scrollTop = 320;
+    panel.scrollLeft = 0;
+    page.scrollTop = 760;
+  }];
+  card._update();
+  assert.equal(updates, 1, "Live-Werte werden weiterhin aktualisiert");
+  assert.equal(panel.scrollTop, 480);
+  assert.equal(panel.scrollLeft, 5);
+  assert.equal(page.scrollTop, 900);
+  // Benutzer scrollt weiter: diese neue Position muss gelten.
+  panel.scrollTop = 650;
+  card._update();
+  assert.equal(panel.scrollTop, 650);
+  assert.equal(updates, 2);
+});

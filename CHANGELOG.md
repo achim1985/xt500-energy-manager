@@ -1,5 +1,11 @@
 # Änderungsprotokoll
 
+## 1.12.1 – 2026-11-03
+
+- Scrollposition bei Live-Updates der neuen Oberfläche stabilisiert, auch bei
+  verschachtelten Home-Assistant-Scrollbereichen. Werte bleiben live; manuelles
+  Scrollen wird nicht durch verzögerte Rücksprünge unterbrochen.
+
 ## 1.12.0 – 2026-11-03
 
 - Neue Bedienoberfläche als Dashboard-Strategie `custom:xt500-energy` mit den
