@@ -130,6 +130,11 @@ const EN = {
   'Ladezustand': 'State of charge', 'Leistung': 'Power', 'lädt …': 'loading …', 'Verlauf konnte nicht geladen werden': 'History could not be loaded',
   ' (+ lädt)': ' (+ charging)', 'Was ist passiert?': 'What happened?', 'Keine Ereignisse im Zeitraum.': 'No events in this period.',
   'Mehr anzeigen': 'Show more', 'Energie': 'Energy', '7 Tage': '7 days', '30 Tage': '30 days', '12 Monate': '12 months',
+  'PV-Eingänge': 'PV inputs', 'Leistung je PV-Eingang': 'Power per PV input', 'Abweichung vom Mittelwert': 'Deviation from average',
+  'Ø im Zeitraum': 'Avg. in period', 'jetzt': 'now', 'Eingang': 'Input', 'Auffällig': 'Conspicuous', 'unauffällig': 'normal',
+  'Eingang {n} liegt im Schnitt {p} % unter den anderen – Verschattung, Verschmutzung oder Defekt prüfen.': 'Input {n} averages {p} % below the others – check for shading, dirt or a defect.',
+  'Alle PV-Eingänge liefern im Zeitraum ähnlich viel.': 'All PV inputs delivered similar power in this period.',
+  'Verglichen wird nur bei Sonne (Mittel über 100 W). Eingänge mit unterschiedlicher Ausrichtung weichen von Natur aus ab.': 'Compared only in daylight (average above 100 W). Inputs with different orientations naturally deviate.',
   'Statistik konnte nicht geladen werden': 'Statistics could not be loaded', 'Vollladungen': 'Full charges',
   'Bestätigte Vollladungen, soweit HA sie im Logbuch aufbewahrt.': 'Confirmed full charges, as far as HA keeps them in the logbook.',
   'laut Zykluszähler (vor {d} Tagen)': 'per cycle counter ({d} days ago)',
@@ -1285,7 +1290,7 @@ function lineChart(ctx, { series, height = 190, yFmt, area, bands = [], now = fa
       const i = clamp(Math.round(((e.clientX - r.left - padL) / (W - padL - padR)) * (n - 1)), 0, n - 1);
       cross.setAttribute('x1', x(i)); cross.setAttribute('x2', x(i)); cross.style.opacity = 1;
       const tm = new Date(data.start + ((data.end - data.start) * i) / (n - 1));
-      tip.innerHTML = `<b>${hrs > 24 ? fmtDateTime(tm) : fmtTime(tm)}</b>` + rs.map((s) => `<span><i style="background:${s.color}"></i>${t(s.label)} ${s.v[i] == null ? '—' : s.unit === '%' ? fmt(s.v[i]) + ' %' : fmtW(s.v[i])}</span>`).join('');
+      tip.innerHTML = `<b>${hrs > 24 ? fmtDateTime(tm) : fmtTime(tm)}</b>` + rs.map((s) => `<span><i style="background:${s.color}"></i>${t(s.label)} ${s.v[i] == null ? '—' : s.unit === '%' ? fmt(s.v[i]) + ' %' : s.unit === '±%' ? (s.v[i] > 0 ? '+' : '') + fmt(s.v[i]) + ' %' : fmtW(s.v[i])}</span>`).join('');
       tip.style.opacity = 1; tip.style.left = clamp(x(i) + 12, 0, W - 150) + 'px';
     };
     wrap.onpointerleave = () => { cross.style.opacity = 0; tip.style.opacity = 0; };
@@ -1514,6 +1519,108 @@ function forecastCard(ctx) {
   return el;
 }
 
+// ---------- PV-Eingänge (MPPT) vergleichen ----------
+
+const PV_COLORS = ['var(--amber)', 'var(--energy)', 'var(--cool)', 'var(--media)', 'var(--accent)', 'var(--heat)'];
+
+// Einzelne PV-Eingänge des Geräts finden: gleiches Gerät wie die PV-Quelle, Name „PV n …“, Einheit W
+async function findPvInputs(ctx) {
+  const states = ctx.hass.states, main = ctx.srcId('pv_power');
+  if (!main) return [];
+  ctx.cache.pvInputs ??= {}; // je Speicher (PV-Quelle) getrennt
+  if (ctx.cache.pvInputs[main]) return ctx.cache.pvInputs[main];
+  const re = /(?:^|[^a-z0-9])pv[\s_-]*(\d{1,2})(?![0-9])/i;
+  let reg = null;
+  try { reg = await ctx.hass.callWS({ type: 'config/entity_registry/list_for_display' }); } catch { /* Fallback über den Namen */ }
+  const byId = new Map((reg?.entities || []).map((e) => [e.ei, e]));
+  const dev = byId.get(main)?.di;
+  const prefix = main.includes('_pv') ? main.slice(0, main.indexOf('_pv')) : '';
+  const found = new Map();
+  for (const [id, st] of Object.entries(states)) {
+    if (!id.startsWith('sensor.') || id === main || st.attributes?.unit_of_measurement !== 'W') continue;
+    const m = re.exec(id) || re.exec(st.attributes?.friendly_name || '');
+    if (!m || /spannung|strom\b|voltage|current|energ/i.test(id)) continue;
+    if (dev ? byId.get(id)?.di !== dev : prefix && !id.startsWith(prefix)) continue;
+    const n = Number(m[1]);
+    if (!found.has(n) || /leistung|power/i.test(id)) found.set(n, id);
+  }
+  const list = [...found.entries()].sort((a, b) => a[0] - b[0]).map(([n, id], i) => ({ n, id, label: 'PV ' + n, color: PV_COLORS[i % PV_COLORS.length] }));
+  if (list.length > 1 || reg) ctx.cache.pvInputs[main] = list;
+  return list;
+}
+
+function pvInputsCard(ctx) {
+  if (!ctx.hass.callWS) return null;
+  const el = card(t('PV-Eingänge'), 'mdi:solar-panel-large');
+  el.hidden = true;
+  const kfmt = (v) => (Math.abs(v) >= 1000 ? fmt(v / 1000, 1) + 'k' : fmt(v));
+  let inputs = [], pwChart = null, devChart = null, rows = null, verdict = null, hours = 24, gen = 0;
+  const hist = (hh) => {
+    const my = ++gen;
+    (async () => {
+      hours = hh ?? hours;
+      if (!inputs.length) return;
+      const end = new Date(), start = new Date(end - hours * 3600e3);
+      const res = await ctx.hass.callWS({ type: 'history/history_during_period', start_time: start.toISOString(), end_time: end.toISOString(),
+        entity_ids: inputs.map((i) => i.id), minimal_response: true, no_attributes: true, significant_changes_only: false });
+      if (my !== gen) return;
+      const n = 240, data = { start: +start, end: +end };
+      const rs = inputs.map((i) => resample((res[i.id] || []).map((p) => [(p.lu ?? p.lc) * 1000, parseFloat(p.s)]).filter((p) => Number.isFinite(p[1])), +start, +end, n));
+      const at = (k) => +start + ((+end - +start) * k) / (n - 1);
+      const sum = inputs.map(() => 0), cnt = inputs.map(() => 0);
+      inputs.forEach((i, j) => { data['p' + j] = []; data['d' + j] = []; });
+      for (let k = 0; k < n; k++) {
+        const vals = rs.map((r) => r[k]), ok = vals.filter((v) => v != null);
+        const mean = ok.length > 1 ? ok.reduce((a, b) => a + b, 0) / ok.length : null;
+        vals.forEach((v, j) => {
+          if (v != null) data['p' + j].push([at(k), v]);
+          if (v != null && mean != null && mean >= 100) { const d = ((v - mean) / mean) * 100; data['d' + j].push([at(k), d]); sum[j] += d; cnt[j]++; }
+        });
+      }
+      pwChart.setData(data); devChart.setData(data);
+      const avg = sum.map((x, j) => (cnt[j] > 20 ? x / cnt[j] : null));
+      const worst = avg.reduce((b, v, j) => (v != null && (b < 0 || v < avg[b]) ? j : b), -1);
+      const bad = worst >= 0 && avg[worst] <= -10;
+      verdict.className = 'banner ' + (bad ? 'warn' : 'info');
+      fill(verdict, icon(bad ? 'mdi:alert-circle-outline' : 'mdi:check-circle-outline'), h('span', null,
+        avg.every((v) => v == null) ? t('Verglichen wird nur bei Sonne (Mittel über 100 W). Eingänge mit unterschiedlicher Ausrichtung weichen von Natur aus ab.')
+          : bad ? t('Eingang {n} liegt im Schnitt {p} % unter den anderen – Verschattung, Verschmutzung oder Defekt prüfen.', { n: inputs[worst].n, p: fmt(-avg[worst]) })
+          : t('Alle PV-Eingänge liefern im Zeitraum ähnlich viel.')));
+      inputs.forEach((i, j) => {
+        const c = rows?.querySelector(`[data-j="${j}"] .avg`); if (!c) return;
+        c.textContent = avg[j] == null ? '—' : (avg[j] > 0 ? '+' : '') + fmt(avg[j]) + ' %';
+        c.dataset.bad = avg[j] != null && avg[j] <= -10 ? '1' : '';
+      });
+    })().catch((e) => console.error(e));
+  };
+  const live = () => {
+    if (!rows) return;
+    const vals = inputs.map((i) => { const v = parseFloat(ctx.hass.states[i.id]?.state); return Number.isFinite(v) ? v : null; });
+    const ok = vals.filter((v) => v != null), mean = ok.length > 1 ? ok.reduce((a, b) => a + b, 0) / ok.length : null;
+    inputs.forEach((i, j) => {
+      const r = rows.querySelector(`[data-j="${j}"]`); if (!r) return;
+      r.querySelector('.now').textContent = vals[j] == null ? '—' : fmtW(vals[j]);
+      const d = vals[j] != null && mean != null && mean >= 100 ? ((vals[j] - mean) / mean) * 100 : null;
+      const c = r.querySelector('.dev'); c.textContent = d == null ? '—' : (d > 0 ? '+' : '') + fmt(d) + ' %'; c.dataset.bad = d != null && d <= -15 ? '1' : '';
+    });
+  };
+  (async () => {
+    inputs = await findPvInputs(ctx);
+    if (inputs.length < 2) return;
+    pwChart = lineChart(ctx, { height: 190, yFmt: kfmt, series: inputs.map((i, j) => ({ key: 'p' + j, label: i.label, color: i.color, unit: 'W' })) });
+    devChart = lineChart(ctx, { height: 150, yFmt: (v) => fmt(v) + '%', series: inputs.map((i, j) => ({ key: 'd' + j, label: i.label, color: i.color, unit: '±%' })) });
+    rows = h('div.pvrows', null, h('div.pvr.head', null, h('span'), h('span', null, t('Eingang')), h('span', null, 'Ist'), h('span', null, '±'), h('span', null, t('Ø im Zeitraum'))),
+      inputs.map((i, j) => h('button.pvr', { 'data-j': j, onclick: () => ctx.moreInfo(i.id) }, h('i', { style: { background: i.color } }), h('span', null, i.label), h('b.now', null, '—'), h('b.dev', null, '—'), h('b.avg', null, '—'))));
+    verdict = h('div.banner.info');
+    fill(el, h('header.card-h', null, icon('mdi:solar-panel-large'), h('h3', null, t('PV-Eingänge'))), verdict,
+      h('div.sub-h', null, t('Leistung je PV-Eingang')), pwChart.el,
+      h('div.sub-h', null, t('Abweichung vom Mittelwert')), devChart.el, rows,
+      h('p.hint', null, t('Verglichen wird nur bei Sonne (Mittel über 100 W). Eingänge mit unterschiedlicher Ausrichtung weichen von Natur aus ab.')));
+    el.hidden = false; live(); ctx.watch(live); hist();
+  })().catch((e) => console.error(e));
+  return { el, load: (hh) => { hours = hh; if (inputs.length > 1) hist(hh); } };
+}
+
 function historyView(ctx) {
   let hours = 24;
   const fl = floorInfo(ctx);
@@ -1524,10 +1631,11 @@ function historyView(ctx) {
   const legend = h('div.legend.series', null, pw.map((s) => h('span', null, h('i', { style: { background: s.color } }), t(s.label) + (s.note ? t(s.note) : ''))));
   const status = h('small.load');
   const ev = eventsCard(ctx);
+  const pvc = pvInputsCard(ctx);
   const ranges = [6, 24, 48].map((hh) => h('button' + (hh === hours ? '.sel' : ''), { onclick: (e) => { hours = hh; ranges.forEach((b) => b.classList.toggle('sel', b === e.currentTarget)); load(); } }, hh + ' h'));
   const load = async () => {
     status.textContent = t('lädt …');
-    ctx.cache.loadEvents?.(hours);
+    ctx.cache.loadEvents?.(hours); pvc?.load(hours);
     try { const d = await loadHistory(ctx, hours); socChart.setData(d); pwChart.setData(d); status.textContent = ''; }
     catch (e) { console.error(e); status.textContent = t('Verlauf konnte nicht geladen werden'); }
   };
@@ -1536,6 +1644,7 @@ function historyView(ctx) {
     h('div.span-12', null, h('div.seg.range-sel', null, ranges), status),
     h('div.span-8.stack', null, card(t('Ladezustand'), 'mdi:battery-medium', socChart.el), card(t('Leistung'), 'mdi:chart-bell-curve-cumulative', pwChart.el, legend)),
     h('div.span-4', null, ev),
+    pvc ? h('div.span-12', null, pvc.el) : null,
     h('div.span-12', null, forecastCard(ctx)),
     h('div.span-8', null, statsCard(ctx)),
     h('div.span-4', null, fullChargeCard(ctx)));
@@ -2271,6 +2380,13 @@ input[type=range]::-moz-range-thumb { width: 18px; height: 18px; border-radius: 
 .fc { display: flex; flex-direction: column; }
 .fc-r { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--border); font-size: 13px; }
 .fc-r:first-child { border-top: 0; } .fc-r ha-icon { color: var(--energy); } .fc-r span { flex: 1; } .fc-r small { color: var(--muted); text-align: right; }
+
+/* PV-Eingänge */
+.pvrows { display: flex; flex-direction: column; margin-top: 12px; }
+.pvr { display: grid; grid-template-columns: 14px 1fr 70px 64px 90px; gap: 8px; align-items: center; padding: 7px 4px; border-top: 1px solid var(--border); font-size: 13px; text-align: left; width: 100%; }
+.pvr.head { border-top: 0; color: var(--faint); font-size: 11.5px; } .pvr b { font-weight: 600; font-variant-numeric: tabular-nums; text-align: right; } .pvr.head span:nth-child(n+3) { text-align: right; }
+.pvr i { width: 8px; height: 8px; border-radius: 50%; } .pvr b[data-bad="1"] { color: var(--danger); }
+.banner.warn { background: color-mix(in srgb, var(--warn) 14%, var(--surface-2)); }
 
 /* Technik */
 .checks { display: flex; flex-direction: column; gap: 8px; }
