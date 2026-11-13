@@ -1,5 +1,14 @@
 # Änderungsprotokoll
 
+## 1.13.0 – 2026-11-13
+
+- Verlauf: neue Karte „PV-Eingänge“. Die einzelnen PV-Eingänge des Geräts
+  werden automatisch erkannt (je Speicher, ohne Konfiguration) und als
+  Leistungskurven, als Abweichung vom Mittelwert und als Tabelle mit aktueller
+  und durchschnittlicher Abweichung dargestellt. Ein Eingang, der im Schnitt
+  mindestens 10 % unter den anderen liegt, wird markiert (Verschattung,
+  Verschmutzung, Defekt). Verglichen wird nur bei Sonne (Mittel über 100 W).
+
 ## 1.12.1 – 2026-11-03
 
 - Scrollposition bei Live-Updates der neuen Oberfläche stabilisiert, auch bei
