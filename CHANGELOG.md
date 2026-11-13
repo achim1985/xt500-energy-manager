@@ -1,5 +1,21 @@
 # Änderungsprotokoll
 
+## 1.15.0 – 2026-11-13
+
+- Heute: Energiebilanz als zwei gestapelte Balken („Woher kam der Strom?“ /
+  „Wohin ging er?“) mit Autarkie- und Eigenverbrauchsring. Die Bilanz erscheint
+  nur bei reiner DC-Kopplung; sonst bleiben die Zählerzeilen sichtbar.
+- Energie: neue Ansicht „Herkunft“ (Netz, Akku, PV direkt je Tag) neben den
+  Einzelwerten; Netzbezug und Netzladung sind rot.
+- Verlauf: Netzbezug und Einspeisung als eine Fläche mit Nulllinie; Autarkie
+  und Eigenverbrauch als Ringe. Bezug und Einspeisung werden vor dem Mitteln
+  getrennt, die Autarkie fällt dadurch genauer aus.
+- Autarkie je Tag: bei jungen Statistiken des Hausverbrauchs wird der Wert aus
+  PV + Netz − Akku abgeleitet, statt Teildaten zu zeigen.
+- Fix: unvollständige 5-Minuten-Statistik (z. B. seit einem Neustart) liefert
+  keinen zu kleinen Hausverbrauch mehr.
+- Barrierefreiheit, Übersetzungen und Aufräumen von Listenern verbessert.
+
 ## 1.14.0 – 2026-11-13
 
 - Verlauf: neue Karte „Netz & Autarkie“ mit Autarkie-Verlauf, Netzbezug und
