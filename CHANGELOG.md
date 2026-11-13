@@ -1,5 +1,30 @@
 # Änderungsprotokoll
 
+## 1.14.0 – 2026-11-13
+
+- Verlauf: neue Karte „Netz & Autarkie“ mit Autarkie-Verlauf, Netzbezug und
+  Einspeisung sowie Summen (Ø Autarkie, Eigenverbrauch, Netzbezug, Einspeisung,
+  Hausverbrauch) für den gewählten Zeitraum.
+- Heute: Netzbezug und Hausverbrauch als Balken; darunter Autarkie,
+  Eigenverbrauchsquote, Einspeisung, Netzladung, Off-Grid und Netzbezug ohne
+  Akkuladung.
+- Energie-Balkendiagramm: Netzbezug als erste Reihe (aus dem Stromzähler der
+  Energie-Einstellungen, sonst aus der Netzleistung) und „Autarkie je Tag“
+  für 7 und 30 Tage.
+- Mehrere Speicher: neue Übersicht „Alle Speicher“; jeder Speicher behält seinen
+  eigenen Zwischenspeicher beim Wechsel.
+- Netzsensor mit „Einspeisung positiv“ wird richtig ausgewertet
+  (neues Attribut `source_meter_sign`, wirkt nach einem Neustart).
+- Der geschätzte Hausverbrauch erhält eine `state_class`, damit Langzeitstatistik
+  entsteht.
+- Einheiten: Tagesenergie in Wh/MWh und Leistung in kW im Verlauf werden
+  umgerechnet; Leistungssensoren in kW lösen im Einrichtungs-Check eine Warnung aus.
+- Weniger Last: Verläufe ab 12 Stunden nutzen die 5-Minuten-Statistik, kurzer
+  Zwischenspeicher für Abfragen, Timer und Beobachter werden beim Verlassen
+  freigegeben, Diagramme zeichnen gedrosselt.
+- Bedienung: Hinweiskarte bei fehlenden Sensoren, Diagramme per Tastatur
+  bedienbar, Fokusrahmen, bessere Beschriftungen.
+
 ## 1.13.0 – 2026-11-13
 
 - Verlauf: neue Karte „PV-Eingänge“. Die einzelnen PV-Eingänge des Geräts

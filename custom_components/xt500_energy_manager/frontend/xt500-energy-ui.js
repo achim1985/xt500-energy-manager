@@ -7,7 +7,7 @@
 // Status-Entität. Es gibt keine fest eingetragenen Entitäts-IDs.
 
 const DOMAIN = 'xt500_energy_manager';
-const VERSION = '1.13.0';
+const VERSION = '1.14.0';
 const BLUEPRINT_PATH = 'xt500_energy_manager/dynamic_tariff_charging.yaml';
 
 // ---------- Sprache ----------
@@ -19,11 +19,17 @@ let NUMLOC = 'de';
 const EN = {
   'Übersicht': 'Overview', 'Steuern': 'Control', 'Verlauf': 'History', 'Technik': 'Technical',
   'Energiemanager': 'Energy manager', 'Regelt': 'Active', 'Aus': 'Off', 'Störung': 'Fault', 'Pause': 'Paused',
+  'Alle Speicher': 'All storages', 'lädt {p}': 'charging {p}', 'entlädt {p}': 'discharging {p}', 'Ruhe': 'Idle', 'Summe': 'Total',
   'Noch kein XT500 eingerichtet': 'No XT500 set up yet',
   'Richte zuerst „XT500 Energy Manager“ unter Einstellungen → Geräte & Dienste ein.': 'Set up “XT500 Energy Manager” under Settings → Devices & services first.',
   'Nur Anzeige – Änderungen sind Administratoren vorbehalten.': 'View only – changes are reserved for administrators.',
   'Nur Administratoren dürfen Einstellungen ändern.': 'Only administrators can change settings.',
   'Abbrechen': 'Cancel', 'OK': 'OK', 'Schließen': 'Close',
+  'Diagramm': 'Chart', 'Erklärung': 'Explanation', 'Ist': 'Actual',
+  'Nicht angezeigte Auswertungen': 'Evaluations not shown',
+  'kein Netzsensor konfiguriert': 'no grid sensor configured', 'kein Hausverbrauchs-Sensor': 'no home consumption sensor', 'Energie-Balken': 'Energy bars',
+  'keine Tageswerte hinterlegt': 'no daily energy values configured', 'Prognose & Statistik': 'Forecast & statistics', 'keine Verbindung zur Verlaufsdatenbank': 'no connection to the history database',
+  'Die Quellsensoren legst du in den Optionen der Integration fest, die PV-Prognose im Energie-Dashboard.': 'Set the source sensors in the integration options and the PV forecast in the Energy dashboard.',
   // Zustandssatz
   'Energiemanager ist ausgeschaltet': 'Energy manager is switched off',
   'Der XT500 arbeitet mit seinen eigenen Einstellungen. Es werden keine Sollwerte geschrieben.': 'The XT500 runs on its own settings. No setpoints are written.',
@@ -61,6 +67,8 @@ const EN = {
   'Energiefluss': 'Energy flow', 'PV': 'PV', 'Akku': 'Battery', 'Netz': 'Grid', 'Haus': 'House',
   'davon AC {p}': 'incl. AC {p}', 'XT500-PV': 'XT500 PV', 'gesperrt': 'blocked', 'Bezug': 'import', 'Einspeisung': 'export',
   'ausgeglichen': 'balanced', 'kein Zähler': 'no meter', 'Autarkie {p} %': 'Self-sufficiency {p} %',
+  'Sensor meldet in {u}: {n}': 'Sensor reports in {u}: {n}', 'Der Energiemanager rechnet mit Watt. Bitte einen Sensor in W verwenden, sonst regelt er falsch.': 'The energy manager works in watts. Please use a sensor in W, otherwise regulation will be wrong.',
+  'Netz & Autarkie': 'Grid & self-sufficiency', 'Autarkie': 'Self-sufficiency', 'Ø Autarkie': 'Avg. self-sufficiency', 'Netzbezug': 'Grid import', 'Netzbezug und Einspeisung': 'Grid import and export', 'Hausverbrauch': 'Home consumption',
   // Gesundheit & Check
   'Messwerte': 'Inputs', 'gültig': 'valid', 'ungültig': 'invalid', 'Regelung': 'Control', 'bereit': 'ready', 'nicht bereit': 'not ready',
   'aus': 'off', 'Verbindung': 'Connection', 'stabil': 'stable', 'Wiederherstellung': 'Recovery',
@@ -89,7 +97,7 @@ const EN = {
   'Fällig · Start um {t}': 'Due · starts at {t}', 'Automatik aus': 'Automatic off', 'Nächste {t}': 'Next {t}',
   'Aktiv bis {t}': 'Active until {t}', 'Angefordert': 'Requested', 'Keine Anforderung': 'No request',
   // Heute & Zyklus
-  'Heute': 'Today', 'PV-Erzeugung': 'PV generation', 'Ins Haus/Netz abgegeben': 'Delivered to house/grid', 'Netzladung': 'Grid charging', 'Off-Grid': 'Off-grid',
+  'Heute': 'Today', 'PV-Erzeugung': 'PV generation', 'Ins Haus/Netz abgegeben': 'Delivered to house/grid', 'Netzladung': 'Grid charging', 'Eigenverbrauch': 'Self-consumption', 'Netzbezug ohne Akkuladung': 'Grid import excl. battery charging', 'Schätzung: (PV − Einspeisung) / PV': 'Estimate: (PV − export) / PV', 'Off-Grid': 'Off-grid',
   '{i} Tage': '{i} days', 'läuft gerade': 'running now', 'nächste: {t}': 'next: {t}', 'Vollladung: {s}': 'Full charge: {s}',
   'Jetzt starten': 'Start now', 'Einstellungen': 'Settings', 'Tage auf 0': 'Reset days',
   'Zyklusladung jetzt starten?': 'Start cycle charge now?',
@@ -137,6 +145,7 @@ const EN = {
   'Verglichen wird nur bei Sonne (Mittel über 100 W). Eingänge mit unterschiedlicher Ausrichtung weichen von Natur aus ab.': 'Compared only in daylight (average above 100 W). Inputs with different orientations naturally deviate.',
   'Statistik konnte nicht geladen werden': 'Statistics could not be loaded', 'Vollladungen': 'Full charges',
   'Bestätigte Vollladungen, soweit HA sie im Logbuch aufbewahrt.': 'Confirmed full charges, as far as HA keeps them in the logbook.',
+  'Autarkie je Tag': 'Self-sufficiency per day', 'Autarkie': 'Self-sufficiency',
   'laut Zykluszähler (vor {d} Tagen)': 'per cycle counter ({d} days ago)',
   'Noch keine Vollladung im Zeitraum.': 'No full charge in this period yet.', 'Letzter manueller Start: {t}': 'Last manual start: {t}',
   // Ereignistexte
@@ -288,6 +297,8 @@ const h = (tag, props, ...kids) => {
 const fill = (el, ...kids) => el.replaceChildren(...kids.flat(Infinity).filter((k) => k != null && k !== false));
 const icon = (name) => { const i = document.createElement('ha-icon'); i.icon = name; i.setAttribute('icon', name); return i; };
 const BAD = new Set(['unknown', 'unavailable', '', undefined, null]);
+// Tagesenergie-Sensoren melden teils Wh oder MWh statt kWh
+const kwhFactor = (so) => { const u = so?.attributes?.unit_of_measurement; return u === 'Wh' ? 1e-3 : u === 'MWh' ? 1e3 : u === 'GWh' ? 1e6 : 1; };
 const num = (so) => { if (!so || BAD.has(so.state)) return null; const v = parseFloat(so.state); return Number.isFinite(v) ? v : null; };
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 const fmt = (v, d = 0) => (v == null ? '—' : new Intl.NumberFormat(NUMLOC, { minimumFractionDigits: d, maximumFractionDigits: d }).format(v));
@@ -345,6 +356,8 @@ function makeCtx(card) {
     get ro() { return card._ro; },
     get config() { return card._config || {}; },
     get managerId() { return card._manager; },
+    get managers() { return card._managers; },
+    switchManager: (m) => card._switchManager(m),
     id: (key) => card._ids[key],
     has: (key) => !!card._ids[key] && !!card._hass.states[card._ids[key]],
     s: (key) => card._hass.states[card._ids[key]],
@@ -355,7 +368,14 @@ function makeCtx(card) {
     srcId: (name) => card._hass.states[card._ids.status]?.attributes?.[`source_${name}_entity`] || null,
     src: (name) => { const id = ctx.srcId(name); return id ? card._hass.states[id] : undefined; },
     hasSrc: (name) => !!ctx.srcId(name),
-    srcN: (name) => num(ctx.src(name)),
+    // Netzsensor: je nach Einrichtung ist + Bezug oder + Einspeisung; die UI rechnet immer mit + Bezug
+    gridSign: () => (card._hass.states[card._ids.status]?.attributes?.source_meter_sign === 'export_positive' ? -1 : 1),
+    srcN: (name) => {
+      let v = num(ctx.src(name)); if (v == null) return v;
+      if (name === 'public_grid_power') v *= ctx.gridSign();
+      else if (name.endsWith('daily_energy')) v *= kwhFactor(ctx.src(name));
+      return v;
+    },
     label: (key) => (LABELS[key] ? L2(LABELS[key]) : (ctx.attr(key, 'friendly_name') || key).replace(/^.*?(Energiemanager|energy manager)\s+/i, '')),
     // Zustand in Klartext – bevorzugt mit den Übersetzungen der Integration aus HA
     sl: (key, value) => {
@@ -427,9 +447,8 @@ async function learnCapacity(ctx) {
   ctx.cache.capBusy = true;
   try {
     const end = new Date(), start = new Date(end - 36 * 3600e3);
-    const res = await ctx.hass.callWS({ type: 'history/history_during_period', start_time: start.toISOString(), end_time: end.toISOString(),
-      entity_ids: [socId, pId], minimal_response: true, no_attributes: true, significant_changes_only: false });
-    const pts = (id) => (res[id] || []).map((p) => [(p.lu ?? p.lc) * 1000, parseFloat(p.s)]).filter((p) => Number.isFinite(p[1]));
+    const res = await fetchSeries(ctx, [socId, pId], start, end, true);
+    const pts = (id) => res[id] || [];
     const soc = pts(socId), pw = pts(pId);
     if (soc.length < 3 || pw.length < 3) return;
     // Energie zwischen zwei Zeitpunkten in Wh (Gerätesensor: + Laden)
@@ -528,9 +547,9 @@ function loadForecast(ctx) {
     if (homeId) {
       try {
         const end = new Date(), start = new Date(end - 48 * 3600e3);
-        const res = await ctx.hass.callWS({ type: 'history/history_during_period', start_time: start.toISOString(), end_time: end.toISOString(), entity_ids: [homeId], minimal_response: true, no_attributes: true, significant_changes_only: false });
+        const res = await fetchSeries(ctx, [homeId], start, end, true);
         const sum = new Array(24).fill(0), cnt = new Array(24).fill(0);
-        for (const p of res[homeId] || []) { const v = parseFloat(p.s); if (!Number.isFinite(v)) continue; const hr = new Date((p.lu ?? p.lc) * 1000).getHours(); sum[hr] += v; cnt[hr]++; }
+        for (const [tm, v] of res[homeId] || []) { const hr = new Date(tm).getHours(); sum[hr] += v; cnt[hr]++; }
         sum.forEach((s, i) => { if (cnt[i]) profile[i] = s / cnt[i]; });
       } catch { /* ohne Profil wird der aktuelle Verbrauch genutzt */ }
     }
@@ -661,6 +680,7 @@ function setupIssues(ctx) {
     seen.add(id);
     const so = ctx.hass.states[id];
     if (!so || BAD.has(so.state)) add('warn', t('Sensor nicht verfügbar: {n}', { n: so?.attributes?.friendly_name || id }), id);
+    else if ((/power_entity$|setpoint_entity$/.test(k)) && ['kW', 'MW'].includes(so.attributes?.unit_of_measurement)) add('warn', t('Sensor meldet in {u}: {n}', { u: so.attributes.unit_of_measurement, n: so.attributes.friendly_name || id }), t('Der Energiemanager rechnet mit Watt. Bitte einen Sensor in W verwenden, sonst regelt er falsch.'));
   }
   if (!ctx.hasSrc('public_grid_power')) add('info', t('Kein Netzzähler hinterlegt'), t('Ohne Netzleistung zeigt der Energiefluss das Netz nicht und die Regelung kann nicht auf 0 W regeln.'));
   if (!['pv_daily_energy', 'grid_charge_daily_energy', 'grid_export_daily_energy'].some((s) => ctx.hasSrc(s))) add('info', t('Keine Tageswerte hinterlegt'), t('Die Tagesbilanz und die Langzeitstatistik bleiben leer.'));
@@ -679,7 +699,7 @@ function card(title, iconName, ...body) {
     ...body);
 }
 
-const helpBtn = (ctx, key, title) => (HELP[key] ? h('button.help', { 'aria-label': '?', title: '?', onclick: (e) => { e.stopPropagation(); ctx.help(key, title); } }, icon('mdi:help-circle-outline')) : null);
+const helpBtn = (ctx, key, title) => (HELP[key] ? h('button.help', { 'aria-label': t('Erklärung') + (title ? ': ' + title : ''), title: t('Erklärung'), onclick: (e) => { e.stopPropagation(); ctx.help(key, title); } }, icon('mdi:help-circle-outline')) : null);
 const rowTitle = (ctx, key, label, help) => h('div.row-t', null, h('b', null, label, helpBtn(ctx, key, label)), help ? h('small', null, help) : null);
 
 function toggle(ctx, key, onChange) {
@@ -1001,25 +1021,49 @@ function issueBanner(ctx) {
 }
 
 function todayCard(ctx) {
+  // Balkenzeilen: Zählerwerte der Quellen bzw. Netzwerte aus dem Verlauf seit Mitternacht
+  const hasHome = !!ctx.id('estimated_home_load'), hasGrid = !!ctx.srcId('public_grid_power');
   const items = [
     { src: 'pv_daily_energy', label: t('PV-Erzeugung'), icon: 'mdi:solar-power-variant', tone: 'amber' },
     { src: 'grid_export_daily_energy', label: t('Ins Haus/Netz abgegeben'), icon: 'mdi:transmission-tower-export', tone: 'cool' },
-    { src: 'grid_charge_daily_energy', label: t('Netzladung'), icon: 'mdi:battery-charging', tone: 'energy' },
-    { src: 'offgrid_daily_energy', label: t('Off-Grid'), icon: 'mdi:power-plug-battery-outline', tone: 'media' },
-  ].filter((i) => ctx.src(i.src));
+    hasGrid ? { g: 'impE', target: () => ctx.srcId('public_grid_power'), label: t('Netzbezug'), icon: 'mdi:transmission-tower-import', tone: 'heat' } : null,
+    hasHome ? { g: 'homeE', target: () => ctx.id('estimated_home_load'), label: t('Hausverbrauch'), icon: 'mdi:home-lightning-bolt-outline', tone: 'muted' } : null,
+  ].filter((i) => i && (i.g || ctx.src(i.src)));
   const rows = items.map((i) => {
     const v = h('b.tv'), bar = h('span.tb-f');
-    return { i, v, bar, el: h('button.today-r', { 'data-tone': i.tone, onclick: () => ctx.moreInfo(ctx.srcId(i.src)) }, h('span.today-ic', null, icon(i.icon)), h('span.today-l', null, i.label), v, h('span.tb', null, bar)) };
+    return { i, v, bar, el: h('button.today-r', { 'data-tone': i.tone, onclick: () => ctx.moreInfo(i.g ? i.target() : ctx.srcId(i.src)) }, h('span.today-ic', null, icon(i.icon)), h('span.today-l', null, i.label), v, h('span.tb', null, bar)) };
   });
   const fcBox = h('button.fc-today', { onclick: () => ctx.go('verlauf') });
-  const el = card(t('Heute'), 'mdi:calendar-today', h('div.today', null, rows.map((r) => r.el)), fcBox);
+  const totals = h('div.totals');
+  let g = null; // Netz-Kennzahlen aus dem Verlauf seit Mitternacht (alle 5 Minuten aktualisiert)
+  const tot = (c, l, v) => h('div.tot', null, h('i', { style: { background: c } }), h('span', null, t(l)), h('b', null, v));
+  const paint = () => {
+    const val = (r) => (r.i.g ? (g && g[r.i.g] != null ? g[r.i.g] / 1000 : null) : ctx.srcN(r.i.src) ?? 0);
+    const vals = rows.map(val), max = Math.max(0.1, ...vals.map((v) => v ?? 0));
+    rows.forEach((r, k) => { r.el.hidden = vals[k] == null; r.v.textContent = fmtKWh(vals[k]); r.bar.style.width = ((vals[k] ?? 0) / max) * 100 + '%'; });
+    fill(totals, [g?.autAvg != null ? tot('var(--amber)', 'Autarkie', fmt(g.autAvg) + ' %') : null,
+      g ? tot('var(--energy)', 'Einspeisung', fmtKWh(g.expE / 1000)) : null,
+      g?.selfUse != null && selfUseOk(ctx) ? withTip(tot('var(--amber)', 'Eigenverbrauch', fmt(g.selfUse) + ' %'), t('Schätzung: (PV − Einspeisung) / PV')) : null,
+      g && ctx.src('grid_charge_daily_energy') && ctx.srcN('grid_charge_daily_energy') != null ? tot('var(--heat)', 'Netzbezug ohne Akkuladung', fmtKWh(Math.max(0, g.impE / 1000 - ctx.srcN('grid_charge_daily_energy')))) : null,
+      ctx.src('grid_charge_daily_energy') ? tot('var(--energy)', 'Netzladung', fmtKWh(ctx.srcN('grid_charge_daily_energy') ?? 0)) : null,
+      ctx.src('offgrid_daily_energy') ? tot('var(--media)', 'Off-Grid', fmtKWh(ctx.srcN('offgrid_daily_energy') ?? 0)) : null].filter(Boolean));
+    el.hidden = !items.length && fcBox.hidden && !totals.children.length;
+  };
+  const loadGrid = async () => {
+    if (!hasGrid || !ctx.hass.callWS || document.hidden) return;
+    try {
+      const hrs = Math.max(0.05, (Date.now() - dayStart(0)) / 3600e3);
+      const gs = gridStats(await loadHistory(ctx, hrs, ['grid', 'home', 'pv'], true), 120, hasHome);
+      g = gs.imp.length ? gs : null; paint();
+    } catch (e) { console.error(e); }
+  };
+  loadGrid(); const gi = setInterval(loadGrid, 300e3); ctx.cleanup(() => clearInterval(gi));
+  const el = card(t('Heute'), 'mdi:calendar-today', h('div.today', null, rows.map((r) => r.el)), totals, fcBox);
   ctx.watch(() => {
-    const vals = rows.map((r) => ctx.srcN(r.i.src) ?? 0);
-    const max = Math.max(0.1, ...vals);
-    rows.forEach((r, k) => { r.v.textContent = fmtKWh(vals[k]); r.bar.style.width = (vals[k] / max) * 100 + '%'; });
+    paint();
     const fc = ctx.cache.fc;
     fcBox.hidden = !fc || fc.none;
-    el.hidden = !items.length && fcBox.hidden;
+    el.hidden = !items.length && fcBox.hidden && !totals.children.length;
     if (fcBox.hidden) return;
     fill(fcBox, h('div.fct-h', null, icon('mdi:weather-partly-cloudy'), t('PV-Prognose')),
       h('div.fct', null, h('span', null, t('Rest heute')), h('b', null, '≈ ' + fmtKWh(fcEnergy(fc, Date.now(), dayStart(1))))),
@@ -1063,8 +1107,43 @@ function cycleCard(ctx, withSettings = false) {
   return el;
 }
 
+function storagesCard(ctx) {
+  const ms = ctx.managers;
+  if (!ms || ms.size < 2) return null;
+  const rows = [...ms.entries()].map(([m, ids], i) => {
+    const bar = h('span.stg-fill'), soc = h('b'), pw = h('span.stg-p'), pv = h('span.stg-pv');
+    const row = h('button.stg-row', { type: 'button', onclick: () => ctx.switchManager(m) }, h('span.stg-n', null, managerName(ctx.hass, ids, `XT500 ${i + 1}`)), soc, h('span.stg-bar', null, bar), pw, pv);
+    const read = () => {
+      const S = ctx.hass.states, at = S[ids.status]?.attributes || {};
+      const src = (n) => (at[`source_${n}_entity`] ? num(S[at[`source_${n}_entity`]]) : null);
+      const ac = S[ids.selected_coupling_mode]?.state !== 'dc' && ids.ac_pv_power ? Math.max(0, num(S[ids.ac_pv_power]) ?? 0) : 0;
+      const dc = src('pv_power') == null ? null : Math.max(0, src('pv_power'));
+      return { soc: src('soc'), batt: (num(S[ids.battery_discharge_power]) ?? 0) - (num(S[ids.battery_charge_power]) ?? 0), pv: dc == null && !ac ? null : (dc ?? 0) + ac };
+    };
+    return { m, row, bar, soc, pw, pv, read };
+  });
+  const sum = h('div.stg-sum');
+  const el = card(t('Alle Speicher'), 'mdi:home-battery-outline', h('div.stg', null, ...rows.map((r) => r.row), sum));
+  ctx.watch(() => {
+    let tb = 0, tp = null;
+    for (const r of rows) {
+      const v = r.read();
+      r.row.classList.toggle('sel', r.m === ctx.managerId);
+      r.soc.textContent = v.soc == null ? '—' : fmt(v.soc) + ' %';
+      r.bar.style.width = Math.max(0, Math.min(100, v.soc ?? 0)) + '%';
+      r.pw.textContent = Math.abs(v.batt) < 10 ? t('Ruhe') : t(v.batt < 0 ? 'lädt {p}' : 'entlädt {p}', { p: fmtW(Math.abs(v.batt)) });
+      r.pv.textContent = v.pv == null ? '' : '☀ ' + fmtW(v.pv);
+      tb += v.batt; if (v.pv != null) tp = (tp ?? 0) + v.pv;
+    }
+    sum.textContent = `${t('Summe')}: ${Math.abs(tb) < 10 ? t('Ruhe') : t(tb < 0 ? 'lädt {p}' : 'entlädt {p}', { p: fmtW(Math.abs(tb)) })}${tp == null ? '' : ' · ☀ ' + fmtW(tp)}`;
+  });
+  return el;
+}
+
 function overview(ctx) {
+  const stg = storagesCard(ctx);
   return h('div.grid', null,
+    stg ? h('div.span-12', null, stg) : null,
     h('div.span-12', null, issueBanner(ctx)),
     h('div.span-7', null, heroCard(ctx)),
     h('div.span-5', null, flowCard(ctx)),
@@ -1214,15 +1293,55 @@ const SERIES = [
 ];
 const seriesId = (ctx, s) => (s.src ? ctx.srcId(s.src) : ctx.id(s.id));
 
-async function loadHistory(ctx, hours) {
+// Zeitreihen holen: bei längeren Zeiträumen die 5-Minuten-Statistik (ca. 50× weniger Daten als der Rohverlauf),
+// sonst oder für Sensoren ohne Statistik der Rohverlauf. Ergebnis je Entität: [[ms, Wert], …]
+// Kurzlebiger Promise-Cache (60 s): gleiche Abfrage von mehreren Karten/Tabs geht nur einmal an HA. Aufrufer dürfen das Ergebnis nicht verändern.
+function fetchSeries(ctx, ids, start, end, coarse) {
+  const m = (ctx.cache.series ||= new Map()), now = Date.now();
+  for (const [k, e] of m) if (now - e.at > 60e3) m.delete(k);
+  const key = [[...ids.filter(Boolean)].sort().join(','), !!coarse, Math.floor(+start / 60000), Math.floor(+end / 60000)].join('|');
+  let e = m.get(key);
+  if (!e) {
+    e = { at: now, p: fetchSeriesRaw(ctx, ids, start, end, coarse) };
+    e.p.catch(() => { if (m.get(key) === e) m.delete(key); });
+    m.set(key, e);
+  }
+  return e.p;
+}
+async function fetchSeriesRaw(ctx, ids, start, end, coarse) {
+  const out = {}; let todo = ids.filter(Boolean);
+  if (!todo.length) return out;
+  const range = { start_time: new Date(start).toISOString(), end_time: new Date(end).toISOString() };
+  if (coarse) {
+    try {
+      const r = await ctx.hass.callWS({ type: 'recorder/statistics_during_period', ...range, statistic_ids: todo, period: '5minute', types: ['mean'] });
+      for (const id of todo) { const rows = (r?.[id] || []).filter((x) => x.mean != null); if (rows.length) out[id] = rows.map((x) => [x.start + 150e3, x.mean]); }
+      todo = todo.filter((id) => !out[id]);
+    } catch { /* ohne Statistik gilt der Rohverlauf */ }
+  }
+  if (todo.length) {
+    const res = await ctx.hass.callWS({ type: 'history/history_during_period', ...range, entity_ids: todo, minimal_response: true, no_attributes: true, significant_changes_only: false });
+    for (const id of todo) out[id] = (res[id] || []).map((p) => [(p.lu ?? p.lc) * 1000, parseFloat(p.s)]).filter((p) => Number.isFinite(p[1]));
+  }
+  return out;
+}
+
+async function loadHistory(ctx, hours, keys, coarse = hours >= 12) {
   const end = new Date(), start = new Date(end - hours * 3600e3);
-  const ids = SERIES.map((s) => seriesId(ctx, s)).filter(Boolean);
-  const res = await ctx.hass.callWS({ type: 'history/history_during_period', start_time: start.toISOString(), end_time: end.toISOString(),
-    entity_ids: ids, minimal_response: true, no_attributes: true, significant_changes_only: false });
+  const SER = keys ? SERIES.filter((s) => keys.includes(s.key)) : SERIES;
+  const ids = SER.map((s) => seriesId(ctx, s)).filter(Boolean);
+  if (!ids.length) return { start: +start, end: +end };
+  const res = await fetchSeries(ctx, ids, start, end, coarse);
   const out = { start: +start, end: +end };
-  for (const s of SERIES) {
+  for (const s of SER) {
     const id = seriesId(ctx, s);
-    out[s.key] = (res[id] || []).map((p) => [(p.lu ?? p.lc) * 1000, parseFloat(p.s)]).filter((p) => Number.isFinite(p[1]));
+    const u = s.unit === 'W' ? ctx.hass.states[id]?.attributes?.unit_of_measurement : null;
+    const f = (u === 'kW' ? 1000 : u === 'MW' ? 1e6 : 1) * (s.src === 'public_grid_power' ? ctx.gridSign() : 1); // andere Anlagen melden Leistung teils in kW
+    const pts = (res[id] || []).map((p) => [p[0], p[1] * f]);
+    // HA speichert nur Änderungen: den aktuellen Wert bis jetzt fortschreiben, sonst fehlt bei konstanten Werten das Ende
+    const cur = num(ctx.hass.states[id]);
+    if (pts.length && cur != null && pts[pts.length - 1][0] < +end) pts.push([+end, cur * f]);
+    out[s.key] = pts;
   }
   return out;
 }
@@ -1244,11 +1363,12 @@ function resample(points, start, end, n) {
 }
 
 function lineChart(ctx, { series, height = 190, yFmt, area, bands = [], now = false }) {
-  const wrap = h('div.chart', { style: { height: height + 'px' } });
+  const wrap = h('div.chart', { style: { height: height + 'px' }, role: 'img', 'aria-label': t('Diagramm'), tabindex: '0' });
+  let curI = null;
   const tip = h('div.tip');
   let data = null;
   const draw = () => {
-    const W = wrap.clientWidth; if (!W || !data) return;
+    const W = wrap.clientWidth; if (!W || !data) return; lastW = W;
     const H = height, padL = 42, padR = 10, padT = 10, padB = 22;
     const n = Math.max(60, Math.min(300, Math.round(W / 3)));
     const rs = series.map((s) => ({ ...s, v: resample(data[s.key] || [], data.start, data.end, n) }));
@@ -1285,31 +1405,44 @@ function lineChart(ctx, { series, height = 190, yFmt, area, bands = [], now = fa
     wrap.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}"><g class="grid">${grid.join('')}${xt.join('')}</g>${bandSvg}${lo < 0 ? `<line class="zero" x1="${padL}" x2="${W - padR}" y1="${y(0)}" y2="${y(0)}"/>` : ''}${nowSvg}${paths}<line class="cross" y1="${padT}" y2="${H - padB}"/></svg>`;
     wrap.append(tip);
     const cross = wrap.querySelector('.cross');
-    wrap.onpointermove = (e) => {
-      const r = wrap.getBoundingClientRect();
-      const i = clamp(Math.round(((e.clientX - r.left - padL) / (W - padL - padR)) * (n - 1)), 0, n - 1);
+    const showAt = (i) => {
+      curI = i;
       cross.setAttribute('x1', x(i)); cross.setAttribute('x2', x(i)); cross.style.opacity = 1;
       const tm = new Date(data.start + ((data.end - data.start) * i) / (n - 1));
       tip.innerHTML = `<b>${hrs > 24 ? fmtDateTime(tm) : fmtTime(tm)}</b>` + rs.map((s) => `<span><i style="background:${s.color}"></i>${t(s.label)} ${s.v[i] == null ? '—' : s.unit === '%' ? fmt(s.v[i]) + ' %' : s.unit === '±%' ? (s.v[i] > 0 ? '+' : '') + fmt(s.v[i]) + ' %' : fmtW(s.v[i])}</span>`).join('');
       tip.style.opacity = 1; tip.style.left = clamp(x(i) + 12, 0, W - 150) + 'px';
     };
+    wrap.onpointermove = (e) => {
+      const r = wrap.getBoundingClientRect();
+      showAt(clamp(Math.round(((e.clientX - r.left - padL) / (W - padL - padR)) * (n - 1)), 0, n - 1));
+    };
+    wrap.onkeydown = (e) => {
+      if (e.key === 'Escape') { cross.style.opacity = 0; tip.style.opacity = 0; curI = null; return; }
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      e.preventDefault();
+      showAt(clamp((curI ?? (e.key === 'ArrowRight' ? -1 : n)) + (e.key === 'ArrowRight' ? 1 : -1), 0, n - 1));
+    };
     wrap.onpointerleave = () => { cross.style.opacity = 0; tip.style.opacity = 0; };
   };
-  const ro = new ResizeObserver(draw); ro.observe(wrap); ctx.cleanup(() => ro.disconnect());
+  let lastW = 0, raf = 0;
+  const ro = new ResizeObserver(() => { cancelAnimationFrame(raf); raf = requestAnimationFrame(() => { if (wrap.clientWidth !== lastW) draw(); }); });
+  ro.observe(wrap); ctx.cleanup(() => { ro.disconnect(); cancelAnimationFrame(raf); });
   return { el: wrap, setData: (d) => { data = d; draw(); } };
 }
 
 // Gruppierte Balken für die Langzeitstatistik
-function barChart(ctx, { height = 200 }) {
-  const wrap = h('div.chart', { style: { height: height + 'px' } });
+function barChart(ctx, { height = 200, unit }) {
+  const wrap = h('div.chart', { style: { height: height + 'px' }, role: 'img', 'aria-label': t('Diagramm'), tabindex: '0' });
+  let curI = null;
   const tip = h('div.tip');
   let data = null;
   const draw = () => {
-    const W = wrap.clientWidth; if (!W || !data) return;
+    const W = wrap.clientWidth; if (!W || !data) return; lastW = W;
     const H = height, padL = 42, padR = 8, padT = 10, padB = 22;
     const n = data.labels.length, ser = data.series;
     let hi = 0; for (const s of ser) for (const v of s.values) hi = Math.max(hi, v ?? 0);
-    const step = niceStep(hi || 1); hi = Math.ceil((hi || 1) / step) * step;
+    let step = niceStep(hi || 1); hi = Math.ceil((hi || 1) / step) * step;
+    if (unit === '%') { step = 25; hi = 100; }
     const y = (v) => padT + (H - padT - padB) * (1 - v / hi);
     const gw = (W - padL - padR) / n, bw = Math.max(2, Math.min(14, (gw * 0.8) / ser.length));
     const grid = [];
@@ -1324,16 +1457,27 @@ function barChart(ctx, { height = 200 }) {
     wrap.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}"><g class="grid">${grid.join('')}${xl.join('')}</g><rect class="hov" y="${padT}" height="${H - padT - padB}" width="${gw}"/>${bars.join('')}</svg>`;
     wrap.append(tip);
     const hov = wrap.querySelector('.hov');
+    const showAt = (i) => {
+      curI = i;
+      hov.setAttribute('x', padL + gw * i); hov.style.opacity = 1;
+      tip.innerHTML = `<b>${data.full[i]}</b>` + ser.map((s) => `<span><i style="background:${s.color}"></i>${s.label} ${unit === '%' ? (s.values[i] == null ? '–' : fmt(s.values[i]) + ' %') : fmtKWh(s.values[i])}</span>`).join('');
+      tip.style.opacity = 1; tip.style.left = clamp(padL + gw * i + gw + 8, 0, W - 170) + 'px';
+    };
     wrap.onpointermove = (e) => {
       const r = wrap.getBoundingClientRect();
-      const i = clamp(Math.floor((e.clientX - r.left - padL) / gw), 0, n - 1);
-      hov.setAttribute('x', padL + gw * i); hov.style.opacity = 1;
-      tip.innerHTML = `<b>${data.full[i]}</b>` + ser.map((s) => `<span><i style="background:${s.color}"></i>${s.label} ${fmtKWh(s.values[i])}</span>`).join('');
-      tip.style.opacity = 1; tip.style.left = clamp(padL + gw * i + gw + 8, 0, W - 170) + 'px';
+      showAt(clamp(Math.floor((e.clientX - r.left - padL) / gw), 0, n - 1));
+    };
+    wrap.onkeydown = (e) => {
+      if (e.key === 'Escape') { hov.style.opacity = 0; tip.style.opacity = 0; curI = null; return; }
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      e.preventDefault();
+      showAt(clamp((curI ?? (e.key === 'ArrowRight' ? -1 : n)) + (e.key === 'ArrowRight' ? 1 : -1), 0, n - 1));
     };
     wrap.onpointerleave = () => { hov.style.opacity = 0; tip.style.opacity = 0; };
   };
-  const ro = new ResizeObserver(draw); ro.observe(wrap); ctx.cleanup(() => ro.disconnect());
+  let lastW = 0, raf = 0;
+  const ro = new ResizeObserver(() => { cancelAnimationFrame(raf); raf = requestAnimationFrame(() => { if (wrap.clientWidth !== lastW) draw(); }); });
+  ro.observe(wrap); ctx.cleanup(() => { ro.disconnect(); cancelAnimationFrame(raf); });
   return { el: wrap, setData: (d) => { data = d; draw(); } };
 }
 
@@ -1346,38 +1490,103 @@ const STAT_SERIES = [
 
 function statsCard(ctx) {
   const ser = STAT_SERIES.filter((s) => ctx.hasSrc(s.src));
-  if (!ser.length || !ctx.hass.callWS) return null;
+  const hasGrid = ctx.hasSrc('public_grid_power');
+  if ((!ser.length && !hasGrid) || !ctx.hass.callWS) return null;
   let mode = store.get('xt500-energy-stat') || 'week';
   const chart = barChart(ctx, { height: 210 });
+  const autChart = barChart(ctx, { height: 110, unit: '%' }), autEl = h('div', { hidden: true }, h('p.hint', null, t('Autarkie je Tag')), autChart.el);
+  const homeId = ctx.id('estimated_home_load'), gridId = ctx.srcId('public_grid_power');
   const totals = h('div.totals'), status = h('small.load');
   const modes = [['week', '7 Tage'], ['month', '30 Tage'], ['year', '12 Monate']];
   const btns = modes.map(([m, l]) => h('button' + (m === mode ? '.sel' : ''), { onclick: () => { mode = m; store.set('xt500-energy-stat', m); btns.forEach((b, i) => b.classList.toggle('sel', modes[i][0] === m)); load(); } }, t(l)));
+  let gen = 0, statsEl = null;
   const load = async () => {
+    const my = ++gen;
     status.textContent = t('lädt …');
     const end = new Date(); const start = new Date(end);
     if (mode === 'year') { start.setMonth(start.getMonth() - 11, 1); start.setHours(0, 0, 0, 0); }
     else { start.setDate(start.getDate() - (mode === 'week' ? 6 : 29)); start.setHours(0, 0, 0, 0); }
     try {
-      const res = await ctx.hass.callWS({ type: 'recorder/statistics_during_period', start_time: start.toISOString(), end_time: end.toISOString(),
-        statistic_ids: ser.map((s) => ctx.srcId(s.src)), period: mode === 'year' ? 'month' : 'day', types: ['change'] });
+      const res = ser.length ? await ctx.hass.callWS({ type: 'recorder/statistics_during_period', start_time: start.toISOString(), end_time: end.toISOString(),
+        statistic_ids: ser.map((s) => ctx.srcId(s.src)), period: mode === 'year' ? 'month' : 'day', types: ['change'] }) : {};
       const buckets = [];
       for (const d = new Date(start); d <= end;) { buckets.push(new Date(d)); if (mode === 'year') d.setMonth(d.getMonth() + 1); else d.setDate(d.getDate() + 1); }
       const keyOf = (d) => (mode === 'year' ? `${d.getFullYear()}-${d.getMonth()}` : d.toDateString());
       const idx = new Map(buckets.map((b, i) => [keyOf(b), i]));
       const series = ser.map((s) => {
         const values = buckets.map(() => 0);
-        for (const r of res[ctx.srcId(s.src)] || []) { const i = idx.get(keyOf(new Date(r.start))); if (i != null) values[i] += Math.max(0, r.change ?? 0); }
+        for (const r of res[ctx.srcId(s.src)] || []) { const i = idx.get(keyOf(new Date(r.start))); if (i != null) values[i] += Math.max(0, r.change ?? 0) * kwhFactor(ctx.src(s.src)); }
         return { label: t(s.label), color: s.color, values };
       });
+      // Netzbezug: Zählerstand aus den Energie-Einstellungen, sonst aus dem stündlichen Mittel der Netzleistung
+      // Einheiten (Wh/kWh/MWh bzw. W/kW) werden aus den Statistik-Metadaten gelesen
+      if (hasGrid) {
+        const prefs = await energyPrefs(ctx);
+        const meter = (prefs?.energy_sources || []).filter((x) => x.type === 'grid').flatMap((x) => (x.flow_from?.length ? x.flow_from.map((f) => f.stat_energy_from) : [x.stat_energy_from])).filter(Boolean);
+        const values = buckets.map(() => 0); let any = false;
+        const gid = ctx.srcId('public_grid_power'), ids = meter.length ? meter : [gid];
+        const meta = {};
+        try { for (const m of await ctx.hass.callWS({ type: 'recorder/get_statistics_metadata', statistic_ids: ids })) meta[m.statistic_id] = m.statistics_unit_of_measurement; } catch (e) { /* ohne Metadaten gelten kWh bzw. W */ }
+        if (meter.length) {
+          const r2 = await ctx.hass.callWS({ type: 'recorder/statistics_during_period', start_time: start.toISOString(), end_time: end.toISOString(),
+            statistic_ids: meter, period: mode === 'year' ? 'month' : 'day', types: ['change'] });
+          for (const id of meter) {
+            const f = meta[id] === 'Wh' ? 1e-3 : meta[id] === 'MWh' ? 1e3 : 1;
+            for (const r of r2[id] || []) { const i = idx.get(keyOf(new Date(r.start))); if (i != null) { values[i] += Math.max(0, r.change ?? 0) * f; any = true; } }
+          }
+        } else {
+          const f = meta[gid] === 'kW' ? 1 : meta[gid] === 'MW' ? 1e3 : 1e-3; // → kWh je Stunde
+          const r2 = await ctx.hass.callWS({ type: 'recorder/statistics_during_period', start_time: start.toISOString(), end_time: end.toISOString(),
+            statistic_ids: [gid], period: 'hour', types: ['mean'] });
+          for (const r of r2[gid] || []) { const i = idx.get(keyOf(new Date(r.start))); if (i != null && r.mean != null) { values[i] += Math.max(0, r.mean * ctx.gridSign()) * f; any = true; } }
+        }
+        if (any) series.unshift({ label: t('Netzbezug'), color: 'var(--heat)', values }); // Netzbezug steht zuerst
+      }
       const labels = buckets.map((b) => (mode === 'year' ? b.toLocaleDateString(NUMLOC, { month: 'short' }) : mode === 'week' ? b.toLocaleDateString(NUMLOC, { weekday: 'short' }) : String(b.getDate())));
       const full = buckets.map((b) => (mode === 'year' ? b.toLocaleDateString(NUMLOC, { month: 'long', year: 'numeric' }) : b.toLocaleDateString(NUMLOC, { weekday: 'short', day: 'numeric', month: 'numeric' })));
+      if (my !== gen) return; // inzwischen anderer Zeitraum gewählt
+      if (statsEl) statsEl.hidden = !series.length;
       chart.setData({ labels, full, series });
       fill(totals, series.map((s) => h('div.tot', null, h('i', { style: { background: s.color } }), h('span', null, s.label), h('b', null, fmtKWh(s.values.reduce((a, b) => a + b, 0))))));
       status.textContent = '';
+      autarky(my, buckets, idx, keyOf, start, end, labels, full);
     } catch (e) { console.error(e); status.textContent = t('Statistik konnte nicht geladen werden'); }
   };
+  // Autarkie je Tag aus den stündlichen Langzeitstatistiken (Hauslast, Netz); ohne Statistik der Hauslast bleibt die Grafik verborgen
+  const autarky = async (my, buckets, idx, keyOf, start, end, labels, full) => {
+    autEl.hidden = true;
+    if (mode === 'year' || !gridId) return;
+    try {
+      const pvId = ctx.srcId('pv_power'), battId = ctx.srcId('battery_power');
+      const ids = [homeId, gridId, pvId, battId].filter(Boolean);
+      const r = await ctx.hass.callWS({ type: 'recorder/statistics_during_period', start_time: start.toISOString(), end_time: end.toISOString(), statistic_ids: ids, period: 'hour', types: ['mean'] });
+      if (my !== gen || !r?.[gridId]?.length) return;
+      const unitF = (id) => { const u = ctx.hass.states[id]?.attributes?.unit_of_measurement; return u === 'kW' ? 1000 : u === 'MW' ? 1e6 : 1; };
+      const hourly = (id, sign = 1) => new Map((r[id] || []).filter((x) => x.mean != null).map((x) => [x.start, x.mean * unitF(id) * sign]));
+      const grid = hourly(gridId, ctx.gridSign());
+      // Hausverbrauch: eigener Sensor, sonst aus PV + Netz − Akkuladung abgeleitet (nur bei reiner DC-Kopplung, AC-PV fehlt sonst)
+      let home = homeId && r[homeId]?.length ? hourly(homeId) : null;
+      if (!home && pvId && battId && r[pvId]?.length && r[battId]?.length && selfUseOk(ctx)) {
+        const pv = hourly(pvId), batt = hourly(battId); // Akku-Sensor: + Laden
+        home = new Map();
+        for (const [k, g] of grid) if (pv.has(k) && batt.has(k)) home.set(k, Math.max(0, pv.get(k) + g - batt.get(k)));
+      }
+      if (!home) return;
+      const sum = buckets.map(() => 0), cov = buckets.map(() => 0);
+      for (const [k, hm] of home) {
+        const g = grid.get(k), i = idx.get(keyOf(new Date(k)));
+        if (i == null || g == null || hm < 100) continue;
+        sum[i] += hm; cov[i] += Math.min(hm, Math.max(0, g));
+      }
+      const values = sum.map((hm, i) => (hm > 0 ? clamp(Math.round((1 - cov[i] / hm) * 100), 0, 100) : null));
+      if (!values.some((v) => v != null)) return;
+      autEl.hidden = false;
+      autChart.setData({ labels, full, series: [{ label: t('Autarkie'), color: 'var(--energy)', values }] });
+    } catch (e) { /* ohne Statistik keine Autarkie-Grafik */ }
+  };
   load();
-  return card(t('Energie'), 'mdi:chart-bar', h('div.card-tools', null, h('div.seg', null, btns), status), chart.el, totals);
+  statsEl = card(t('Energie'), 'mdi:chart-bar', h('div.card-tools', null, h('div.seg', null, btns), status), chart.el, totals, autEl);
+  return statsEl;
 }
 
 // Logbuch der Integration als lesbare Zeitleiste
@@ -1463,7 +1672,10 @@ function fullChargeCard(ctx) {
     h('span', null, e.when.toLocaleDateString(NUMLOC, { weekday: 'short', day: 'numeric', month: 'long' })), h('small', null, ctx.sl('full_charge_confirmation', e.state))))
     : fromCounter() || h('p.hint', null, t('Noch keine Vollladung im Zeitraum.')));
   render([]);
-  loadEvents(ctx, 120 * 24, ['full_charge_confirmation'])
+  const fcc = ctx.cache.fcEvents; // 120-Tage-Logbuch: 5 Minuten merken, damit Tab-Wechsel nicht jedes Mal neu lädt
+  const fcP = fcc && Date.now() - fcc.at < 300e3 ? fcc.p : (ctx.cache.fcEvents = { at: Date.now(), p: loadEvents(ctx, 120 * 24, ['full_charge_confirmation']) }).p;
+  fcP.catch(() => { if (ctx.cache.fcEvents?.p === fcP) ctx.cache.fcEvents = null; });
+  fcP
     .then((ev) => render(ev.filter((e) => ['confirmed', 'timeout'].includes(e.state))))
     .catch(() => render([]));
   return card(t('Vollladungen'), 'mdi:battery-check-outline', h('p.hint', null, t('Bestätigte Vollladungen, soweit HA sie im Logbuch aufbewahrt.')), list, last);
@@ -1494,10 +1706,9 @@ function forecastCard(ctx) {
     const ids = [ctx.srcId('pv_power'), ctx.srcId('soc')].filter(Boolean);
     let hist = {};
     try {
-      hist = await ctx.hass.callWS({ type: 'history/history_during_period', start_time: new Date(dayStart(0)).toISOString(), end_time: new Date().toISOString(),
-        entity_ids: ids, minimal_response: true, no_attributes: true, significant_changes_only: false });
+      hist = await fetchSeries(ctx, ids, dayStart(0), Date.now(), true);
     } catch { /* Prognose geht auch ohne Verlauf */ }
-    const pts = (id) => (hist[id] || []).map((p) => [(p.lu ?? p.lc) * 1000, parseFloat(p.s)]).filter((p) => Number.isFinite(p[1]));
+    const pts = (id) => hist[id] || [];
     const sim = simulate(ctx);
     const data = {
       start: dayStart(0), end: dayStart(2),
@@ -1561,11 +1772,10 @@ function pvInputsCard(ctx) {
       hours = hh ?? hours;
       if (!inputs.length) return;
       const end = new Date(), start = new Date(end - hours * 3600e3);
-      const res = await ctx.hass.callWS({ type: 'history/history_during_period', start_time: start.toISOString(), end_time: end.toISOString(),
-        entity_ids: inputs.map((i) => i.id), minimal_response: true, no_attributes: true, significant_changes_only: false });
+      const res = await fetchSeries(ctx, inputs.map((i) => i.id), start, end, hours >= 12);
       if (my !== gen) return;
       const n = 240, data = { start: +start, end: +end };
-      const rs = inputs.map((i) => resample((res[i.id] || []).map((p) => [(p.lu ?? p.lc) * 1000, parseFloat(p.s)]).filter((p) => Number.isFinite(p[1])), +start, +end, n));
+      const rs = inputs.map((i) => resample(res[i.id] || [], +start, +end, n));
       const at = (k) => +start + ((+end - +start) * k) / (n - 1);
       const sum = inputs.map(() => 0), cnt = inputs.map(() => 0);
       inputs.forEach((i, j) => { data['p' + j] = []; data['d' + j] = []; });
@@ -1609,7 +1819,7 @@ function pvInputsCard(ctx) {
     if (inputs.length < 2) return;
     pwChart = lineChart(ctx, { height: 190, yFmt: kfmt, series: inputs.map((i, j) => ({ key: 'p' + j, label: i.label, color: i.color, unit: 'W' })) });
     devChart = lineChart(ctx, { height: 150, yFmt: (v) => fmt(v) + '%', series: inputs.map((i, j) => ({ key: 'd' + j, label: i.label, color: i.color, unit: '±%' })) });
-    rows = h('div.pvrows', null, h('div.pvr.head', null, h('span'), h('span', null, t('Eingang')), h('span', null, 'Ist'), h('span', null, '±'), h('span', null, t('Ø im Zeitraum'))),
+    rows = h('div.pvrows', null, h('div.pvr.head', null, h('span'), h('span', null, t('Eingang')), h('span', null, t('Ist')), h('span', null, '±'), h('span', null, t('Ø im Zeitraum'))),
       inputs.map((i, j) => h('button.pvr', { 'data-j': j, onclick: () => ctx.moreInfo(i.id) }, h('i', { style: { background: i.color } }), h('span', null, i.label), h('b.now', null, '—'), h('b.dev', null, '—'), h('b.avg', null, '—'))));
     verdict = h('div.banner.info');
     fill(el, h('header.card-h', null, icon('mdi:solar-panel-large'), h('h3', null, t('PV-Eingänge'))), verdict,
@@ -1619,6 +1829,79 @@ function pvInputsCard(ctx) {
     el.hidden = false; live(); ctx.watch(live); hist();
   })().catch((e) => console.error(e));
   return { el, load: (hh) => { hours = hh; if (inputs.length > 1) hist(hh); } };
+}
+
+// Netz-Kennzahlen aus Netz-/Hausverlauf (Netz: + Bezug, − Einspeisung); Autarkie nur bei Verbrauch ≥ 100 W
+function gridStats(d, NB, hasHome) {
+  const grid = resample(d.grid || [], d.start, d.end, NB), home = hasHome ? resample(d.home || [], d.start, d.end, NB) : [];
+  const bh = (d.end - d.start) / 3600e3 / NB;
+  const mid = (i) => d.start + ((d.end - d.start) * i) / (NB - 1);
+  const pv = d.pv && d.pv.length ? resample(d.pv, d.start, d.end, NB) : [];
+  const r = { imp: [], exp: [], aut: [], impE: 0, expE: 0, homeE: 0, impHomeE: 0, pvE: 0, pvExpE: 0, selfUse: null };
+  grid.forEach((g, i) => {
+    if (g == null) return;
+    if (pv[i] != null) { r.pvE += Math.max(0, pv[i]) * bh; r.pvExpE += Math.max(0, -g) * bh; }
+    r.imp.push([mid(i), Math.max(0, g)]); r.exp.push([mid(i), Math.max(0, -g)]);
+    r.impE += Math.max(0, g) * bh; r.expE += Math.max(0, -g) * bh;
+    const hm = home[i];
+    if (hm != null && hm >= 100) { r.aut.push([mid(i), clamp((1 - Math.max(0, g) / hm) * 100, 0, 100)]); r.homeE += hm * bh; r.impHomeE += Math.min(hm, Math.max(0, g)) * bh; }
+  });
+  r.autAvg = r.homeE > 0 ? clamp((1 - r.impHomeE / r.homeE) * 100, 0, 100) : null;
+  r.selfUse = r.pvE > 50 ? clamp((1 - r.pvExpE / r.pvE) * 100, 0, 100) : null;
+  return r;
+}
+// Eigenverbrauchsquote nur bei reiner DC-PV (AC-PV steckt nicht in der PV-Reihe) – sonst ausblenden
+const withTip = (el, tip) => { el.title = tip; return el; };
+function selfUseOk(ctx) {
+  const m = ctx.st('selected_coupling_mode');
+  return m !== 'ac' && m !== 'hybrid' && m !== 'both' && !(m !== 'dc' && ctx.has('ac_pv_power'));
+}
+
+// ---------- Netz & Autarkie ----------
+// Aus dem Netz- und Hausverbrauchsverlauf abgeleitet (Netz: + Bezug, − Einspeisung).
+// Autarkie = Anteil des Hausverbrauchs, der nicht aus dem Netz kommt; bei sehr geringem Verbrauch nicht aussagekräftig.
+function gridHistoryCard(ctx) {
+  const hasGrid = !!ctx.srcId('public_grid_power'), hasHome = !!ctx.id('estimated_home_load');
+  if (!hasGrid) return null;
+  const C_IMP = 'var(--heat)', C_EXP = 'var(--energy)', C_AUT = 'var(--amber)';
+  const kfmt = (v) => (Math.abs(v) >= 1000 ? fmt(v / 1000, 1) + 'k' : fmt(v));
+  const autChart = hasHome ? lineChart(ctx, { height: 150, yFmt: (v) => fmt(v) + '%', series: [{ key: 'aut', label: 'Autarkie', color: C_AUT, unit: '%' }] }) : null;
+  const flowChart = lineChart(ctx, { height: 170, yFmt: kfmt, series: [
+    { key: 'imp', label: 'Netzbezug', color: C_IMP, unit: 'W' }, { key: 'exp', label: 'Einspeisung', color: C_EXP, unit: 'W' }] });
+  const totals = h('div.totals');
+  const NB = 240;
+  const setData = (d) => {
+    const { imp, exp, aut, impE, expE, homeE, impHomeE, selfUse } = gridStats(d, NB, hasHome);
+    el.hidden = !imp.length;
+    const data = { start: d.start, end: d.end, imp, exp, aut };
+    autChart?.setData(data); flowChart.setData(data);
+    const tot = (color, label, val) => h('div.tot', null, h('i', { style: { background: color } }), h('span', null, t(label)), h('b', null, val));
+    fill(totals, [
+      homeE > 0 ? tot(C_AUT, 'Ø Autarkie', fmt(clamp((1 - impHomeE / homeE) * 100, 0, 100)) + ' %') : null,
+      tot(C_IMP, 'Netzbezug', fmtKWh(impE / 1000)), tot(C_EXP, 'Einspeisung', fmtKWh(expE / 1000)),
+      selfUse != null && selfUseOk(ctx) ? withTip(tot(C_AUT, 'Eigenverbrauch', fmt(selfUse) + ' %'), t('Schätzung: (PV − Einspeisung) / PV')) : null,
+      homeE > 0 ? tot('var(--muted)', 'Hausverbrauch', fmtKWh(homeE / 1000)) : null,
+    ].filter(Boolean));
+  };
+  const legend = h('div.legend.series', null, [['Netzbezug', C_IMP], ['Einspeisung', C_EXP]].map(([l, c]) => h('span', null, h('i', { style: { background: c } }), t(l))));
+  const el = card(t('Netz & Autarkie'), 'mdi:transmission-tower',
+    autChart ? h('div.sub-h', null, t('Autarkie')) : null, autChart?.el,
+    h('div.sub-h', null, t('Netzbezug und Einspeisung')), flowChart.el, legend, totals);
+  return { el, setData };
+}
+
+// Hinweis, welche optionalen Auswertungen fehlen und was dafür einzurichten ist
+function emptyHintsCard(ctx) {
+  const hasGrid = ctx.hasSrc('public_grid_power');
+  const list = [];
+  if (!hasGrid) list.push([t('Netz & Autarkie'), t('kein Netzsensor konfiguriert')]);
+  else if (!ctx.id('estimated_home_load')) list.push([t('Autarkie'), t('kein Hausverbrauchs-Sensor')]);
+  if (!STAT_SERIES.some((s) => ctx.hasSrc(s.src)) && !hasGrid) list.push([t('Energie-Balken'), t('keine Tageswerte hinterlegt')]);
+  if (!ctx.hass.callWS) list.push([t('Prognose & Statistik'), t('keine Verbindung zur Verlaufsdatenbank')]);
+  if (!list.length) return null;
+  return card(t('Nicht angezeigte Auswertungen'), 'mdi:information-outline',
+    h('div.checks', null, list.map(([a, b]) => h('div.chk.info', null, icon('mdi:information-outline'), h('div', null, h('b', null, a), h('small', null, b))))),
+    h('p.hint', null, t('Die Quellsensoren legst du in den Optionen der Integration fest, die PV-Prognose im Energie-Dashboard.')));
 }
 
 function historyView(ctx) {
@@ -1632,11 +1915,14 @@ function historyView(ctx) {
   const status = h('small.load');
   const ev = eventsCard(ctx);
   const pvc = pvInputsCard(ctx);
+  const gh = gridHistoryCard(ctx);
   const ranges = [6, 24, 48].map((hh) => h('button' + (hh === hours ? '.sel' : ''), { onclick: (e) => { hours = hh; ranges.forEach((b) => b.classList.toggle('sel', b === e.currentTarget)); load(); } }, hh + ' h'));
+  let gen = 0;
   const load = async () => {
+    const my = ++gen;
     status.textContent = t('lädt …');
     ctx.cache.loadEvents?.(hours); pvc?.load(hours);
-    try { const d = await loadHistory(ctx, hours); socChart.setData(d); pwChart.setData(d); status.textContent = ''; }
+    try { const d = await loadHistory(ctx, hours); if (my !== gen) return; socChart.setData(d); pwChart.setData(d); gh?.setData(d); status.textContent = ''; }
     catch (e) { console.error(e); status.textContent = t('Verlauf konnte nicht geladen werden'); }
   };
   load();
@@ -1644,10 +1930,12 @@ function historyView(ctx) {
     h('div.span-12', null, h('div.seg.range-sel', null, ranges), status),
     h('div.span-8.stack', null, card(t('Ladezustand'), 'mdi:battery-medium', socChart.el), card(t('Leistung'), 'mdi:chart-bell-curve-cumulative', pwChart.el, legend)),
     h('div.span-4', null, ev),
+    gh ? h('div.span-12', null, gh.el) : null,
     pvc ? h('div.span-12', null, pvc.el) : null,
     h('div.span-12', null, forecastCard(ctx)),
     h('div.span-8', null, statsCard(ctx)),
-    h('div.span-4', null, fullChargeCard(ctx)));
+    h('div.span-4', null, fullChargeCard(ctx)),
+    (() => { const eh = emptyHintsCard(ctx); return eh ? h('div.span-12', null, eh) : null; })());
 }
 
 // ---------- Technik ----------
@@ -1767,13 +2055,17 @@ class XT500Base extends HTMLElement {
   constructor() {
     super();
     this.attachShadow({ mode: 'open' });
-    this._updaters = []; this._cleanups = []; this._ids = {}; this._pending = new Map(); this._cache = {}; this._seen = {};
+    this._updaters = []; this._cleanups = []; this._ids = {}; this._pending = new Map(); this._caches = {}; this._cache = {}; this._seen = {};
   }
 
   setConfig(config) {
     this._config = config || {};
     if (this._hass) { this._sig = null; this.hass = this._hass; }
   }
+
+  // Beim Entfernen aus dem DOM Timer und Beobachter stoppen, beim Wiedereinhängen neu aufbauen
+  disconnectedCallback() { if (this._cleanups) { this._reset(); this._disc = true; } }
+  connectedCallback() { if (this._disc && this._hass) { this._disc = false; this._sig = null; this.hass = this._hass; } }
 
   set hass(hass) {
     const first = !this._hass;
@@ -1786,7 +2078,7 @@ class XT500Base extends HTMLElement {
     if (first || nStates !== this._nStates || !this._managers) { this._managers = findManagers(hass); this._nStates = nStates; }
     const wanted = this._config?.manager_id || this._manager;
     const id = this._managers.has(wanted) ? wanted : this._managers.keys().next().value;
-    if (id !== this._manager) this._cache = {};
+    if (id !== this._manager) this._cache = (this._caches[id] ??= {});
     this._manager = id; this._ids = this._managers.get(id) || {};
     this._ro = this._config?.read_only_for_non_admins !== false && !!hass.user && hass.user.is_admin === false;
     const dark = hass.themes?.darkMode;
@@ -1796,11 +2088,17 @@ class XT500Base extends HTMLElement {
     if (this._changed()) this._update();
   }
 
+  _switchManager(m) { this._config = { ...this._config, manager_id: m }; this._sig = null; this.hass = this._hass; }
+
   // Nur die Entitäten dieses Managers und seine Quellen beobachten
   _watched() {
     const ids = Object.values(this._ids);
     const a = this._hass.states[this._ids.status]?.attributes || {};
     for (const [k, v] of Object.entries(a)) if (k.startsWith('source_') && k.endsWith('_entity') && v) ids.push(v);
+    if (this._managers?.size > 1) for (const [m, mi] of this._managers) if (m !== this._manager) {
+      ids.push(...Object.values(mi));
+      for (const [k, v] of Object.entries(this._hass.states[mi.status]?.attributes || {})) if (k.startsWith('source_') && k.endsWith('_entity') && v) ids.push(v);
+    }
     return ids;
   }
 
@@ -2088,6 +2386,7 @@ const CSS = `
   --shadow: 0 1px 2px rgba(15,20,30,.05), 0 6px 20px rgba(15,20,30,.05);
 }
 * { box-sizing: border-box; }
+button:focus-visible, select:focus-visible, .chart:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; padding: 0; text-align: left; }
 ha-icon { --mdc-icon-size: 20px; display: inline-flex; }
 h1, h2, h3, p { margin: 0; }
@@ -2117,6 +2416,14 @@ h1, h2, h3, p { margin: 0; }
 @container (max-width: 520px) { .tab { flex-direction: column; gap: 2px; font-size: 11px; padding: 7px 2px; } }
 
 .grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: var(--gap); }
+.stg { display: grid; gap: 6px; }
+.stg-row { display: grid; grid-template-columns: minmax(0, 1.2fr) 3.5em minmax(40px, 1fr) minmax(0, 1.2fr) minmax(0, 1fr); align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--line, rgba(128,128,128,.25)); border-radius: 10px; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.stg-row.sel { border-color: var(--energy, currentColor); }
+.stg-bar { height: 6px; border-radius: 3px; background: rgba(128,128,128,.25); overflow: hidden; }
+.stg-fill { display: block; height: 100%; background: var(--energy, currentColor); }
+.stg-n { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stg-sum { font-size: .9em; opacity: .75; padding: 2px 4px; }
+@media (max-width: 560px) { .stg-row { grid-template-columns: 1fr auto; } .stg-bar { grid-column: 1 / -1; } }
 .grid > * { grid-column: span 12; min-width: 0; }
 .grid > :empty { display: none; }
 .stack { display: flex; flex-direction: column; gap: var(--gap); }
@@ -2233,7 +2540,7 @@ h1, h2, h3, p { margin: 0; }
 /* Heute */
 .today { display: flex; flex-direction: column; gap: 4px; }
 .today-r { display: grid; grid-template-columns: 30px 1fr auto; grid-template-rows: auto 4px; align-items: center; column-gap: 10px; row-gap: 4px; padding: 7px 4px; border-radius: 10px; --c: var(--energy); }
-.today-r[data-tone="amber"] { --c: var(--amber); } .today-r[data-tone="cool"] { --c: var(--cool); } .today-r[data-tone="media"] { --c: var(--media); }
+.today-r[data-tone="heat"] { --c: var(--heat); } .today-r[data-tone="muted"] { --c: var(--muted); } .today-r[data-tone="amber"] { --c: var(--amber); } .today-r[data-tone="cool"] { --c: var(--cool); } .today-r[data-tone="media"] { --c: var(--media); }
 .today-ic { grid-row: span 2; color: var(--c); display: grid; place-items: center; }
 .today-l { color: var(--muted); font-size: 13px; }
 .tv { font-variant-numeric: tabular-nums; font-size: 14px; }
