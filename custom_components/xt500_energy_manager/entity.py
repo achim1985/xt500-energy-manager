@@ -20,6 +20,7 @@ from .const import (
     CONF_LOAD_DISCHARGE_LIMIT_ENTITY,
     CONF_LOAD_PORT_POWER_ENTITY,
     CONF_MAX_CHARGE_SOC_ENTITY,
+    CONF_METER_SIGN,
     CONF_MIN_DISCHARGE_SOC_ENTITY,
     CONF_OFFGRID_DAILY_ENERGY_ENTITY,
     CONF_PV_DAILY_ENERGY_ENTITY,
@@ -84,6 +85,7 @@ class XT500Entity(Entity):
             ),
             "source_ac_pv_sign": self.runtime.entry.data.get(CONF_AC_PV_SIGN),
             "source_public_grid_power_entity": self.runtime.entry.data.get(CONF_GRID_POWER_ENTITY),
+            "source_meter_sign": self.runtime.entry.data.get(CONF_METER_SIGN),
             "source_grid_port_power_entity": self.runtime.entry.data.get(CONF_GRID_PORT_POWER_ENTITY),
             "source_load_port_power_entity": self.runtime.entry.data.get(CONF_LOAD_PORT_POWER_ENTITY),
             "source_pv_daily_energy_entity": self.runtime.entry.data.get(
