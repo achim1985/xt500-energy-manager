@@ -1,5 +1,14 @@
 # Änderungsprotokoll
 
+## Unveröffentlicht
+
+- Verlauf: neue Karte „Vergleich mit dem Vorjahr“ (Netzbezug, Einspeisung,
+  PV-Erzeugung je Monat gegen das Vorjahr, mit Kennzahlen); nutzt die Zähler
+  der Energie-Einstellungen von Home Assistant.
+- Layout: bessere Darstellung auf schmalen Displays (Tabellen, Umschalter,
+  Kopfzeile, Zeitachse), größere Tippflächen auf Touch-Geräten, besserer
+  Kontrast bei schwachen Texten.
+
 ## 1.15.0 – 2026-11-13
 
 - Heute: Energiebilanz als zwei gestapelte Balken („Woher kam der Strom?“ /

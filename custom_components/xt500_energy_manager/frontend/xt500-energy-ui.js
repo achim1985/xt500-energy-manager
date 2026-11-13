@@ -65,7 +65,7 @@ const EN = {
   'Ladeziel': 'Target', 'Ladegrenze': 'Charge limit', 'Grenze': 'Limit',
   // Energiefluss
   'Energiefluss': 'Energy flow', 'PV': 'PV', 'Akku': 'Battery', 'Netz': 'Grid', 'Haus': 'House',
-  'davon AC {p}': 'incl. AC {p}', 'XT500-PV': 'XT500 PV', 'gesperrt': 'blocked', 'Bezug': 'import', 'Einspeisung': 'export', 'Netzeinspeisung': 'Grid export', 'Hausverbrauch je Tag, aus Stundenmitteln geschätzt': 'Home consumption per day, estimated from hourly means', 'Haus (Rest)': 'Home (remainder)',
+  'davon AC {p}': 'incl. AC {p}', 'XT500-PV': 'XT500 PV', 'gesperrt': 'blocked', 'Bezug': 'import', 'Einspeisung': 'export', 'Netzeinspeisung': 'Grid export', 'Vergleich mit dem Vorjahr': 'Comparison with last year', 'Dieser Monat': 'This month', 'Vorjahresmonat gesamt: {v}': 'Same month last year: {v}', 'Jahr bis Vormonat': 'Year to last month', 'kein vollständiges Vorjahr': 'no complete previous year', 'zum Vorjahr': 'vs. last year', 'Vorjahr gesamt': 'Last year total', 'Hausverbrauch je Tag, aus Stundenmitteln geschätzt': 'Home consumption per day, estimated from hourly means', 'Haus (Rest)': 'Home (remainder)',
   'ausgeglichen': 'balanced', 'kein Zähler': 'no meter', 'Autarkie {p} %': 'Self-sufficiency {p} %',
   'Sensor meldet in {u}: {n}': 'Sensor reports in {u}: {n}', 'Der Energiemanager rechnet mit Watt. Bitte einen Sensor in W verwenden, sonst regelt er falsch.': 'The energy manager works in watts. Please use a sensor in W, otherwise regulation will be wrong.',
   'Netz & Autarkie': 'Grid & self-sufficiency', 'Autarkie': 'Self-sufficiency', 'Ø Autarkie': 'Avg. self-sufficiency', 'Netzbezug': 'Grid import', 'Netzbezug und Einspeisung': 'Grid import and export', 'Einspeisung (nach unten)': 'Export (downwards)', 'Hausverbrauch': 'Home consumption',
@@ -1408,7 +1408,9 @@ function lineChart(ctx, { series, height = 190, yFmt, area, bands = [], now = fa
     const y = (v) => padT + (H - padT - padB) * (1 - (v - lo) / (hi - lo || 1));
     const grid = [];
     for (let v = lo; v <= hi + 1e-6; v += step) grid.push(`<line x1="${padL}" x2="${W - padR}" y1="${y(v)}" y2="${y(v)}"/><text x="${padL - 6}" y="${y(v) + 3}" text-anchor="end">${yFmt(v)}</text>`);
-    const hrs = (data.end - data.start) / 3600e3, stepH = hrs > 24 ? 12 : hrs > 8 ? 4 : 1, xt = [];
+    const hrs = (data.end - data.start) / 3600e3, stepH0 = hrs > 24 ? 12 : hrs > 8 ? 4 : 1, xt = [];
+    // schmale Diagramme: Beschriftungen mit genug Abstand (min. ~46 px), sonst laufen sie ineinander
+    const stepH = Math.max(stepH0, [1, 2, 3, 4, 6, 12].find((sh) => ((W - padL - padR) * sh) / hrs >= 46) || 12);
     const first = new Date(data.start); first.setMinutes(0, 0, 0);
     for (let tt = +first + 3600e3; tt < data.end; tt += 3600e3) {
       const d = new Date(tt); if (d.getHours() % stepH) continue;
@@ -1521,7 +1523,7 @@ function statsCard(ctx) {
   const chart = barChart(ctx, { height: 210 });
   const srcChart = barChart(ctx, { height: 210, stacked: true }); srcChart.el.hidden = true;
   let view = store.get('xt500-energy-statview') === 'single' ? 'single' : 'src', single = null, origin = null;
-  const autChart = barChart(ctx, { height: 110, unit: '%' }), autEl = h('div', { hidden: true }, h('p.hint', null, t('Autarkie je Tag')), autChart.el);
+  const autChart = barChart(ctx, { height: 110, unit: '%' }), autEl = h('div', { hidden: true }, h('p.hint', { style: { marginTop: '14px' } }, t('Autarkie je Tag')), autChart.el);
   const homeId = ctx.id('estimated_home_load'), gridId = ctx.srcId('public_grid_power');
   const totals = h('div.totals'), status = h('small.load');
   const modes = [['week', '7 Tage'], ['month', '30 Tage'], ['year', '12 Monate']];
@@ -1946,6 +1948,88 @@ function selfUseOk(ctx) {
 // ---------- Netz & Autarkie ----------
 // Aus dem Netz- und Hausverbrauchsverlauf abgeleitet (Netz: + Bezug, − Einspeisung).
 // Autarkie = Anteil des Hausverbrauchs, der nicht aus dem Netz kommt; bei sehr geringem Verbrauch nicht aussagekräftig.
+// ---------- Vergleich: Monate gegen Vorjahr (Zähler aus den Energie-Einstellungen von HA) ----------
+function compareCard(ctx) {
+  if (!ctx.hass.callWS) return null;
+  const CMP = [
+    { key: 'imp', label: 'Netzbezug', color: 'var(--danger)', good: 'down' },
+    { key: 'exp', label: 'Einspeisung', color: 'var(--cool)', good: 'up' },
+    { key: 'pv', label: 'PV-Erzeugung', color: 'var(--amber)', good: 'up' },
+  ];
+  let metric = store.get('xt500-energy-cmp') || 'imp', data = null, built = false, gen = 0;
+  const chart = barChart(ctx, { height: 190 });
+  const seg = h('div.seg'), kpis = h('div.cmp-kpis'), lgd = h('div.legend.series'), body = h('div', { hidden: true }, seg, kpis, chart.el, lgd);
+  const el = card(t('Vergleich mit dem Vorjahr'), 'mdi:chart-timeline-variant', body);
+  el.hidden = true;
+  const idsOf = (prefs) => {
+    const src = (prefs?.energy_sources || []), grid = src.filter((x) => x.type === 'grid');
+    const pick = (x, flow, old) => (x[flow]?.length ? x[flow].map((f) => f[old]) : [x[old]]);
+    return {
+      imp: grid.flatMap((x) => pick(x, 'flow_from', 'stat_energy_from')).filter(Boolean),
+      exp: grid.flatMap((x) => pick(x, 'flow_to', 'stat_energy_to')).filter(Boolean),
+      pv: src.filter((x) => x.type === 'solar').map((x) => x.stat_energy_from).filter(Boolean),
+    };
+  };
+  const show = () => {
+    if (!data) return;
+    const keys = CMP.filter((c) => data.out[c.key]);
+    if (!keys.length) return;
+    if (!data.out[metric]) metric = keys[0].key;
+    const c = CMP.find((x) => x.key === metric), { cur, prev } = data.out[metric], M = data.month, Y = data.year;
+    if (!built) {
+      built = true;
+      keys.forEach((k) => seg.append(h('button', { 'data-k': k.key, onclick: () => { metric = k.key; store.set('xt500-energy-cmp', k.key); show(); } }, t(k.label))));
+      seg.hidden = keys.length < 2;
+    }
+    [...seg.children].forEach((b) => { b.classList.toggle('sel', b.dataset.k === metric); b.setAttribute('aria-pressed', String(b.dataset.k === metric)); });
+    const sum = (a, n) => a.slice(0, n).reduce((x, y) => x + y, 0);
+    const ytd = sum(cur, M), ytdP = sum(prev, M);
+    const delta = M > 0 && ytdP > 0 && prev.slice(0, M).every((v) => v > 0) ? (ytd / ytdP - 1) * 100 : null; // nur mit vollständigem Vorjahr
+    const tone = delta == null || Math.abs(delta) < 1 ? '' : ((delta > 0) === (c.good === 'up') ? '.good' : '.bad');
+    const kpi = (l, v, sub, tn = '') => h('div.cmp-k' + tn, null, h('small', null, l), h('b', null, v), h('span', null, sub));
+    fill(kpis, [
+      kpi(t('Dieser Monat'), fmtKWh(cur[M]), t('Vorjahresmonat gesamt: {v}', { v: fmtKWh(prev[M]) })),
+      M > 0 ? kpi(t('Jahr bis Vormonat'), fmtKWh(ytd), delta == null ? t('kein vollständiges Vorjahr') : `${delta > 0 ? '+' : '−'}${fmt(Math.abs(delta), 0)} % ${t('zum Vorjahr')}`, tone) : null,
+      sum(prev, 12) > 0 ? kpi(t('Vorjahr gesamt'), fmtKWh(sum(prev, 12)), String(Y - 1)) : null,
+    ].filter(Boolean));
+    const mo = (i, o) => new Date(Y, i, 1).toLocaleDateString(NUMLOC, o);
+    chart.setData({
+      labels: cur.map((_, i) => mo(i, { month: 'short' })), full: cur.map((_, i) => mo(i, { month: 'long' })),
+      series: [{ label: String(Y - 1), color: 'var(--muted)', values: prev }, { label: String(Y), color: c.color, values: cur.map((v, i) => (i > M ? null : v)) }],
+    });
+    fill(lgd, h('span', null, h('i', { style: { background: 'var(--muted)' } }), String(Y - 1)), h('span', null, h('i', { style: { background: c.color } }), String(Y)));
+    body.hidden = false; el.hidden = false;
+  };
+  const load = async () => {
+    if (document.hidden) return;
+    const my = ++gen;
+    try {
+      const m = idsOf(await energyPrefs(ctx)), all = [...new Set(Object.values(m).flat())];
+      if (!all.length) return;
+      const now = new Date(), Y = now.getFullYear(), meta = {};
+      try { for (const x of await ctx.hass.callWS({ type: 'recorder/get_statistics_metadata', statistic_ids: all })) meta[x.statistic_id] = x.statistics_unit_of_measurement; } catch (e) { /* ohne Metadaten gelten kWh */ }
+      const res = await ctx.hass.callWS({ type: 'recorder/statistics_during_period', start_time: new Date(Y - 1, 0, 1).toISOString(), end_time: now.toISOString(), statistic_ids: all, period: 'month', types: ['change'] });
+      if (my !== gen) return;
+      const out = {};
+      for (const c of CMP) {
+        const cur = Array(12).fill(0), prev = Array(12).fill(0); let any = false;
+        for (const id of m[c.key]) {
+          const f = meta[id] === 'Wh' ? 1e-3 : meta[id] === 'MWh' ? 1e3 : meta[id] === 'GWh' ? 1e6 : 1;
+          for (const r of res[id] || []) {
+            const d = new Date(r.start), v = Math.max(0, r.change ?? 0) * f;
+            if (d.getFullYear() === Y) cur[d.getMonth()] += v; else if (d.getFullYear() === Y - 1) prev[d.getMonth()] += v; else continue;
+            any = true;
+          }
+        }
+        if (any) out[c.key] = { cur, prev };
+      }
+      data = { out, year: Y, month: now.getMonth() }; show();
+    } catch (e) { console.error(e); }
+  };
+  load(); const iv = setInterval(load, 1800e3); ctx.cleanup(() => clearInterval(iv));
+  return el;
+}
+
 function gridHistoryCard(ctx) {
   const hasGrid = !!ctx.srcId('public_grid_power'), hasHome = !!ctx.id('estimated_home_load');
   if (!hasGrid) return null;
@@ -2022,6 +2106,7 @@ function historyView(ctx) {
     h('div.span-12', null, forecastCard(ctx)),
     h('div.span-8', null, statsCard(ctx)),
     h('div.span-4', null, fullChargeCard(ctx)),
+    h('div.span-12', null, compareCard(ctx)),
     (() => { const eh = emptyHintsCard(ctx); return eh ? h('div.span-12', null, eh) : null; })());
 }
 
@@ -2454,7 +2539,7 @@ const CSS = `
 :host {
   --bg: #0b0d11; --surface: #151820; --surface-2: #1b1f29; --surface-3: #232835;
   --border: rgba(255,255,255,.06); --border-strong: rgba(255,255,255,.12);
-  --text: #eceef2; --muted: #8d93a0; --faint: #5c6270;
+  --text: #eceef2; --muted: #8d93a0; --faint: #7b8292;
   --amber: #f5b84a; --energy: #3fd0a4; --cool: #5aa7ff; --heat: #ff8a4c; --media: #a78bfa;
   --danger: #ff6b6b; --warn: #f5b84a; --ok: #3fd0a4; --accent: #7aa2ff;
   --radius: 18px; --radius-sm: 12px; --gap: 12px;
@@ -2467,7 +2552,7 @@ const CSS = `
 :host([light]) {
   --bg: #eef0f4; --surface: #fff; --surface-2: #f5f6f9; --surface-3: #eceef3;
   --border: rgba(15,20,30,.07); --border-strong: rgba(15,20,30,.14);
-  --text: #14171d; --muted: #646b78; --faint: #9aa0ab;
+  --text: #14171d; --muted: #646b78; --faint: #737a88;
   --amber: #e9a020; --energy: #12a77c; --cool: #2f7fe0; --heat: #ec6a2a; --media: #7c5ce6;
   --danger: #e0393e; --warn: #d8901a; --ok: #12a77c; --accent: #3d6fe8;
   --shadow: 0 1px 2px rgba(15,20,30,.05), 0 6px 20px rgba(15,20,30,.05);
@@ -2488,6 +2573,8 @@ h1, h2, h3, p { margin: 0; }
 .logo ha-icon { --mdc-icon-size: 24px; }
 .brand h1 { font-size: 20px; font-weight: 700; letter-spacing: -.01em; }
 .brand small { color: var(--muted); font-size: 12.5px; }
+.brand > div { min-width: 0; } .brand h1, .brand small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@container (max-width: 360px) { .top { gap: 8px; } .brand { gap: 8px; } .logo { width: 36px; height: 36px; } .brand h1 { font-size: 16px; } .live { padding: 6px 10px; } }
 .live { display: inline-flex; align-items: center; gap: 7px; padding: 6px 12px; border-radius: 99px; font-size: 12.5px; font-weight: 600; background: var(--surface); border: 1px solid var(--border); white-space: nowrap; }
 .live::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--c, var(--ok)); animation: pulse 2s infinite; }
 .live[data-tone="muted"] { --c: var(--faint); } .live[data-tone="danger"] { --c: var(--danger); } .live[data-tone="warn"] { --c: var(--warn); }
@@ -2596,7 +2683,7 @@ h1, h2, h3, p { margin: 0; }
 .fl-sub:empty { display: none; }
 .fl-node.solar { left: 50%; top: 0; transform: translateX(-50%); }
 .fl-node.battery { left: 0; top: 50%; transform: translateY(-50%); }
-.fl-node.grid { right: 0; top: 50%; transform: translateY(-50%); }
+.fl-node.grid { right: 0; top: 50%; transform: translateY(-50%); gap: 0; } /* nicht den 12-Spalten-Abstand der Layout-Klasse .grid erben */
 .fl-node.home { left: 50%; bottom: 0; transform: translateX(-50%); }
 .flow[data-sun="1"] .fl-node.solar .fl-ic { box-shadow: 0 0 24px color-mix(in srgb, var(--amber) 50%, transparent); }
 
@@ -2610,6 +2697,8 @@ h1, h2, h3, p { margin: 0; }
 .hl-ic { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; background: var(--surface-2); color: var(--muted); flex: none; }
 .hl-t { display: flex; flex-direction: column; min-width: 0; }
 .hl-t b { font-size: 13px; } .hl-t small { color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hl-t b { overflow-wrap: anywhere; hyphens: auto; }
+@container (max-width: 420px) { .hl { padding: 10px 8px; gap: 8px; } .hl .dot { left: 30px; } .hl-t b { font-size: 12.5px; } }
 .hl.bad small { color: var(--danger); }
 
 /* Vorrang-Treppe */
@@ -2665,7 +2754,7 @@ h1, h2, h3, p { margin: 0; }
 .rows > .row:first-child { border-top: 0; }
 .row-ic { color: var(--muted); display: grid; }
 .row-t { flex: 1; min-width: 0; display: flex; flex-direction: column; } .row-t b { font-weight: 600; font-size: 14px; display: inline-flex; align-items: center; gap: 4px; } .row-t small { color: var(--muted); font-size: 12.5px; }
-.help { color: var(--faint); display: inline-grid; place-items: center; border-radius: 50%; } .help:hover { color: var(--accent); } .help ha-icon { --mdc-icon-size: 16px; }
+.help { color: var(--faint); display: inline-grid; place-items: center; border-radius: 50%; } .help:hover { color: var(--accent); } .help ha-icon { --mdc-icon-size: 16px; } .help { position: relative; } .help::after { content: ""; position: absolute; inset: -14px; }
 .row.range { flex-wrap: wrap; row-gap: 8px; }
 .row.range input { flex: 1 0 100%; }
 .row.disabled { opacity: .45; pointer-events: none; }
@@ -2680,6 +2769,8 @@ input[type=range]::-moz-range-thumb { width: 18px; height: 18px; border-radius: 
 .stepper button { width: 32px; height: 30px; border-radius: 8px; display: grid; place-items: center; color: var(--muted); }
 .stepper button:hover { background: var(--surface-3); color: var(--text); }
 .stepper .sv { min-width: 70px; text-align: center; font-size: 14px; }
+@container (max-width: 520px) { .stepper button { width: 44px; height: 44px; } .btn { min-height: 44px; justify-content: center; } }
+@media (pointer: coarse) { .seg button { min-height: 44px; } .stepper button { width: 44px; height: 44px; } .btn { min-height: 44px; justify-content: center; } .tab { min-height: 44px; } }
 .time { background: var(--surface-2); border: 1px solid var(--border); color: var(--text); border-radius: 10px; padding: 7px 10px; font: inherit; color-scheme: dark; }
 :host([light]) .time { color-scheme: light; }
 .switch { width: 50px; height: 30px; border-radius: 30px; background: var(--surface-3); position: relative; flex: none; transition: background .25s; border: 1px solid var(--border-strong); }
@@ -2739,6 +2830,8 @@ input[type=range]::-moz-range-thumb { width: 18px; height: 18px; border-radius: 
 .card .seg { background: var(--surface-2); }
 .seg button { padding: 6px 14px; border-radius: 8px; color: var(--muted); font-weight: 600; font-size: 13px; }
 .seg button.sel { background: var(--surface-3); color: var(--text); }
+.seg { max-width: 100%; flex-wrap: wrap; }
+@container (max-width: 520px) { .seg button { min-height: 44px; padding: 6px 12px; } }
 .load { color: var(--muted); margin-left: 10px; }
 .chart { position: relative; width: 100%; touch-action: pan-y; }
 .chart svg { display: block; overflow: visible; }
@@ -2772,6 +2865,10 @@ input[type=range]::-moz-range-thumb { width: 18px; height: 18px; border-radius: 
 span.eb-s { cursor: default; } .eb-s { border: 0; padding: 0; min-width: 3px; cursor: pointer; } .eb-s:hover { filter: brightness(1.15); }
 .eb .totals { margin-top: 8px; } .eb .rings { margin-top: 0; }
 .totals { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 6px 16px; margin-top: 12px; }
+.cmp-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 12px 0; }
+.cmp-k { background: var(--surface-2); border-radius: 12px; padding: 10px 12px; display: grid; gap: 2px; }
+.cmp-k small, .cmp-k span { color: var(--muted); font-size: 12.5px; } .cmp-k b { font-size: 18px; font-variant-numeric: tabular-nums; }
+.cmp-k.good span { color: var(--ok); } .cmp-k.bad span { color: var(--danger); }
 .tot { display: flex; align-items: center; font-size: 12.5px; color: var(--muted); } .tot span { flex: 1; } .tot b { color: var(--text); font-variant-numeric: tabular-nums; }
 .events { display: flex; flex-direction: column; }
 .ev { display: grid; grid-template-columns: 44px 28px 1fr; align-items: center; gap: 8px; padding: 6px 0; font-size: 13px; position: relative; }
@@ -2792,6 +2889,7 @@ span.eb-s { cursor: default; } .eb-s { border: 0; padding: 0; min-width: 3px; cu
 .pvr { display: grid; grid-template-columns: 14px 1fr 70px 64px 90px; gap: 8px; align-items: center; padding: 7px 4px; border-top: 1px solid var(--border); font-size: 13px; text-align: left; width: 100%; }
 .pvr.head { border-top: 0; color: var(--faint); font-size: 11.5px; } .pvr b { font-weight: 600; font-variant-numeric: tabular-nums; text-align: right; } .pvr.head span:nth-child(n+3) { text-align: right; }
 .pvr i { width: 8px; height: 8px; border-radius: 50%; } .pvr b[data-bad="1"] { color: var(--danger); }
+@container (max-width: 420px) { .pvr { grid-template-columns: 8px minmax(0, 1fr) 46px 40px 54px; gap: 6px; font-size: 12.5px; } button.pvr { min-height: 44px; } .pvr > span { min-width: 0; white-space: nowrap; } .pvr.head { font-size: 10.5px; line-height: 1.15; } .pvr.head span:last-child { white-space: normal; } }
 .banner.warn { background: color-mix(in srgb, var(--warn) 14%, var(--surface-2)); }
 
 /* Technik */
