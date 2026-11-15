@@ -1853,6 +1853,8 @@ function pvInputsCard(ctx) {
         const mean = ok.length > 1 ? ok.reduce((a, b) => a + b, 0) / ok.length : null;
         vals.forEach((v, j) => {
           if (v != null) data['p' + j].push([at(k), v]);
+          // zu wenig Leistung (Nacht/Dämmerung): keine sinnvolle Abweichung → 0 % statt Lücke, nicht in den Ø einrechnen
+          if (v != null && mean != null && mean < 100) data['d' + j].push([at(k), 0]);
           if (v != null && mean != null && mean >= 100) { const d = ((v - mean) / mean) * 100; data['d' + j].push([at(k), d]); sum[j] += d; cnt[j]++; }
         });
       }
