@@ -1,6 +1,6 @@
 # Änderungsprotokoll
 
-## Unveröffentlicht
+## 1.16.0 – 2026-11-15
 
 - Verlauf: neue Karte „Vergleich mit dem Vorjahr“ (Netzbezug, Einspeisung,
   PV-Erzeugung je Monat gegen das Vorjahr, mit Kennzahlen); nutzt die Zähler
@@ -8,6 +8,8 @@
 - Layout: bessere Darstellung auf schmalen Displays (Tabellen, Umschalter,
   Kopfzeile, Zeitachse), größere Tippflächen auf Touch-Geräten, besserer
   Kontrast bei schwachen Texten.
+- Fix: PV-Eingänge – „Abweichung vom Mittelwert“ zeigt bei zu wenig Leistung
+  (Nacht, Dämmerung) 0 % statt flacher Linien mit dem letzten Tageswert.
 
 ## 1.15.0 – 2026-11-13
 

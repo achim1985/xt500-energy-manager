@@ -7,7 +7,7 @@
 // Status-Entität. Es gibt keine fest eingetragenen Entitäts-IDs.
 
 const DOMAIN = 'xt500_energy_manager';
-const VERSION = '1.15.0';
+const VERSION = '1.16.0';
 const BLUEPRINT_PATH = 'xt500_energy_manager/dynamic_tariff_charging.yaml';
 
 // ---------- Sprache ----------
