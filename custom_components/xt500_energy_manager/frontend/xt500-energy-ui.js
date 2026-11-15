@@ -1371,16 +1371,17 @@ async function loadHistory(ctx, hours, keys, coarse = hours >= 12) {
 
 // Gleichmäßige Stützstellen (letzter Wert gilt bis zur nächsten Änderung)
 // Vor dem ersten und deutlich nach dem letzten Punkt bleibt die Linie leer
-function resample(points, start, end, n) {
-  const out = []; let j = 0, last = points.length ? points[0][1] : null;
+// maxGap (ms): ältere Werte werden nicht über längere Lücken fortgeschrieben (sonst entstehen Geraden über Nacht)
+function resample(points, start, end, n, maxGap) {
+  const out = []; let j = 0, last = points.length ? points[0][1] : null, lastTs = points.length ? points[0][0] : null;
   const firstT = points[0]?.[0], lastT = points[points.length - 1]?.[0];
   for (let i = 0; i < n; i++) {
     const tA = start + ((end - start) * i) / (n - 1);
     const tB = start + ((end - start) * (i + 1)) / (n - 1);
     let sum = 0, cnt = 0;
-    while (j < points.length && points[j][0] <= tB) { if (points[j][0] >= tA) { sum += points[j][1]; cnt++; } last = points[j][1]; j++; }
+    while (j < points.length && points[j][0] <= tB) { if (points[j][0] >= tA) { sum += points[j][1]; cnt++; } last = points[j][1]; lastTs = points[j][0]; j++; }
     const outside = firstT == null || tB < firstT || tA > lastT + (tB - tA) * 2;
-    out.push(cnt ? sum / cnt : outside ? null : last);
+    out.push(cnt ? sum / cnt : outside || (maxGap != null && tA - lastTs > maxGap) ? null : last);
   }
   return out;
 }
@@ -1394,7 +1395,7 @@ function lineChart(ctx, { series, height = 190, yFmt, area, bands = [], now = fa
     const W = wrap.clientWidth; if (!W || !data) return; lastW = W;
     const H = height, padL = 42, padR = 10, padT = 10, padB = 22;
     const n = Math.max(60, Math.min(300, Math.round(W / 3)));
-    const rs = series.map((s) => ({ ...s, v: resample(data[s.key] || [], data.start, data.end, n) }));
+    const rs = series.map((s) => ({ ...s, v: resample(data[s.key] || [], data.start, data.end, n, s.maxGap) }));
     let lo = Infinity, hi = -Infinity;
     for (const s of rs) for (const v of s.v) if (v != null) { lo = Math.min(lo, v); hi = Math.max(hi, v); }
     let step;
@@ -1886,7 +1887,7 @@ function pvInputsCard(ctx) {
     inputs = await findPvInputs(ctx);
     if (inputs.length < 2) return;
     pwChart = lineChart(ctx, { height: 190, yFmt: kfmt, series: inputs.map((i, j) => ({ key: 'p' + j, label: i.label, color: i.color, unit: 'W' })) });
-    devChart = lineChart(ctx, { height: 150, yFmt: (v) => fmt(v) + '%', series: inputs.map((i, j) => ({ key: 'd' + j, label: i.label, color: i.color, unit: '±%' })) });
+    devChart = lineChart(ctx, { height: 150, yFmt: (v) => fmt(v) + '%', series: inputs.map((i, j) => ({ key: 'd' + j, label: i.label, color: i.color, unit: '±%', maxGap: 45 * 60e3 })) });
     rows = h('div.pvrows', null, h('div.pvr.head', null, h('span'), h('span', null, t('Eingang')), h('span', null, t('Ist')), h('span', null, '±'), h('span', null, t('Ø im Zeitraum'))),
       inputs.map((i, j) => h('button.pvr', { 'data-j': j, onclick: () => ctx.moreInfo(i.id) }, h('i', { style: { background: i.color } }), h('span', null, i.label), h('b.now', null, '—'), h('b.dev', null, '—'), h('b.avg', null, '—'))));
     verdict = h('div.banner.info');
