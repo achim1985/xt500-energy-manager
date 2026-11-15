@@ -1395,7 +1395,7 @@ function lineChart(ctx, { series, height = 190, yFmt, area, bands = [], now = fa
     const W = wrap.clientWidth; if (!W || !data) return; lastW = W;
     const H = height, padL = 42, padR = 10, padT = 10, padB = 22;
     const n = Math.max(60, Math.min(300, Math.round(W / 3)));
-    const rs = series.map((s) => ({ ...s, v: resample(data[s.key] || [], data.start, data.end, n, s.maxGap) }));
+    const rs = series.map((s) => ({ ...s, v: resample(data[s.key] || [], data.start, data.end, n, s.maxGapFrac ? s.maxGapFrac * (data.end - data.start) : s.maxGap) }));
     let lo = Infinity, hi = -Infinity;
     for (const s of rs) for (const v of s.v) if (v != null) { lo = Math.min(lo, v); hi = Math.max(hi, v); }
     let step;
@@ -1887,7 +1887,7 @@ function pvInputsCard(ctx) {
     inputs = await findPvInputs(ctx);
     if (inputs.length < 2) return;
     pwChart = lineChart(ctx, { height: 190, yFmt: kfmt, series: inputs.map((i, j) => ({ key: 'p' + j, label: i.label, color: i.color, unit: 'W' })) });
-    devChart = lineChart(ctx, { height: 150, yFmt: (v) => fmt(v) + '%', series: inputs.map((i, j) => ({ key: 'd' + j, label: i.label, color: i.color, unit: '±%', maxGap: 45 * 60e3 })) });
+    devChart = lineChart(ctx, { height: 150, yFmt: (v) => fmt(v) + '%', series: inputs.map((i, j) => ({ key: 'd' + j, label: i.label, color: i.color, unit: '±%', maxGapFrac: 0.011 })) });
     rows = h('div.pvrows', null, h('div.pvr.head', null, h('span'), h('span', null, t('Eingang')), h('span', null, t('Ist')), h('span', null, '±'), h('span', null, t('Ø im Zeitraum'))),
       inputs.map((i, j) => h('button.pvr', { 'data-j': j, onclick: () => ctx.moreInfo(i.id) }, h('i', { style: { background: i.color } }), h('span', null, i.label), h('b.now', null, '—'), h('b.dev', null, '—'), h('b.avg', null, '—'))));
     verdict = h('div.banner.info');
